@@ -21,14 +21,14 @@ interface PipedVideo {
   duration: number;
 }
 
-async function searchPiped(query: string): Promise<any[]> {
-  for (const instance of PIPED_INSTANCES) {
+// Race all instances in parallel - return first successful result
+async function searchPipedParallel(query: string): Promise<any[]> {
+  const promises = PIPED_INSTANCES.map(async (instance) => {
     try {
       const url = `${instance}/search?q=${encodeURIComponent(query)}&filter=videos`;
-      console.log('[API] Trying Piped:', url);
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout
       
       const response = await fetch(url, {
         signal: controller.signal,
@@ -37,10 +37,7 @@ async function searchPiped(query: string): Promise<any[]> {
       
       clearTimeout(timeoutId);
       
-      if (!response.ok) {
-        console.log('[API] Piped instance failed:', instance, response.status);
-        continue;
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       
       const data = await response.json();
       
@@ -56,25 +53,37 @@ async function searchPiped(query: string): Promise<any[]> {
           };
         });
       }
-    } catch (error: any) {
-      console.log('[API] Piped error:', instance, error.message);
+      throw new Error('No results');
+    } catch {
+      throw new Error(`${instance} failed`);
     }
+  });
+
+  // Return first successful result
+  try {
+    return await Promise.any(promises);
+  } catch {
+    return [];
   }
-  return [];
 }
 
 // Fallback: scrape YouTube directly (basic)
 async function searchYouTubeDirect(query: string): Promise<any[]> {
   try {
     const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
-    console.log('[API] Trying YouTube direct scrape');
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
     
     const response = await fetch(url, {
+      signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept-Language': 'en-US,en;q=0.9',
       },
     });
+    
+    clearTimeout(timeoutId);
     
     if (!response.ok) return [];
     
@@ -114,8 +123,7 @@ async function searchYouTubeDirect(query: string): Promise<any[]> {
     }
     
     return videos.slice(0, 20);
-  } catch (error) {
-    console.error('[API] YouTube scrape failed:', error);
+  } catch {
     return [];
   }
 }
@@ -131,14 +139,11 @@ export async function GET(request: NextRequest) {
   // Add "karaoke" if not present
   const karaokeQuery = query.toLowerCase().includes('karaoke') ? query : `${query} karaoke`;
   
-  console.log('[API] Searching:', karaokeQuery);
+  // Try Piped instances in parallel (race)
+  let songs = await searchPipedParallel(karaokeQuery);
   
-  // Try Piped first
-  let songs = await searchPiped(karaokeQuery);
-  
-  // Fallback to direct scrape
+  // Fallback to direct scrape only if Piped failed
   if (songs.length === 0) {
-    console.log('[API] Piped failed, trying direct scrape');
     songs = await searchYouTubeDirect(karaokeQuery);
   }
   
@@ -152,7 +157,13 @@ export async function GET(request: NextRequest) {
     return 0;
   });
   
-  console.log('[API] Found', songs.length, 'songs');
-  
-  return NextResponse.json({ songs });
+  // Set cache headers for faster subsequent requests
+  return NextResponse.json(
+    { songs },
+    {
+      headers: {
+        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+      },
+    }
+  );
 }

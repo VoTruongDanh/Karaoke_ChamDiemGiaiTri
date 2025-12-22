@@ -22,9 +22,9 @@ interface CacheConfig {
 }
 
 const DEFAULT_CONFIG: Required<CacheConfig> = {
-  maxSearchEntries: 50,
-  cacheTTL: 5 * 60 * 1000, // 5 minutes
-  maxRecentSearches: 10,
+  maxSearchEntries: 100,
+  cacheTTL: 15 * 60 * 1000, // 15 minutes (increased from 5)
+  maxRecentSearches: 20,
 };
 
 /**
