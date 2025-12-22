@@ -154,7 +154,32 @@ function TVStatCard({ label, value, icon, delay }: { label: string; value: numbe
 }
 
 /**
- * TV Song Result Screen - Premium design with thumbnail (light/dark mode)
+ * Confetti particle component
+ */
+function Confetti({ isHighScore }: { isHighScore: boolean }) {
+  if (!isHighScore) return null;
+  
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {[...Array(30)].map((_, i) => (
+        <div
+          key={i}
+          className="absolute w-2 h-2 rounded-full animate-confetti"
+          style={{
+            left: `${Math.random() * 100}%`,
+            top: '-10px',
+            backgroundColor: ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff6bd6'][i % 5],
+            animationDelay: `${Math.random() * 2}s`,
+            animationDuration: `${2 + Math.random() * 2}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * TV Song Result Screen - Compact design for TV with effects
  */
 function TVSongResultScreen({ 
   song, 
@@ -167,99 +192,104 @@ function TVSongResultScreen({
   onNext: () => void;
   hasNextSong: boolean;
 }) {
-  const [countdown, setCountdown] = useState(20);
-  const [showContent, setShowContent] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setShowContent(true), 100);
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    if (countdown <= 0) {
-      onNext();
-      return;
-    }
-    const timer = setTimeout(() => setCountdown(prev => prev - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [countdown, onNext]);
-
   const gradeInfo = finalScore ? getScoreGrade(finalScore.totalScore) : null;
+  const isHighScore = finalScore ? finalScore.totalScore >= 80 : false;
+
+  // Play celebration sound for high scores
+  useEffect(() => {
+    if (isHighScore) {
+      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQYAQKPd7qJhAQBIqeXxmVQAAE2u6fKRRwAATrDq8o1CAABP');
+      audio.volume = 0.3;
+      audio.play().catch(() => {});
+    }
+  }, [isHighScore]);
+
+  // Handle Enter key to go next
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onNext();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onNext]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center p-tv-8 relative overflow-hidden">
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-400/20 dark:bg-purple-500/10 rounded-full blur-[100px] animate-pulse" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-pink-400/20 dark:bg-pink-500/10 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
-      </div>
+    <div className="h-screen bg-tv-bg flex items-center justify-center p-4 relative">
+      {/* Confetti effect for high scores */}
+      <Confetti isHighScore={isHighScore} />
+      
+      {/* Glow background for high scores */}
+      {isHighScore && (
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-yellow-500/20 rounded-full blur-[100px] animate-pulse" />
+        </div>
+      )}
 
-      {/* Main content - horizontal layout */}
-      <div className="relative z-10 flex items-center gap-tv-8 max-w-6xl w-full">
-        {/* Left side - Thumbnail with gradient border */}
-        <div className={`flex-shrink-0 transition-all duration-1000 ${showContent ? 'opacity-100 scale-100' : 'opacity-0 scale-90'}`}>
-          <div className={`relative p-1 rounded-3xl bg-gradient-to-br ${gradeInfo?.gradient || 'from-purple-500 to-pink-500'} ${gradeInfo?.glow || ''}`}>
+      <div className="flex items-center gap-8 max-w-3xl w-full relative z-10">
+        {/* Left - Thumbnail */}
+        <div className="flex-shrink-0">
+          <div className={`relative p-1 rounded-2xl bg-gradient-to-br ${gradeInfo?.gradient || 'from-purple-500 to-pink-500'} ${isHighScore ? 'animate-pulse' : ''}`}>
             <img 
               src={song.song.thumbnail} 
               alt="" 
-              className="w-72 h-72 rounded-2xl object-cover"
+              className="w-40 h-40 rounded-xl object-cover"
             />
-            {/* Grade badge overlay */}
             {gradeInfo && (
-              <div className={`absolute -bottom-4 -right-4 w-20 h-20 rounded-full bg-gradient-to-br ${gradeInfo.gradient} flex items-center justify-center shadow-2xl border-4 border-white dark:border-slate-900`}>
-                <span className="text-4xl font-black text-white">{gradeInfo.grade}</span>
+              <div className={`absolute -bottom-3 -right-3 w-12 h-12 rounded-full bg-gradient-to-br ${gradeInfo.gradient} flex items-center justify-center shadow-lg border-2 border-white dark:border-slate-900 ${isHighScore ? 'animate-bounce' : ''}`}>
+                <span className="text-xl font-black text-white">{gradeInfo.grade}</span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Right side - Score info */}
+        {/* Right - Score info */}
         <div className="flex-1 min-w-0">
           {/* Song title */}
-          <div className={`mb-tv-4 transition-all duration-1000 delay-200 ${showContent ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-8'}`}>
-            <p className="text-tv-sm text-slate-500 dark:text-slate-400 mb-1">🎵 Hoàn thành</p>
-            <h2 className="text-tv-2xl font-bold text-slate-800 dark:text-white truncate">{song.song.title}</h2>
-          </div>
+          <p className="text-sm text-gray-500 mb-1">🎵 Hoàn thành</p>
+          <h2 className="text-lg font-bold truncate mb-3">{song.song.title}</h2>
 
           {finalScore && gradeInfo ? (
             <>
-              {/* Title */}
-              <h1 className={`text-tv-4xl font-black mb-tv-6 bg-gradient-to-r ${gradeInfo.textGradient} bg-clip-text text-transparent transition-all duration-1000 delay-400 ${showContent ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-8'}`}>
+              <h1 className={`text-xl font-bold mb-3 bg-gradient-to-r ${gradeInfo.textGradient} bg-clip-text text-transparent ${isHighScore ? 'animate-pulse' : ''}`}>
                 {gradeInfo.title} {gradeInfo.emoji}
               </h1>
 
-              {/* Score display */}
-              <div className={`flex items-end gap-tv-4 mb-tv-6 transition-all duration-1000 delay-600 ${showContent ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-8'}`}>
-                <span className={`text-[140px] font-black leading-none bg-gradient-to-br ${gradeInfo.textGradient} bg-clip-text text-transparent`}>
-                  <TVAnimatedScore target={finalScore.totalScore} />
+              <div className="flex items-baseline gap-3 mb-4">
+                <span className={`text-5xl font-black bg-gradient-to-br ${gradeInfo.textGradient} bg-clip-text text-transparent`}>
+                  {finalScore.totalScore}
                 </span>
-                <span className="text-tv-2xl text-slate-500 dark:text-slate-400 mb-6">điểm</span>
+                <span className="text-base text-gray-500">điểm</span>
               </div>
 
-              {/* Stats */}
-              <div className={`flex gap-tv-4 transition-all duration-1000 delay-800 ${showContent ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-8'}`}>
-                <TVStatCard label="Cao độ" value={finalScore.pitchAccuracy} icon="🎵" delay={0} />
-                <TVStatCard label="Nhịp điệu" value={finalScore.timing} icon="🥁" delay={0} />
+              <div className="flex gap-4 text-sm mb-4">
+                <div className="bg-white/10 rounded-lg px-3 py-1.5">
+                  <span className="text-gray-400">🎵 Cao độ:</span>
+                  <span className="ml-1 font-semibold">{finalScore.pitchAccuracy}</span>
+                </div>
+                <div className="bg-white/10 rounded-lg px-3 py-1.5">
+                  <span className="text-gray-400">🥁 Nhịp:</span>
+                  <span className="ml-1 font-semibold">{finalScore.timing}</span>
+                </div>
               </div>
             </>
           ) : (
-            <div className={`transition-all duration-1000 delay-400 ${showContent ? 'opacity-100' : 'opacity-0'}`}>
-              <h1 className="text-tv-4xl font-bold text-slate-800 dark:text-white mb-tv-2">Hoàn thành! 🎵</h1>
-              <p className="text-tv-lg text-slate-500 dark:text-slate-400">Bài hát đã kết thúc</p>
+            <div className="mb-4">
+              <h1 className="text-xl font-bold mb-2">Hoàn thành! 🎵</h1>
+              <p className="text-base text-gray-500">Bài hát đã kết thúc</p>
             </div>
           )}
 
-          {/* Auto next indicator */}
-          <div className={`mt-tv-6 transition-all duration-1000 delay-1000 ${showContent ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-8'}`}>
-            <div className="inline-flex items-center gap-tv-3 bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-full px-tv-5 py-tv-2 border border-slate-200/50 dark:border-slate-700/50 shadow-lg">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">{countdown}</span>
-              </div>
-              <span className="text-tv-sm text-slate-600 dark:text-slate-300">
-                {hasNextSong ? 'Bài tiếp theo' : 'Về trang chủ'}
-              </span>
-            </div>
-          </div>
+          {/* Manual next button */}
+          <button
+            onClick={onNext}
+            autoFocus
+            className="px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-base font-medium transition-all focus:outline-none focus:ring-2 focus:ring-primary-400 focus:scale-105"
+          >
+            {hasNextSong ? 'Bài tiếp theo →' : 'Về trang chủ →'}
+          </button>
         </div>
       </div>
     </div>
@@ -281,6 +311,9 @@ function TVAppContent() {
   const sessionStartTime = useRef<Date>(new Date());
   // Store result data locally so it persists
   const [resultData, setResultData] = useState<{ song: QueueItem; finalScore: ScoreData | null } | null>(null);
+  // Back button protection - require double press
+  const [showBackConfirm, setShowBackConfirm] = useState(false);
+  const backPressTimeRef = useRef<number>(0);
   
   const { addToast } = useToast();
   
@@ -315,6 +348,85 @@ function TVAppContent() {
   // Keep mobileScore in ref to avoid stale closure
   const mobileScoreRef = useRef(mobileScore);
   mobileScoreRef.current = mobileScore;
+
+  // Back button protection - prevent accidental browser navigation
+  useEffect(() => {
+    // Push a dummy state to prevent immediate back navigation
+    window.history.pushState({ karaoke: true }, '', window.location.href);
+    
+    const handlePopState = (e: PopStateEvent) => {
+      const now = Date.now();
+      const timeSinceLastPress = now - backPressTimeRef.current;
+      
+      // Always push state back to prevent navigation
+      window.history.pushState({ karaoke: true }, '', window.location.href);
+      
+      if (currentScreen === 'home') {
+        if (timeSinceLastPress < 2000 && backPressTimeRef.current > 0) {
+          // Second press within 2s - actually allow exit
+          setShowBackConfirm(false);
+          window.history.go(-2); // Go back past our dummy state
+          return;
+        } else {
+          // First press - show warning
+          backPressTimeRef.current = now;
+          setShowBackConfirm(true);
+          addToast({ type: 'warning', message: 'Nhấn Back lần nữa để thoát', duration: 2000 });
+          setTimeout(() => setShowBackConfirm(false), 2000);
+        }
+      } else if (currentScreen !== 'playing' && currentScreen !== 'result') {
+        // Navigate to home instead of browser back
+        setCurrentScreen('home');
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Backspace, Escape, GoBack, BrowserBack (common back keys on TV remotes)
+      if (e.key === 'Backspace' || e.key === 'Escape' || e.key === 'GoBack' || e.key === 'BrowserBack' || e.keyCode === 461 || e.keyCode === 10009) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const now = Date.now();
+        const timeSinceLastPress = now - backPressTimeRef.current;
+        
+        if (currentScreen === 'home') {
+          if (timeSinceLastPress < 2000 && backPressTimeRef.current > 0) {
+            // Second press - allow exit
+            setShowBackConfirm(false);
+            window.history.go(-2);
+            return;
+          } else {
+            // First press - show warning
+            backPressTimeRef.current = now;
+            setShowBackConfirm(true);
+            addToast({ type: 'warning', message: 'Nhấn Back lần nữa để thoát', duration: 2000 });
+            setTimeout(() => setShowBackConfirm(false), 2000);
+          }
+        } else if (currentScreen !== 'playing' && currentScreen !== 'result') {
+          setCurrentScreen('home');
+        }
+      }
+    };
+
+    // Prevent accidental page close
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (currentScreen === 'playing' || queueItems.length > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [currentScreen, addToast, queueItems.length]);
 
   // Create session when connected
   useEffect(() => {
@@ -484,6 +596,8 @@ function TVAppContent() {
             onNowPlayingSelect={currentSong ? () => navigateTo('playing') : undefined}
             onSummarySelect={completedSongs.length > 0 ? handleShowSummary : undefined}
             onPlayNow={handleStartPlaying}
+            onGetSuggestions={songLibrary ? (videoIds, addedSongs) => songLibrary.getSuggestions(videoIds, 4, addedSongs) : undefined}
+            onAddToQueue={handleSongSelect}
           />
         );
 
@@ -520,7 +634,6 @@ function TVAppContent() {
             onSkip={handleSkip}
             scoringEnabled={!!mobileScore}
             scoreData={mobileScore}
-            realTimeFeedback={mobileFeedback}
             onError={handleYouTubeError}
             autoSkipDelay={5000}
           />

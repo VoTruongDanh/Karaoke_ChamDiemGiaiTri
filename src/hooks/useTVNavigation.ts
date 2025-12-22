@@ -258,19 +258,30 @@ export function useTVNavigation(config: TVNavigationConfig = {}): TVNavigationRe
       const action = KEY_MAP[event.key] || KEY_MAP[String(event.keyCode)];
       if (!action) return; // Ignore unsupported keys
 
-      event.preventDefault();
-      event.stopPropagation();
-
       if (action === 'select') {
-        selectCurrent();
+        // Check if current focus is on a registered element
+        const element = getFocusedElement();
+        if (element) {
+          event.preventDefault();
+          event.stopPropagation();
+          selectCurrent();
+        }
+        // Otherwise let browser handle it (for native buttons)
       } else {
-        moveFocus(action);
+        // Try to move focus within grid
+        const nextPos = findNextPosition(action, currentFocus.row, currentFocus.col);
+        if (nextPos) {
+          event.preventDefault();
+          event.stopPropagation();
+          moveFocus(action);
+        }
+        // If no next position, let browser handle native focus
       }
     };
 
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [enabled, moveFocus, selectCurrent]);
+  }, [enabled, moveFocus, selectCurrent, currentFocus, findNextPosition, getFocusedElement]);
 
   /**
    * Notify on focus change

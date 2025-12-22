@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import QRCode from 'qrcode';
 import { NavigationGrid } from '@/components/NavigationGrid';
 import { FocusableButton } from '@/components/FocusableButton';
@@ -8,6 +8,7 @@ import { LazyImage } from '@/components/LazyImage';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useQueueStore } from '@/stores/queueStore';
 import type { QueueItem } from '@/types/queue';
+import type { Song } from '@/types/song';
 
 export interface HomeScreenProps {
   sessionCode: string;
@@ -17,6 +18,8 @@ export interface HomeScreenProps {
   onNowPlayingSelect?: () => void;
   onSummarySelect?: () => void;
   onPlayNow?: () => void;
+  onGetSuggestions?: (videoIds: string[], addedSongs?: Song[]) => Promise<Song[]>;
+  onAddToQueue?: (song: Song) => void;
 }
 
 function SearchIcon() {
@@ -148,10 +151,55 @@ export function HomeScreen({
   onQueueSelect,
   onNowPlayingSelect,
   onPlayNow,
+  onGetSuggestions,
+  onAddToQueue,
 }: HomeScreenProps) {
   const currentSong = useQueueStore((state) => state.getCurrent());
   const queueItems = useQueueStore((state) => state.items);
   const waitingCount = queueItems.filter(item => item.status === 'waiting').length;
+  
+  // Suggestions state
+  const [suggestions, setSuggestions] = useState<Song[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+
+  // Load suggestions based on queue
+  useEffect(() => {
+    if (!onGetSuggestions) return;
+    
+    const queueSongs = queueItems.map(item => item.song);
+    if (currentSong) queueSongs.unshift(currentSong.song);
+    
+    if (queueSongs.length === 0) {
+      setSuggestions([]);
+      return;
+    }
+    
+    setIsLoadingSuggestions(true);
+    const videoIds = queueSongs.slice(0, 3).map(s => s.youtubeId);
+    const existingIds = new Set(queueSongs.map(s => s.youtubeId));
+    
+    onGetSuggestions(videoIds, queueSongs.slice(0, 3))
+      .then(results => {
+        const filtered = results.filter(s => !existingIds.has(s.youtubeId));
+        setSuggestions(filtered.slice(0, 4));
+      })
+      .catch(() => setSuggestions([]))
+      .finally(() => setIsLoadingSuggestions(false));
+  }, [queueItems, currentSong, onGetSuggestions]);
+
+  const handleAddSuggestion = useCallback((song: Song) => {
+    if (!onAddToQueue) return;
+    onAddToQueue(song);
+    setAddedIds(prev => new Set(prev).add(song.youtubeId));
+    setTimeout(() => {
+      setAddedIds(prev => {
+        const next = new Set(prev);
+        next.delete(song.youtubeId);
+        return next;
+      });
+    }, 2000);
+  }, [onAddToQueue]);
 
   return (
     <NavigationGrid className="min-h-screen bg-tv-bg p-6 lg:p-8">
@@ -177,35 +225,39 @@ export function HomeScreen({
           </div>
 
           {/* Right - Main content */}
-          <div className="flex-1 flex flex-col gap-4 min-w-0">
+          <div className="flex-1 flex flex-col gap-4 min-w-0 overflow-visible">
             {/* Now Playing - Top - 2 rows layout like search results */}
             {currentSong ? (
               <FocusableButton
                 row={0}
-                col={2}
+                col={0}
                 onSelect={onNowPlayingSelect || (() => {})}
                 variant="ghost"
-                className="!p-0 !min-h-0 !min-w-0 w-full text-left !overflow-hidden"
+                className="!p-0 !min-h-0 !min-w-0 w-full text-left !rounded-2xl !overflow-hidden"
               >
-                <div className="bg-white/5 backdrop-blur rounded-2xl p-4 w-full overflow-hidden">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
-                    <p className="text-base text-green-500 font-medium">Đang phát</p>
-                  </div>
-                  {/* 2 rows: image on top, text below */}
-                  <div className="flex flex-col">
+                {/* Video with overlay - 16:9 */}
+                <div className="relative w-full max-w-md p-2">
+                  <div className="relative w-full aspect-video rounded-xl overflow-hidden">
                     <LazyImage 
                       src={currentSong.song.thumbnail} 
                       alt={currentSong.song.title}
-                      className="w-full h-40 lg:h-48 rounded-xl object-cover mb-3"
-                      width={400}
-                      height={225}
+                      className="w-full h-full object-cover"
+                      width={480}
+                      height={270}
                       priority
                     />
-                    <div className="overflow-hidden">
-                      <p className="text-xl lg:text-2xl font-semibold truncate mb-1">{currentSong.song.title}</p>
-                      <p className="text-base lg:text-lg text-gray-400 truncate">{currentSong.song.channelName}</p>
+                    {/* Overlay gradient */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                    {/* "Đang phát" badge */}
+                    <div className="absolute top-2 left-2 flex items-center gap-2 bg-black/50 backdrop-blur-sm px-2 py-1 rounded-full">
+                      <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                      <p className="text-xs text-green-400 font-medium">Đang phát</p>
                     </div>
+                  </div>
+                  {/* Song info below video */}
+                  <div className="mt-2">
+                    <p className="text-base font-semibold truncate">{currentSong.song.title}</p>
+                    <p className="text-sm text-gray-400 truncate">{currentSong.song.channelName}</p>
                   </div>
                 </div>
               </FocusableButton>
@@ -268,23 +320,110 @@ export function HomeScreen({
             {waitingCount > 0 && (
               <div className="bg-white/5 dark:bg-white/5 backdrop-blur rounded-2xl p-4">
                 <p className="text-base text-gray-400 mb-3">Tiếp theo</p>
-                <div className="flex gap-3 overflow-x-auto hide-scrollbar">
+                <div className="flex gap-3 overflow-x-auto hide-scrollbar p-1">
                   {queueItems
                     .filter(item => item.status === 'waiting')
                     .slice(0, 6)
-                    .map((item) => (
-                      <div key={item.id} className="flex-shrink-0 w-32 lg:w-36">
-                        <LazyImage 
-                          src={item.song.thumbnail} 
-                          alt={item.song.title}
-                          className="w-32 h-20 lg:w-36 lg:h-24 rounded-lg mb-1 object-cover"
-                          width={144}
-                          height={96}
-                        />
-                        <p className="text-base truncate">{item.song.title}</p>
-                      </div>
-                    ))}
+                    .map((item, index) => {
+                      // Row 2 if no PlayNow button, Row 3 if PlayNow button exists
+                      const hasPlayNow = waitingCount > 0 && !currentSong && onPlayNow;
+                      const queueRow = hasPlayNow ? 3 : 2;
+                      return (
+                        <FocusableButton
+                          key={item.id}
+                          row={queueRow}
+                          col={index}
+                          onSelect={onQueueSelect}
+                          variant="ghost"
+                          className="!p-0 !min-h-0 !min-w-0 flex-shrink-0 w-32 lg:w-36 text-left !rounded-lg"
+                        >
+                          <div className="w-full">
+                            <LazyImage 
+                              src={item.song.thumbnail} 
+                              alt={item.song.title}
+                              className="w-32 h-20 lg:w-36 lg:h-24 rounded-lg mb-1 object-cover"
+                              width={144}
+                              height={96}
+                            />
+                            <p className="text-base truncate">{item.song.title}</p>
+                          </div>
+                        </FocusableButton>
+                      );
+                    })}
                 </div>
+              </div>
+            )}
+
+            {/* Suggestions - show when queue has songs */}
+            {suggestions.length > 0 && onAddToQueue && (
+              <div className="bg-white/5 dark:bg-white/5 backdrop-blur rounded-2xl p-4">
+                <p className="text-base text-gray-400 mb-3">🎵 Gợi ý cho bạn</p>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  {suggestions.map((song, index) => {
+                    const isAdded = addedIds.has(song.youtubeId);
+                    // Calculate base row based on what's visible above
+                    const hasPlayNow = waitingCount > 0 && !currentSong && onPlayNow;
+                    const hasQueuePreview = waitingCount > 0;
+                    let baseRow = 2;
+                    if (hasPlayNow) baseRow++;
+                    if (hasQueuePreview) baseRow++;
+                    
+                    // 2 columns layout: index 0,1 = row 0, index 2,3 = row 1
+                    // So pressing down from first row goes to second row
+                    const suggestionRow = baseRow + Math.floor(index / 2);
+                    const suggestionCol = index % 2;
+                    
+                    return (
+                      <FocusableButton
+                        key={song.youtubeId}
+                        row={suggestionRow}
+                        col={suggestionCol}
+                        onSelect={() => !isAdded && handleAddSuggestion(song)}
+                        variant="ghost"
+                        className={`!p-0 !min-h-0 !min-w-0 w-full text-left !rounded-xl !overflow-hidden ${
+                          isAdded ? 'ring-2 ring-green-500' : ''
+                        }`}
+                      >
+                        <div className="flex flex-col bg-white/5 w-full">
+                          <div className="relative w-full aspect-video">
+                            <LazyImage 
+                              src={song.thumbnail} 
+                              alt={song.title}
+                              className="w-full h-full object-cover"
+                              width={200}
+                              height={112}
+                            />
+                            {isAdded ? (
+                              <div className="absolute inset-0 bg-green-500/50 flex items-center justify-center">
+                                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                </svg>
+                              </div>
+                            ) : (
+                              <div className="absolute top-1 right-1 w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center">
+                                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
+                          <div className="p-2">
+                            <p className="text-sm font-medium line-clamp-2 leading-tight">{song.title}</p>
+                            <p className="text-xs text-gray-400 truncate mt-1">{song.channelName}</p>
+                          </div>
+                        </div>
+                      </FocusableButton>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Loading suggestions */}
+            {isLoadingSuggestions && (queueItems.length > 0 || currentSong) && (
+              <div className="flex items-center justify-center gap-2 py-4">
+                <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm text-gray-400">Đang tải gợi ý...</span>
               </div>
             )}
           </div>

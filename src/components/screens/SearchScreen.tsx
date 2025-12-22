@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { NavigationGrid } from '@/components/NavigationGrid';
 import { FocusableButton } from '@/components/FocusableButton';
 import { LazyImage } from '@/components/LazyImage';
@@ -29,18 +29,12 @@ function BackIcon() {
   );
 }
 
-function AddIcon() {
+function MicIcon() {
   return (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
     </svg>
   );
-}
-
-function formatDuration(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
 function SongCard({ song, row, col, onSelect }: { song: Song; row: number; col: number; onSelect: () => void }) {
@@ -50,34 +44,38 @@ function SongCard({ song, row, col, onSelect }: { song: Song; row: number; col: 
       col={col}
       onSelect={onSelect}
       variant="ghost"
-      className="!p-0 !min-h-0 !min-w-0 w-full text-left"
+      className="!p-0 !min-h-[200px] !h-[200px] !min-w-0 text-left !rounded-lg !border-0"
     >
-      <div className="flex items-center gap-3 p-2 w-full">
+      <div className="flex flex-col w-full h-[200px]">
         <LazyImage 
           src={song.thumbnail} 
           alt={song.title}
-          className="w-20 h-12 rounded-lg object-cover flex-shrink-0"
-          width={80}
-          height={48}
+          className="w-full h-[130px] rounded-t-lg object-cover flex-shrink-0"
+          width={260}
+          height={130}
         />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{song.title}</p>
-          <p className="text-xs text-gray-400 truncate">{song.channelName}</p>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-xs text-gray-500">{formatDuration(song.duration)}</span>
-          <span className="text-primary-400"><AddIcon /></span>
+        <div className="p-2 h-[70px] overflow-hidden">
+          <p className="text-sm font-medium line-clamp-2 leading-tight">{song.title}</p>
+          <p className="text-xs text-gray-400 truncate mt-1">{song.channelName}</p>
         </div>
       </div>
     </FocusableButton>
   );
 }
 
+function SearchKeyIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+    </svg>
+  );
+}
+
 function OnScreenKeyboard({ onKeyPress, startRow }: { onKeyPress: (key: string) => void; startRow: number }) {
   return (
-    <div className="space-y-1">
+    <div className="space-y-0.5">
       {KEYBOARD_LAYOUT.map((row, rowIndex) => (
-        <div key={rowIndex} className="flex gap-1 justify-center">
+        <div key={rowIndex} className="flex gap-0.5 justify-center">
           {row.map((key, colIndex) => (
             <FocusableButton
               key={`${rowIndex}-${colIndex}`}
@@ -86,12 +84,11 @@ function OnScreenKeyboard({ onKeyPress, startRow }: { onKeyPress: (key: string) 
               onSelect={() => onKeyPress(key)}
               variant="secondary"
               size="sm"
-              className={`!min-w-[44px] !min-h-[44px] !px-2 !text-sm ${
-                key === ' ' ? '!min-w-[88px]' : ''
-              } ${key === '🔍' ? '!bg-primary-600' : ''}`}
-              autoFocus={rowIndex === 0 && colIndex === 0}
+              className={`!min-w-[36px] !min-h-[36px] !px-1 !text-xs ${
+                key === ' ' ? '!min-w-[72px]' : ''
+              } ${key === '🔍' ? '!bg-primary-600 !text-white' : ''}`}
             >
-              {key === ' ' ? '␣' : key}
+              {key === ' ' ? '␣' : key === '🔍' ? <SearchKeyIcon /> : key}
             </FocusableButton>
           ))}
         </div>
@@ -111,6 +108,9 @@ export function SearchScreen({
   const [results, setResults] = useState<Song[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const recognitionRef = useRef<any>(null);
 
   const handleKeyPress = useCallback(async (key: string) => {
     if (key === '⌫') {
@@ -134,9 +134,9 @@ export function SearchScreen({
     }
   }, [query, onSearch]);
 
-  const handleRecentSearch = useCallback(async (searchQuery: string) => {
+  const doSearch = useCallback(async (searchQuery: string) => {
+    if (!searchQuery.trim()) return;
     setQuery(searchQuery);
-    onRecentSearchSelect?.(searchQuery);
     setIsSearching(true);
     setHasSearched(true);
     try {
@@ -147,16 +147,84 @@ export function SearchScreen({
     } finally {
       setIsSearching(false);
     }
-  }, [onSearch, onRecentSearchSelect]);
+  }, [onSearch]);
+
+  const handleRecentSearch = useCallback(async (searchQuery: string) => {
+    onRecentSearchSelect?.(searchQuery);
+    doSearch(searchQuery);
+  }, [onRecentSearchSelect, doSearch]);
+
+  // Voice search
+  const startVoiceSearch = useCallback(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setVoiceError('Trình duyệt không hỗ trợ');
+      setTimeout(() => setVoiceError(null), 3000);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
+      recognition.lang = 'vi-VN';
+      recognition.continuous = false;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setVoiceError(null);
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setQuery(transcript);
+        if (event.results[0].isFinal) {
+          doSearch(transcript);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        setIsListening(false);
+        if (event.error === 'not-allowed') {
+          setVoiceError('Cho phép microphone');
+        } else if (event.error === 'no-speech') {
+          setVoiceError('Không nghe thấy');
+        } else {
+          setVoiceError('Lỗi nhận dạng');
+        }
+        setTimeout(() => setVoiceError(null), 3000);
+      };
+
+      recognition.onend = () => setIsListening(false);
+      recognition.start();
+    } catch {
+      setVoiceError('Không thể khởi động');
+      setTimeout(() => setVoiceError(null), 3000);
+    }
+  }, [doSearch]);
+
+  const stopVoiceSearch = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) recognitionRef.current.stop();
+    };
+  }, []);
 
   const KEYBOARD_ROWS = KEYBOARD_LAYOUT.length;
-  const RESULTS_START_ROW = KEYBOARD_ROWS + 2;
+  const RESULTS_COL_START = 10; // Results start at col 10 (after keyboard cols 0-9)
 
   return (
-    <NavigationGrid className="min-h-screen bg-tv-bg p-6">
-      <div className="max-w-5xl mx-auto">
+    <NavigationGrid className="h-screen bg-tv-bg p-3 overflow-hidden">
+      <div className="w-full h-full flex flex-col">
         {/* Header */}
-        <header className="flex items-center gap-4 mb-6">
+        <header className="flex items-center gap-2 mb-2 flex-shrink-0">
           <FocusableButton
             row={0}
             col={0}
@@ -164,29 +232,48 @@ export function SearchScreen({
             variant="secondary"
             size="sm"
             icon={<BackIcon />}
-            className="!min-w-0 !px-3"
+            className="!min-w-0 !px-2 !min-h-[36px]"
           >
             Quay lại
           </FocusableButton>
-          <h1 className="text-2xl font-bold">Tìm kiếm</h1>
+          <h1 className="text-lg font-bold flex-1">Tìm kiếm</h1>
+          
+          {/* Voice search button - col 10 to navigate down to results */}
+          <FocusableButton
+            row={0}
+            col={RESULTS_COL_START}
+            onSelect={isListening ? stopVoiceSearch : startVoiceSearch}
+            variant="primary"
+            size="sm"
+            icon={<MicIcon />}
+            className={`!min-w-0 !px-2 !min-h-[36px] ${isListening ? '!bg-red-500 animate-pulse' : ''}`}
+            autoFocus
+          >
+            {isListening ? 'Nghe...' : 'Mic'}
+          </FocusableButton>
         </header>
+        
+        {/* Voice error */}
+        {voiceError && (
+          <div className="mb-2 text-center text-red-400 text-sm flex-shrink-0">{voiceError}</div>
+        )}
 
-        <div className="grid grid-cols-12 gap-6">
+        <div className="flex gap-2 flex-1 min-h-0 overflow-hidden">
           {/* Left - Keyboard */}
-          <div className="col-span-5">
+          <div className="w-[380px] flex-shrink-0 flex flex-col">
             {/* Search input */}
-            <div className="bg-white/5 backdrop-blur rounded-xl p-3 mb-4">
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="bg-white/5 backdrop-blur rounded-lg p-1.5 mb-1.5">
+              <div className="flex items-center gap-1.5">
+                <svg className="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
-                <div className="flex-1 min-h-[32px] flex items-center">
+                <div className="flex-1 min-h-[20px] flex items-center overflow-hidden">
                   {query ? (
-                    <span className="text-base">{query}</span>
+                    <span className="text-xs truncate">{query}</span>
                   ) : (
-                    <span className="text-base text-gray-500">Nhập tên bài hát...</span>
+                    <span className="text-xs text-gray-500">Nhập tên bài hát...</span>
                   )}
-                  <span className="w-0.5 h-5 bg-primary-400 animate-pulse ml-1" />
+                  <span className="w-0.5 h-3 bg-primary-400 animate-pulse ml-0.5 flex-shrink-0" />
                 </div>
               </div>
             </div>
@@ -196,18 +283,18 @@ export function SearchScreen({
 
             {/* Recent searches */}
             {recentSearches.length > 0 && !hasSearched && (
-              <div className="mt-4">
-                <p className="text-xs text-gray-400 mb-2">Gần đây</p>
-                <div className="flex flex-wrap gap-1">
+              <div className="mt-1.5">
+                <p className="text-[10px] text-gray-400 mb-0.5">Gần đây</p>
+                <div className="flex flex-wrap gap-0.5">
                   {recentSearches.slice(0, 5).map((search, index) => (
                     <FocusableButton
                       key={index}
-                      row={KEYBOARD_ROWS + 1}
+                      row={KEYBOARD_ROWS + 2}
                       col={index}
                       onSelect={() => handleRecentSearch(search)}
                       variant="secondary"
                       size="sm"
-                      className="!py-1 !px-2 !min-h-0 !min-w-0 !text-xs"
+                      className="!py-0.5 !px-1.5 !min-h-0 !min-w-0 !text-[10px]"
                     >
                       {search}
                     </FocusableButton>
@@ -218,41 +305,41 @@ export function SearchScreen({
           </div>
 
           {/* Right - Results */}
-          <div className="col-span-7">
-            <div className="bg-white/5 backdrop-blur rounded-2xl p-4 min-h-[400px]">
-              <p className="text-sm text-gray-400 mb-3">
+          <div className="flex-1 min-w-0 overflow-hidden">
+            <div className="bg-white/5 backdrop-blur rounded-lg p-3 h-full flex flex-col overflow-hidden">
+              <p className="text-[10px] text-gray-400 mb-2 flex-shrink-0">
                 {isSearching ? 'Đang tìm...' : hasSearched ? `Kết quả (${results.length})` : 'Kết quả'}
               </p>
 
               {isSearching ? (
-                <div className="flex items-center justify-center h-48">
-                  <div className="w-8 h-8 border-3 border-primary-400 border-t-transparent rounded-full animate-spin" />
+                <div className="flex items-center justify-center flex-1">
+                  <div className="w-5 h-5 border-2 border-primary-400 border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : results.length > 0 ? (
-                <div className="space-y-1 max-h-[500px] overflow-y-auto hide-scrollbar">
+                <div className="grid grid-cols-2 gap-3 overflow-y-auto hide-scrollbar flex-1 content-start p-2">
                   {results.map((song, index) => (
                     <SongCard
                       key={song.youtubeId}
                       song={song}
-                      row={RESULTS_START_ROW + index}
-                      col={0}
+                      row={1 + Math.floor(index / 2)}
+                      col={RESULTS_COL_START + (index % 2)}
                       onSelect={() => onSongSelect(song)}
                     />
                   ))}
                 </div>
               ) : hasSearched ? (
-                <div className="text-center py-12 text-gray-400">
-                  <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="text-center py-2 text-gray-400 flex-1 flex flex-col items-center justify-center">
+                  <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <p className="text-sm">Không tìm thấy</p>
+                  <p className="text-[10px]">Không tìm thấy</p>
                 </div>
               ) : (
-                <div className="text-center py-12 text-gray-400">
-                  <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="text-center py-2 text-gray-400 flex-1 flex flex-col items-center justify-center">
+                  <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
-                  <p className="text-sm">Nhập để tìm kiếm</p>
+                  <p className="text-[10px]">Nhập để tìm kiếm</p>
                 </div>
               )}
             </div>

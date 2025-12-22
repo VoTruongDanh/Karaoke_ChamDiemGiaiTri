@@ -152,18 +152,17 @@ export function FocusableButton({
     'font-semibold rounded-tv-lg',
     'cursor-pointer select-none',
     // Smooth transitions for all properties
-    'transition-all duration-200 ease-out',
+    'transition-all duration-150 ease-out',
     'transform-gpu', // Hardware acceleration for smooth animations
     // Size (includes TV-optimized padding and font sizes)
     sizeStyles,
     // Variant base styles
     variantStyles.base,
-    // Focus state styles - lighter, subtle
+    // Focus state styles - minimal
     isFocused && !disabled && variantStyles.focused,
     isFocused && !disabled && [
-      'scale-[1.02]', // Subtle scale
-      'shadow-md', // Light shadow
-      'ring-2 ring-primary-400/60', // Lighter ring
+      'scale-[1.01]', // Very subtle scale
+      'ring-1 ring-primary-400/50', // Thin ring
       'z-10',
     ].join(' '),
     // Disabled state

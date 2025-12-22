@@ -11,6 +11,9 @@ interface YTPlayer {
   getCurrentTime: () => number;
   seekTo: (seconds: number, allowSeekAhead: boolean) => void;
   getDuration: () => number;
+  mute: () => void;
+  unMute: () => void;
+  getPlayerState: () => number;
 }
 
 interface YTPlayerOptions {
@@ -79,6 +82,22 @@ function ForwardIcon() {
   );
 }
 
+function PlayIcon() {
+  return (
+    <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M8 5v14l11-7z" />
+    </svg>
+  );
+}
+
+function PauseIcon() {
+  return (
+    <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+    </svg>
+  );
+}
+
 const YOUTUBE_ERROR_MESSAGES: Record<number, string> = {
   2: 'Video ID không hợp lệ',
   5: 'Lỗi HTML5 player',
@@ -126,7 +145,7 @@ function YouTubePlayer({
           const checkInterval = setInterval(() => {
             if (window.YT && window.YT.Player) { clearInterval(checkInterval); resolve(); }
           }, 100);
-          setTimeout(() => { clearInterval(checkInterval); reject(new Error('Timeout')); }, 10000);
+          setTimeout(() => { clearInterval(checkInterval); reject(new Error('Timeout loading YouTube API')); }, 30000);
           return;
         }
         const tag = document.createElement('script');
@@ -134,7 +153,7 @@ function YouTubePlayer({
         tag.onerror = () => reject(new Error('Failed to load YouTube API'));
         window.onYouTubeIframeAPIReady = () => resolve();
         document.head.appendChild(tag);
-        setTimeout(() => reject(new Error('Timeout')), 10000);
+        setTimeout(() => reject(new Error('Timeout loading YouTube API')), 30000);
       });
     };
 
@@ -148,10 +167,44 @@ function YouTubePlayer({
           videoId,
           width: '100%',
           height: '100%',
-          playerVars: { autoplay: 1, controls: 0, modestbranding: 1, rel: 0, fs: 0, origin: window.location.origin },
+          playerVars: { autoplay: 1, controls: 0, modestbranding: 1, rel: 0, fs: 0, origin: window.location.origin, playsinline: 1, mute: 1 },
           events: {
-            onReady: () => { if (isMounted) { setIsLoading(false); onReadyRef.current?.(); } },
-            onStateChange: (event) => { if (event.data === window.YT.PlayerState.ENDED) onEndRef.current(); },
+            onReady: () => { 
+              if (isMounted) { 
+                setIsLoading(false); 
+                onReadyRef.current?.(); 
+                // Force autoplay - muted first then unmute (bypass browser autoplay policy)
+                const player = playerRef.current;
+                if (player) {
+                  try {
+                    player.mute();
+                    player.playVideo();
+                    // Check and unmute after playing starts
+                    const checkAndUnmute = () => {
+                      if (!playerRef.current) return;
+                      try {
+                        const state = playerRef.current.getPlayerState();
+                        if (state === window.YT.PlayerState.PLAYING) {
+                          playerRef.current.unMute();
+                        } else if (state === window.YT.PlayerState.BUFFERING || state === window.YT.PlayerState.CUED) {
+                          setTimeout(checkAndUnmute, 200);
+                        } else {
+                          // Try play again
+                          playerRef.current.playVideo();
+                          setTimeout(checkAndUnmute, 300);
+                        }
+                      } catch {
+                        playerRef.current?.unMute();
+                      }
+                    };
+                    setTimeout(checkAndUnmute, 200);
+                  } catch {}
+                }
+              } 
+            },
+            onStateChange: (event) => { 
+              if (event.data === window.YT.PlayerState.ENDED) onEndRef.current(); 
+            },
             onError: (event) => {
               const msg = YOUTUBE_ERROR_MESSAGES[event.data] || `Lỗi (${event.data})`;
               if (isMounted) { setError(msg); setIsLoading(false); onErrorRef.current?.(msg); }
@@ -187,7 +240,7 @@ function YouTubePlayer({
           <div className="w-8 h-8 border-3 border-primary-400 border-t-transparent rounded-full animate-spin" />
         </div>
       )}
-      <div ref={containerRef} className="w-full h-full" />
+      <div ref={containerRef} className="w-full h-full [&>iframe]:w-full [&>iframe]:h-full" />
     </div>
   );
 }
@@ -206,17 +259,65 @@ export function PlayingScreen({
   const [countdown, setCountdown] = useState(0);
   const [showControls, setShowControls] = useState(true);
   const [seekIndicator, setSeekIndicator] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [focusedRow, setFocusedRow] = useState<0 | 1 | 2>(1); // 0 = top row, 1 = center row, 2 = progress bar
+  const [focusedCol, setFocusedCol] = useState<number>(1); // column in current row
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isSeeking, setIsSeeking] = useState(false);
   const playerRef = useRef<YTPlayer | null>(null);
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const progressRef = useRef<HTMLDivElement>(null);
+  const timeUpdateRef = useRef<NodeJS.Timeout | null>(null);
+  const seekTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Row 0: back (col 0), skip (col 1)
+  // Row 1: rewind (col 0), play (col 1), forward (col 2)
+  // Row 2: progress bar
+  const getButtonId = () => {
+    if (focusedRow === 0) {
+      return focusedCol === 0 ? 'back' : 'skip';
+    }
+    if (focusedRow === 2) return 'progress';
+    if (focusedCol === 0) return 'rewind';
+    if (focusedCol === 1) return 'play';
+    return 'forward';
+  };
+
+  const focusedButton = getButtonId();
 
   // Reset on song change
   useEffect(() => {
     setError(null);
     setCountdown(0);
     setShowControls(true);
+    setIsPlaying(true);
+    setFocusedRow(1);
+    setFocusedCol(1); // play button
+    setCurrentTime(0);
+    setDuration(0);
     if (countdownRef.current) clearInterval(countdownRef.current);
   }, [currentSong.id]);
+
+  // Update time periodically
+  useEffect(() => {
+    const updateTime = () => {
+      const player = playerRef.current;
+      if (player && !isSeeking) {
+        try {
+          setCurrentTime(player.getCurrentTime() || 0);
+          const dur = player.getDuration();
+          if (dur > 0) setDuration(dur);
+        } catch {}
+      }
+    };
+    
+    timeUpdateRef.current = setInterval(updateTime, 500);
+    return () => {
+      if (timeUpdateRef.current) clearInterval(timeUpdateRef.current);
+    };
+  }, [isSeeking]);
 
   // Auto-hide controls after 5s
   const resetHideTimer = useCallback(() => {
@@ -230,53 +331,186 @@ export function PlayingScreen({
     return () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); };
   }, [resetHideTimer]);
 
-  // Handle keyboard for seek and show controls
+  // Toggle play/pause
+  const togglePlayPause = useCallback(() => {
+    const player = playerRef.current;
+    if (!player) return;
+    try {
+      if (isPlaying) {
+        player.pauseVideo();
+        setIsPlaying(false);
+      } else {
+        player.playVideo();
+        setIsPlaying(true);
+      }
+    } catch {}
+    resetHideTimer();
+  }, [isPlaying, resetHideTimer]);
+
+  // Handle keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const player = playerRef.current;
-      const target = e.target as HTMLElement;
-      const isOnButton = target.tagName === 'BUTTON';
       
       // Any key shows controls
       resetHideTimer();
       
-      // If focused on a button, let it handle Enter/Space
-      if (isOnButton && (e.key === 'Enter' || e.key === ' ')) {
-        return;
-      }
-      
-      // Arrow up/down - just show controls (navigation handled by browser)
-      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-        // Don't prevent default - allow focus navigation
-        return;
-      }
-      
-      // Arrow left/right - seek (only when not on a button or when controls hidden)
-      if (player && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-        // If controls are hidden, seek
-        // If controls are shown and on a button, let navigation work
-        if (!showControls || !isOnButton) {
-          e.preventDefault();
-          try {
-            const currentTime = player.getCurrentTime();
-            const seekAmount = e.key === 'ArrowLeft' ? -10 : 10;
-            const newTime = Math.max(0, currentTime + seekAmount);
-            player.seekTo(newTime, true);
-            setSeekIndicator(e.key === 'ArrowLeft' ? '-10s' : '+10s');
-            setTimeout(() => setSeekIndicator(null), 1000);
-          } catch {}
-        }
-      }
-      
-      // Enter/OK on remote - show controls if hidden
-      if ((e.key === 'Enter' || e.key === ' ') && !showControls) {
+      // Arrow navigation
+      if (e.key === 'ArrowLeft') {
         e.preventDefault();
+        if (showControls) {
+          if (focusedRow === 2) {
+            // Progress bar: seek backward 5%
+            if (player && duration > 0) {
+              setIsSeeking(true);
+              const seekAmount = duration * 0.05; // 5% of duration
+              const newTime = Math.max(0, currentTime - seekAmount);
+              player.seekTo(newTime, true);
+              setCurrentTime(newTime);
+              // Resume time updates after seek completes
+              if (seekTimeoutRef.current) clearTimeout(seekTimeoutRef.current);
+              seekTimeoutRef.current = setTimeout(() => setIsSeeking(false), 1000);
+            }
+          } else if (focusedRow === 0) {
+            // Top row: back (0), skip (1)
+            if (focusedCol > 0) setFocusedCol(0);
+          } else {
+            // Center row: rewind (0), play (1), forward (2)
+            if (focusedCol > 0) setFocusedCol(focusedCol - 1);
+          }
+        } else {
+          // Seek when controls hidden
+          if (player) {
+            try {
+              const ct = player.getCurrentTime();
+              player.seekTo(Math.max(0, ct - 10), true);
+              setSeekIndicator('-10s');
+              setTimeout(() => setSeekIndicator(null), 1000);
+            } catch {}
+          }
+        }
+        return;
+      }
+      
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        if (showControls) {
+          if (focusedRow === 2) {
+            // Progress bar: seek forward 5%
+            if (player && duration > 0) {
+              setIsSeeking(true);
+              const seekAmount = duration * 0.05; // 5% of duration
+              const newTime = Math.min(duration, currentTime + seekAmount);
+              player.seekTo(newTime, true);
+              setCurrentTime(newTime);
+              // Resume time updates after seek completes
+              if (seekTimeoutRef.current) clearTimeout(seekTimeoutRef.current);
+              seekTimeoutRef.current = setTimeout(() => setIsSeeking(false), 1000);
+            }
+          } else if (focusedRow === 0) {
+            // Top row: back (0), skip (1)
+            if (focusedCol < 1) setFocusedCol(1);
+          } else {
+            // Center row: rewind (0), play (1), forward (2)
+            if (focusedCol < 2) setFocusedCol(focusedCol + 1);
+          }
+        } else {
+          // Seek when controls hidden
+          if (player) {
+            try {
+              const ct = player.getCurrentTime();
+              player.seekTo(ct + 10, true);
+              setSeekIndicator('+10s');
+              setTimeout(() => setSeekIndicator(null), 1000);
+            } catch {}
+          }
+        }
+        return;
+      }
+      
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (showControls) {
+          if (focusedRow === 2) {
+            setFocusedRow(1);
+            setFocusedCol(1); // play button
+          } else if (focusedRow === 1) {
+            setFocusedRow(0);
+            setFocusedCol(0); // back button
+          }
+        } else {
+          setFocusedRow(1);
+          setFocusedCol(1); // play button
+        }
+        return;
+      }
+      
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (showControls) {
+          if (focusedRow === 0) {
+            setFocusedRow(1);
+            setFocusedCol(1); // play button
+          } else if (focusedRow === 1) {
+            setFocusedRow(2); // progress bar
+          }
+        } else {
+          setFocusedRow(1);
+          setFocusedCol(1); // play button
+        }
+        return;
+      }
+      
+      // Enter/Space - execute focused button action or toggle play
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (!showControls) {
+          togglePlayPause();
+          return;
+        }
+        
+        const buttonId = getButtonId();
+        switch (buttonId) {
+          case 'back':
+            onBack();
+            break;
+          case 'rewind':
+            if (player) {
+              try {
+                const ct = player.getCurrentTime();
+                player.seekTo(Math.max(0, ct - 10), true);
+                setSeekIndicator('-10s');
+                setTimeout(() => setSeekIndicator(null), 1000);
+              } catch {}
+            }
+            break;
+          case 'play':
+            togglePlayPause();
+            break;
+          case 'forward':
+            if (player) {
+              try {
+                const ct = player.getCurrentTime();
+                player.seekTo(ct + 10, true);
+                setSeekIndicator('+10s');
+                setTimeout(() => setSeekIndicator(null), 1000);
+              } catch {}
+            }
+            break;
+          case 'skip':
+            onSkip?.();
+            break;
+          case 'progress':
+            // Enter on progress bar toggles play/pause
+            togglePlayPause();
+            break;
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [resetHideTimer, showControls]);
+  }, [resetHideTimer, showControls, focusedRow, focusedCol, togglePlayPause, onBack, onSkip, currentTime, duration]);
 
   // Error auto-skip countdown
   useEffect(() => {
@@ -314,24 +548,47 @@ export function PlayingScreen({
     onSongEnd(scoreDataRef.current || undefined);
   }, [onSongEnd]);
 
-  const handleSeek = useCallback((direction: 'back' | 'forward') => {
+  const getButtonClass = (button: typeof focusedButton) => {
+    const base = "p-3 rounded-full transition-all focus:outline-none";
+    if (focusedButton === button && showControls) {
+      return `${base} bg-[#f5f5f5]/60 ring-2 ring-[#f5f5f5] scale-110`;
+    }
+    return `${base} bg-[#f5f5f5]/40 hover:bg-[#f5f5f5]/50`;
+  };
+
+  // Format time as mm:ss
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Handle progress bar click
+  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const player = playerRef.current;
-    if (!player) return;
+    if (!player || !progressRef.current || duration <= 0) return;
+    
+    setIsSeeking(true);
+    const rect = progressRef.current.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const percentage = clickX / rect.width;
+    const seekTime = percentage * duration;
+    
+    player.seekTo(seekTime, true);
+    setCurrentTime(seekTime);
     resetHideTimer();
-    try {
-      const currentTime = player.getCurrentTime();
-      const seekAmount = direction === 'back' ? -10 : 10;
-      const newTime = Math.max(0, currentTime + seekAmount);
-      player.seekTo(newTime, true);
-      setSeekIndicator(direction === 'back' ? '-10s' : '+10s');
-      setTimeout(() => setSeekIndicator(null), 1000);
-    } catch {}
-  }, [resetHideTimer]);
+    
+    // Resume time updates after seek completes
+    if (seekTimeoutRef.current) clearTimeout(seekTimeoutRef.current);
+    seekTimeoutRef.current = setTimeout(() => setIsSeeking(false), 1000);
+  };
+
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="min-h-screen bg-black relative" onClick={resetHideTimer}>
+    <div className="h-screen w-screen bg-black relative overflow-hidden" onClick={resetHideTimer}>
       {/* YouTube Player */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 overflow-hidden">
         <YouTubePlayer
           videoId={currentSong.song.youtubeId}
           onEnd={handleSongEnd}
@@ -368,8 +625,9 @@ export function PlayingScreen({
         <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/70 to-transparent flex items-center justify-between">
           <button
             onClick={onBack}
-            tabIndex={showControls ? 0 : -1}
-            className="flex items-center gap-2 px-3 py-2 bg-black/50 hover:bg-black/70 rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:ring-primary-400/60 focus:bg-black/70 focus:scale-105"
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
+              focusedButton === 'back' ? 'bg-[#f5f5f5]/60 ring-2 ring-[#f5f5f5] scale-105' : 'bg-[#f5f5f5]/40 hover:bg-[#f5f5f5]/50'
+            }`}
           >
             <BackIcon />
             <span>Thoát</span>
@@ -378,8 +636,9 @@ export function PlayingScreen({
           {onSkip && (
             <button
               onClick={onSkip}
-              tabIndex={showControls ? 0 : -1}
-              className="flex items-center gap-2 px-3 py-2 bg-black/50 hover:bg-black/70 rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:ring-primary-400/60 focus:bg-black/70 focus:scale-105"
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
+                focusedButton === 'skip' ? 'bg-[#f5f5f5]/60 ring-2 ring-[#f5f5f5] scale-105' : 'bg-[#f5f5f5]/40 hover:bg-[#f5f5f5]/50'
+              }`}
             >
               <span>Bỏ qua</span>
               <SkipIcon />
@@ -387,28 +646,90 @@ export function PlayingScreen({
           )}
         </div>
 
-        {/* Center seek controls */}
-        <div className="absolute inset-0 flex items-center justify-center gap-16 pointer-events-none">
+        {/* Center controls - rewind, play/pause, forward */}
+        <div className="absolute inset-0 flex items-center justify-center gap-8">
           <button
-            onClick={() => handleSeek('back')}
-            tabIndex={showControls ? 0 : -1}
-            className="p-4 bg-black/50 hover:bg-black/70 rounded-full transition-all pointer-events-auto focus:outline-none focus:ring-2 focus:ring-primary-400/60 focus:bg-black/70 focus:scale-110"
+            onClick={() => {
+              const player = playerRef.current;
+              if (player) {
+                try {
+                  const currentTime = player.getCurrentTime();
+                  player.seekTo(Math.max(0, currentTime - 10), true);
+                  setSeekIndicator('-10s');
+                  setTimeout(() => setSeekIndicator(null), 1000);
+                } catch {}
+              }
+            }}
+            className={getButtonClass('rewind')}
           >
             <RewindIcon />
           </button>
+          
           <button
-            onClick={() => handleSeek('forward')}
-            tabIndex={showControls ? 0 : -1}
-            className="p-4 bg-black/50 hover:bg-black/70 rounded-full transition-all pointer-events-auto focus:outline-none focus:ring-2 focus:ring-primary-400/60 focus:bg-black/70 focus:scale-110"
+            onClick={togglePlayPause}
+            className={`p-4 rounded-full transition-all ${
+              focusedButton === 'play' ? 'bg-[#f5f5f5]/60 ring-2 ring-[#f5f5f5] scale-110' : 'bg-[#f5f5f5]/40 hover:bg-[#f5f5f5]/50'
+            }`}
+          >
+            {isPlaying ? <PauseIcon /> : <PlayIcon />}
+          </button>
+          
+          <button
+            onClick={() => {
+              const player = playerRef.current;
+              if (player) {
+                try {
+                  const currentTime = player.getCurrentTime();
+                  player.seekTo(currentTime + 10, true);
+                  setSeekIndicator('+10s');
+                  setTimeout(() => setSeekIndicator(null), 1000);
+                } catch {}
+              }
+            }}
+            className={getButtonClass('forward')}
           >
             <ForwardIcon />
           </button>
         </div>
 
-        {/* Bottom song info */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent">
-          <p className="text-lg font-semibold truncate">{currentSong.song.title}</p>
-          <p className="text-sm text-gray-300">{currentSong.song.channelName}</p>
+        {/* Bottom song info + progress bar */}
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent">
+          {/* Progress bar */}
+          <div className="px-4 pt-4">
+            <div 
+              ref={progressRef}
+              onClick={handleProgressClick}
+              className={`relative h-2 bg-white/20 rounded-full cursor-pointer transition-all ${
+                focusedRow === 2 ? 'ring-2 ring-primary-400 h-3' : ''
+              }`}
+            >
+              {/* Progress fill */}
+              <div 
+                className="absolute left-0 top-0 h-full bg-primary-500 rounded-full transition-all"
+                style={{ width: `${progress}%` }}
+              />
+              {/* Handle - always visible when focused */}
+              <div 
+                className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg transition-opacity ${
+                  focusedRow === 2 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                }`}
+                style={{ left: `calc(${progress}% - 8px)` }}
+              />
+            </div>
+            {/* Time display */}
+            <div className="flex justify-between mt-1 text-xs text-gray-400">
+              <span>{formatTime(currentTime)}</span>
+              <span className={focusedRow === 2 ? 'text-primary-400' : ''}>
+                {focusedRow === 2 ? '◀ ▶ để tua' : formatTime(duration)}
+              </span>
+            </div>
+          </div>
+          
+          {/* Song info */}
+          <div className="px-4 pb-4">
+            <p className="text-lg font-semibold truncate">{currentSong.song.title}</p>
+            <p className="text-sm text-gray-300">{currentSong.song.channelName}</p>
+          </div>
         </div>
 
         {/* Score display */}
@@ -423,7 +744,7 @@ export function PlayingScreen({
       {/* Hint when controls hidden */}
       {!showControls && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-gray-500">
-          Nhấn ◀ ▶ để tua • Nhấn phím khác để hiện điều khiển
+          Nhấn Enter để phát/dừng • ◀ ▶ để tua
         </div>
       )}
     </div>

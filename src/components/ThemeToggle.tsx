@@ -73,7 +73,8 @@ export function ThemeToggle() {
     <button
       onClick={toggleTheme}
       tabIndex={0}
-      className="p-2 rounded-tv bg-tv-card border border-tv-border hover:bg-tv-hover transition-colors focus:outline-4 focus:outline-primary-400"
+      data-focusable="true"
+      className="p-2 rounded-lg bg-white/10 dark:bg-tv-card border border-slate-200 dark:border-tv-border hover:bg-slate-100 dark:hover:bg-tv-hover transition-all focus:outline-none focus:ring-2 focus:ring-primary-400/60 focus:scale-105"
       aria-label={isDark ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'}
       title={isDark ? 'Chế độ sáng' : 'Chế độ tối'}
       onKeyDown={(e) => {
