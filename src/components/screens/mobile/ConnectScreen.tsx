@@ -78,7 +78,6 @@ export function ConnectScreen({
       {/* Header */}
       <header className="p-6 text-center">
         <div className="flex items-center justify-center gap-3 mb-2">
-          <span className="text-4xl">🎤</span>
           <h1 className="text-2xl font-bold text-primary-600 dark:text-primary-400">Karaoke</h1>
         </div>
         <p className="text-slate-500 dark:text-gray-400">Điều khiển từ điện thoại</p>

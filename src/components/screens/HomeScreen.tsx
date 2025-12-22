@@ -64,7 +64,7 @@ function QRCodeDisplay({ code }: { code: string }) {
       setMobileUrl(url);
       
       QRCode.toDataURL(url, {
-        width: 200,
+        width: 280,
         margin: 2,
         color: { dark: '#000000', light: '#ffffff' },
       })
@@ -74,20 +74,20 @@ function QRCodeDisplay({ code }: { code: string }) {
   }, [code]);
 
   return (
-    <div className="flex flex-col items-center">
-      <div className="bg-white p-tv-2 rounded-tv-lg mb-tv-2 shadow-lg">
+    <div className="flex flex-col items-center text-center">
+      <div className="bg-white p-3 rounded-xl mb-4 shadow-lg">
         {qrDataUrl ? (
-          <img src={qrDataUrl} alt="QR Code" className="w-40 h-40" />
+          <img src={qrDataUrl} alt="QR Code" className="w-52 h-52" />
         ) : (
-          <div className="w-40 h-40 flex items-center justify-center bg-gray-100">
-            <span className="text-gray-400 text-sm">Đang tạo QR...</span>
+          <div className="w-52 h-52 flex items-center justify-center bg-gray-100">
+            <span className="text-gray-400 text-base">Đang tạo...</span>
           </div>
         )}
       </div>
-      <p className="text-tv-xs text-secondary mb-tv-1">Quét mã QR hoặc nhập mã</p>
-      <p className="text-tv-3xl font-bold text-primary-500 tracking-[0.3em]">{code}</p>
+      <p className="text-base text-gray-400 mb-1">Quét QR hoặc nhập mã</p>
+      <p className="text-5xl font-bold text-primary-500 tracking-widest mb-2">{code}</p>
       {mobileUrl && (
-        <p className="text-tv-xs text-secondary mt-tv-1 break-all max-w-[200px] text-center">
+        <p className="text-sm text-gray-500 break-all leading-tight max-w-[220px]">
           {mobileUrl}
         </p>
       )}
@@ -154,17 +154,14 @@ export function HomeScreen({
   const waitingCount = queueItems.filter(item => item.status === 'waiting').length;
 
   return (
-    <NavigationGrid className="min-h-screen bg-tv-bg p-tv-4">
-      <div className="max-w-6xl mx-auto">
-        {/* Header - Compact */}
-        <header className="flex items-center justify-between mb-tv-4">
-          <div className="flex items-center gap-tv-2">
-            <span className="text-tv-2xl">🎤</span>
-            <h1 className="text-tv-xl font-bold text-primary-500">Karaoke</h1>
-          </div>
-          <div className="flex items-center gap-tv-2">
+    <NavigationGrid className="min-h-screen bg-tv-bg p-6 lg:p-8">
+      <div className="max-w-6xl mx-auto h-full">
+        {/* Header */}
+        <header className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl lg:text-4xl font-bold text-primary-500">Karaoke</h1>
+          <div className="flex items-center gap-3">
             {waitingCount > 0 && (
-              <span className="text-tv-xs bg-primary-600 text-white px-tv-2 py-tv-1 rounded-full">
+              <span className="text-base bg-primary-600 text-white px-3 py-1 rounded-full whitespace-nowrap">
                 {waitingCount} bài
               </span>
             )}
@@ -172,44 +169,63 @@ export function HomeScreen({
           </div>
         </header>
 
-        {/* Main grid - 2 columns */}
-        <div className="grid grid-cols-12 gap-tv-4">
+        {/* Main content */}
+        <div className="flex gap-6 lg:gap-8 items-start">
           {/* Left - QR Code */}
-          <div className="col-span-5">
-            <div className="tv-card h-full flex flex-col items-center justify-center">
-              <QRCodeDisplay code={sessionCode} />
-            </div>
+          <div className="bg-white/5 dark:bg-white/5 backdrop-blur rounded-2xl p-4 flex-shrink-0">
+            <QRCodeDisplay code={sessionCode} />
           </div>
 
-          {/* Right - Actions & Now Playing */}
-          <div className="col-span-7 flex flex-col gap-tv-3">
-            {/* Play Now - Big button when queue has songs */}
-            {waitingCount > 0 && !currentSong && onPlayNow && (
-              <button
-                onClick={onPlayNow}
-                className="py-tv-4 bg-accent-green hover:bg-green-600 text-white text-tv-xl font-bold rounded-tv-lg flex items-center justify-center gap-tv-2 transition-colors"
-              >
-                <PlayIcon />
-                Phát ngay
-              </button>
-            )}
+          {/* Right - Main content */}
+          <div className="flex-1 flex flex-col gap-4 min-w-0">
+            {/* Now Playing - Top */}
+            <div className="bg-white/5 dark:bg-white/5 backdrop-blur rounded-2xl p-4">
+              <p className="text-base text-gray-400 mb-2">Đang phát</p>
+              {currentSong ? (
+                <div 
+                  className="flex items-center gap-4 cursor-pointer"
+                  onClick={onNowPlayingSelect}
+                >
+                  <LazyImage 
+                    src={currentSong.song.thumbnail} 
+                    alt={currentSong.song.title}
+                    className="w-32 h-20 lg:w-36 lg:h-24 rounded-lg object-cover flex-shrink-0"
+                    width={144}
+                    height={96}
+                    priority
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xl lg:text-2xl font-semibold truncate">{currentSong.song.title}</p>
+                    <p className="text-lg text-gray-400 truncate">{currentSong.song.channelName}</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+                    <span className="text-base text-green-500 font-medium">LIVE</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-4 opacity-50">
+                  <div className="w-32 h-20 lg:w-36 lg:h-24 bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <MusicIcon />
+                  </div>
+                  <p className="text-lg text-gray-400">Chưa có bài hát</p>
+                </div>
+              )}
+            </div>
 
-            {/* Now Playing */}
-            <NowPlayingPreview currentSong={currentSong} onSelect={onNowPlayingSelect} />
-
-            {/* Quick actions - Horizontal */}
-            <div className="flex gap-tv-2">
+            {/* Action buttons */}
+            <div className="flex gap-3">
               <FocusableButton
                 row={0}
                 col={0}
                 onSelect={onSearchSelect}
                 variant="primary"
-                size="lg"
+                size="md"
                 icon={<SearchIcon />}
                 autoFocus
-                className="flex-1"
+                className="flex-1 !whitespace-nowrap !text-sm"
               >
-                Tìm kiếm
+                <span className="whitespace-nowrap text-sm">Tìm kiếm</span>
               </FocusableButton>
               
               <FocusableButton
@@ -217,32 +233,43 @@ export function HomeScreen({
                 col={1}
                 onSelect={onQueueSelect}
                 variant="secondary"
-                size="lg"
+                size="md"
                 icon={<QueueIcon />}
-                className="flex-1"
+                className="flex-1 !whitespace-nowrap !text-sm"
               >
-                Hàng đợi {waitingCount > 0 && `(${waitingCount})`}
+                <span className="whitespace-nowrap text-sm">Hàng đợi {waitingCount > 0 && `(${waitingCount})`}</span>
               </FocusableButton>
             </div>
 
-            {/* Queue preview - Compact */}
+            {/* Play Now button */}
+            {waitingCount > 0 && !currentSong && onPlayNow && (
+              <button
+                onClick={onPlayNow}
+                className="w-full py-4 bg-green-500 hover:bg-green-600 text-white text-xl font-bold rounded-xl flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
+              >
+                <PlayIcon />
+                Phát ngay ({waitingCount} bài)
+              </button>
+            )}
+
+            {/* Queue preview */}
             {waitingCount > 0 && (
-              <div className="tv-card">
-                <p className="text-tv-xs text-secondary mb-tv-2">Tiếp theo</p>
-                <div className="flex gap-tv-2 overflow-x-auto hide-scrollbar">
+              <div className="bg-white/5 dark:bg-white/5 backdrop-blur rounded-2xl p-4">
+                <p className="text-base text-gray-400 mb-3">Tiếp theo</p>
+                <div className="flex gap-3 overflow-x-auto hide-scrollbar">
                   {queueItems
                     .filter(item => item.status === 'waiting')
-                    .slice(0, 5)
+                    .slice(0, 6)
                     .map((item) => (
-                      <div key={item.id} className="flex-shrink-0 w-28">
+                      <div key={item.id} className="flex-shrink-0 w-32 lg:w-36">
                         <LazyImage 
                           src={item.song.thumbnail} 
                           alt={item.song.title}
-                          className="w-28 h-16 rounded-tv mb-1"
-                          width={112}
-                          height={64}
+                          className="w-32 h-20 lg:w-36 lg:h-24 rounded-lg mb-1 object-cover"
+                          width={144}
+                          height={96}
                         />
-                        <p className="text-tv-xs truncate">{item.song.title}</p>
+                        <p className="text-base truncate">{item.song.title}</p>
                       </div>
                     ))}
                 </div>

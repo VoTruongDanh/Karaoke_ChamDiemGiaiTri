@@ -16,14 +16,9 @@ import type { Song } from '@/types/song';
 type MobileScreen = 'connect' | 'controller' | 'queue' | 'result';
 
 const YOUTUBE_API_KEY = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY || '';
+const SESSION_STORAGE_KEY = 'karaoke_session_code';
 
-async function mockSearch(query: string): Promise<Song[]> {
-  await new Promise(resolve => setTimeout(resolve, 500));
-  return [
-    { youtubeId: 'dQw4w9WgXcQ', title: `${query} - Karaoke`, thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg', channelName: 'Karaoke Channel', duration: 213 },
-    { youtubeId: 'kJQP7kiw5Fk', title: `${query} - Beat`, thumbnail: 'https://i.ytimg.com/vi/kJQP7kiw5Fk/hqdefault.jpg', channelName: 'Music Karaoke', duration: 245 },
-  ];
-}
+console.log('[Mobile] YouTube API Key:', YOUTUBE_API_KEY ? 'present (will try YouTube first)' : 'not set (using Invidious)');
 
 function LoadingFallback() {
   return (
@@ -41,12 +36,13 @@ function MobileAppContent() {
   const joinedAtRef = useRef<number>(0);
   // Store result data locally so it persists even if socket state changes
   const [resultData, setResultData] = useState<{ song: any; finalScore: any } | null>(null);
+  // Track if we've attempted auto-reconnect
+  const autoReconnectAttemptedRef = useRef(false);
   
-  const songLibrary = useMemo<SongLibrary | null>(() => {
-    if (YOUTUBE_API_KEY && YOUTUBE_API_KEY !== 'YOUR_YOUTUBE_API_KEY_HERE') {
-      return createSongLibrary(YOUTUBE_API_KEY);
-    }
-    return null;
+  const songLibrary = useMemo<SongLibrary>(() => {
+    // Always create songLibrary - will use Invidious as fallback if no API key
+    console.log('[Mobile] Creating songLibrary, API key:', YOUTUBE_API_KEY ? 'present' : 'using Invidious');
+    return createSongLibrary(YOUTUBE_API_KEY || undefined);
   }, []);
   
   const {
@@ -75,20 +71,36 @@ function MobileAppContent() {
   });
 
   const handleDisconnect = useCallback(() => {
+    // Clear saved session on manual disconnect
+    try {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+    } catch {}
     disconnect();
     joinedAtRef.current = 0;
     setCurrentScreen('connect');
   }, [disconnect]);
 
   const handleSearch = useCallback(async (query: string, pageToken?: string): Promise<{ songs: Song[]; nextPageToken?: string }> => {
-    if (songLibrary) {
+    console.log('[Mobile] handleSearch called:', query);
+    try {
+      const result = await songLibrary.search(query, pageToken);
+      console.log('[Mobile] Search result:', result.songs.length, 'songs');
+      return result;
+    } catch (error) {
+      console.error('[Mobile] Search failed:', error);
+      return { songs: [], nextPageToken: undefined };
+    }
+  }, [songLibrary]);
+
+  const handleGetSuggestions = useCallback(async (videoIds: string[]): Promise<Song[]> => {
+    if (videoIds.length > 0) {
       try {
-        return await songLibrary.search(query, pageToken);
+        return await songLibrary.getSuggestions(videoIds, 6);
       } catch {
-        return { songs: await mockSearch(query), nextPageToken: undefined };
+        return [];
       }
     }
-    return { songs: await mockSearch(query), nextPageToken: undefined };
+    return [];
   }, [songLibrary]);
 
   const sessionCode = session?.code || '';
@@ -97,12 +109,45 @@ function MobileAppContent() {
   const handleConnect = useCallback((code: string) => {
     setIsAttemptingJoin(true);
     joinedAtRef.current = Date.now(); // Mark join time
+    // Save session code to localStorage
+    try {
+      localStorage.setItem(SESSION_STORAGE_KEY, code);
+    } catch {}
     joinSession(code);
     setTimeout(() => setIsAttemptingJoin(false), 10000);
   }, [joinSession]);
 
+  // Auto-reconnect on page load if session exists
+  useEffect(() => {
+    // Wait for socket to be connected before attempting auto-reconnect
+    if (!isConnected) return;
+    if (autoReconnectAttemptedRef.current) return;
+    if (isJoined) return; // Already joined
+    
+    // Priority: URL param > localStorage
+    const codeToUse = initialCode || (() => {
+      try {
+        return localStorage.getItem(SESSION_STORAGE_KEY) || '';
+      } catch {
+        return '';
+      }
+    })();
+    
+    if (codeToUse) {
+      autoReconnectAttemptedRef.current = true;
+      console.log('[Mobile] Auto-reconnecting to session:', codeToUse);
+      handleConnect(codeToUse);
+    }
+  }, [initialCode, isConnected, isJoined, handleConnect]);
+
   useEffect(() => {
     if (isJoined || socketError) setIsAttemptingJoin(false);
+    // Clear saved session if join failed
+    if (socketError) {
+      try {
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+      } catch {}
+    }
   }, [isJoined, socketError]);
 
   // Auto-navigate on join - clear any old finishedSong
@@ -151,6 +196,7 @@ function MobileAppContent() {
             queue={queue}
             currentSong={currentSong}
             onSearch={handleSearch}
+            onGetSuggestions={handleGetSuggestions}
             onAddToQueue={addToQueue}
             onViewQueue={() => setCurrentScreen('queue')}
             onDisconnect={handleDisconnect}
