@@ -1,0 +1,298 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* TV-optimized base styles */
+@layer base {
+  /* Light mode (default) */
+  :root {
+    --tv-min-font-size: 24px;
+    --tv-focus-ring-width: 4px;
+    --tv-focus-ring-color: rgba(14, 165, 233, 0.5);
+    
+    /* Light theme colors */
+    --tv-bg: #f8fafc;
+    --tv-surface: #f1f5f9;
+    --tv-card: #ffffff;
+    --tv-border: #e2e8f0;
+    --tv-hover: #f1f5f9;
+    --tv-text: #1e293b;
+    --tv-text-secondary: #64748b;
+  }
+
+  /* Dark mode */
+  .dark {
+    --tv-bg: #0a0a0f;
+    --tv-surface: #141420;
+    --tv-card: #1e1e2e;
+    --tv-border: #2a2a3e;
+    --tv-hover: #2e2e42;
+    --tv-text: #ffffff;
+    --tv-text-secondary: #9ca3af;
+  }
+
+  /* Ensure minimum font size for TV readability */
+  html {
+    font-size: 16px;
+  }
+
+  body {
+    @apply bg-tv-bg antialiased;
+    color: var(--tv-text);
+    min-height: 100vh;
+  }
+
+  /* Remove default focus outlines, we'll use custom ones */
+  *:focus {
+    outline: none;
+  }
+
+  /* Smooth scrolling for TV */
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  /* TV-friendly focusable element base */
+  .tv-focusable {
+    @apply transition-all duration-200 ease-out;
+    @apply focus:ring-tv focus:ring-primary-500 focus:shadow-tv-focus;
+    @apply focus:scale-105;
+  }
+
+  /* TV button base styles */
+  .tv-button {
+    @apply tv-focusable;
+    @apply px-tv-4 py-tv-2;
+    @apply text-tv-base font-medium;
+    @apply bg-tv-card;
+    @apply rounded-tv border border-tv-border;
+    @apply cursor-pointer;
+    color: var(--tv-text);
+  }
+
+  .tv-button:hover {
+    background-color: var(--tv-hover);
+  }
+
+  /* TV card component */
+  .tv-card {
+    @apply bg-tv-card rounded-tv-lg border border-tv-border;
+    @apply p-tv-3;
+    color: var(--tv-text);
+  }
+
+  /* TV text sizes */
+  .tv-text-xs { @apply text-tv-xs; }
+  .tv-text-sm { @apply text-tv-sm; }
+  .tv-text-base { @apply text-tv-base; }
+  .tv-text-lg { @apply text-tv-lg; }
+  .tv-text-xl { @apply text-tv-xl; }
+  .tv-text-2xl { @apply text-tv-2xl; }
+  .tv-text-3xl { @apply text-tv-3xl; }
+  .tv-text-4xl { @apply text-tv-4xl; }
+
+  /* Text color utilities for theme */
+  .text-secondary {
+    color: var(--tv-text-secondary);
+  }
+}
+
+@layer utilities {
+  /* Karaoke text highlight animation */
+  .karaoke-highlight {
+    @apply text-accent-yellow;
+    text-shadow: 0 0 10px rgba(234, 179, 8, 0.5);
+  }
+
+  /* Glow effect for active elements */
+  .tv-glow {
+    @apply shadow-tv-glow;
+  }
+
+  /* Hide scrollbar for TV interface */
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Animation utilities for notifications */
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-out forwards;
+  }
+
+  .animate-fade-out {
+    animation: fadeOut 0.2s ease-out forwards;
+  }
+
+  .animate-slide-in-right {
+    animation: slideInRight 0.3s ease-out forwards;
+  }
+
+  .animate-slide-out-right {
+    animation: slideOutRight 0.2s ease-out forwards;
+  }
+
+  .animate-slide-in-left {
+    animation: slideInLeft 0.3s ease-out forwards;
+  }
+
+  .animate-slide-out-left {
+    animation: slideOutLeft 0.2s ease-out forwards;
+  }
+
+  .animate-slide-in-up {
+    animation: slideInUp 0.3s ease-out forwards;
+  }
+
+  .animate-slide-out-down {
+    animation: slideOutDown 0.2s ease-out forwards;
+  }
+
+  .animate-zoom-in {
+    animation: zoomIn 0.2s ease-out forwards;
+  }
+
+  .animate-zoom-out {
+    animation: zoomOut 0.2s ease-out forwards;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.15s ease-out forwards;
+  }
+
+  .animate-focus-pulse {
+    animation: focusPulse 1.5s ease-in-out infinite;
+  }
+}
+
+/* Keyframe animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOutLeft {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideOutDown {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(50px);
+  }
+}
+
+@keyframes zoomIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes zoomOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes focusPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(14, 165, 233, 0.5);
+  }
+}
