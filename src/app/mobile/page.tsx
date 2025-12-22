@@ -92,10 +92,10 @@ function MobileAppContent() {
     }
   }, [songLibrary]);
 
-  const handleGetSuggestions = useCallback(async (videoIds: string[]): Promise<Song[]> => {
+  const handleGetSuggestions = useCallback(async (videoIds: string[], addedSongs?: Song[]): Promise<Song[]> => {
     if (videoIds.length > 0) {
       try {
-        return await songLibrary.getSuggestions(videoIds, 6);
+        return await songLibrary.getSuggestions(videoIds, 6, addedSongs);
       } catch {
         return [];
       }
@@ -105,50 +105,67 @@ function MobileAppContent() {
 
   const sessionCode = session?.code || '';
   const [isAttemptingJoin, setIsAttemptingJoin] = useState(false);
+  const lastTriedCodeRef = useRef<string>('');
+  const originalSavedCodeRef = useRef<string>('');
+
+  // Get saved code from localStorage (only read once on mount)
+  useEffect(() => {
+    try {
+      originalSavedCodeRef.current = localStorage.getItem(SESSION_STORAGE_KEY) || '';
+      console.log('[Mobile] Original saved code:', originalSavedCodeRef.current);
+    } catch {}
+  }, []);
 
   const handleConnect = useCallback((code: string) => {
     setIsAttemptingJoin(true);
-    joinedAtRef.current = Date.now(); // Mark join time
-    // Save session code to localStorage
+    joinedAtRef.current = Date.now();
+    lastTriedCodeRef.current = code;
     try {
       localStorage.setItem(SESSION_STORAGE_KEY, code);
     } catch {}
     joinSession(code);
-    setTimeout(() => setIsAttemptingJoin(false), 10000);
   }, [joinSession]);
 
-  // Auto-reconnect on page load if session exists
+  // Auto-reconnect on page load
   useEffect(() => {
-    // Wait for socket to be connected before attempting auto-reconnect
     if (!isConnected) return;
+    if (isJoined) return;
     if (autoReconnectAttemptedRef.current) return;
-    if (isJoined) return; // Already joined
     
-    // Priority: URL param > localStorage
-    const codeToUse = initialCode || (() => {
-      try {
-        return localStorage.getItem(SESSION_STORAGE_KEY) || '';
-      } catch {
-        return '';
-      }
-    })();
+    // Try URL code first, then original saved code
+    const codeToUse = initialCode || originalSavedCodeRef.current;
+    
+    console.log('[Mobile] Auto-reconnect:', { initialCode, savedCode: originalSavedCodeRef.current, codeToUse });
     
     if (codeToUse) {
       autoReconnectAttemptedRef.current = true;
-      console.log('[Mobile] Auto-reconnecting to session:', codeToUse);
       handleConnect(codeToUse);
     }
   }, [initialCode, isConnected, isJoined, handleConnect]);
 
+  // Handle join result - retry with saved code if URL code fails
   useEffect(() => {
-    if (isJoined || socketError) setIsAttemptingJoin(false);
-    // Clear saved session if join failed
-    if (socketError) {
-      try {
-        localStorage.removeItem(SESSION_STORAGE_KEY);
-      } catch {}
+    if (isJoined) {
+      setIsAttemptingJoin(false);
+      return;
     }
-  }, [isJoined, socketError]);
+    
+    if (socketError && isAttemptingJoin) {
+      setIsAttemptingJoin(false);
+      const lastTried = lastTriedCodeRef.current;
+      const originalSaved = originalSavedCodeRef.current;
+      
+      console.log('[Mobile] Join failed:', { lastTried, originalSaved, initialCode });
+      
+      // If URL code failed and we have a different original saved code, try it
+      if (lastTried === initialCode && originalSaved && originalSaved !== initialCode) {
+        console.log('[Mobile] URL code failed, trying original saved code:', originalSaved);
+        setTimeout(() => {
+          handleConnect(originalSaved);
+        }, 500);
+      }
+    }
+  }, [isJoined, socketError, isAttemptingJoin, initialCode, handleConnect]);
 
   // Auto-navigate on join - clear any old finishedSong
   useEffect(() => {

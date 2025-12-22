@@ -55,31 +55,34 @@ export class InvidiousService {
   }
 
   /**
-   * Get related/suggested videos via API
+   * Get related/suggested videos - simplified approach using search
    */
   async getRelatedVideos(videoId: string, maxResults: number = 10): Promise<Song[]> {
     try {
+      // First try the API
       const url = `/api/youtube/related?v=${encodeURIComponent(videoId)}&max=${maxResults}`;
       console.log('[Search] Getting related:', url);
       
       const response = await fetch(url);
       
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      if (response.ok) {
+        const data = await response.json();
+        const songs: Song[] = (data.songs || []).map((video: any) => ({
+          youtubeId: video.youtubeId,
+          title: video.title,
+          thumbnail: video.thumbnail || `https://i.ytimg.com/vi/${video.youtubeId}/mqdefault.jpg`,
+          channelName: video.channelName || 'Unknown',
+          duration: video.duration || 0,
+        }));
+
+        if (songs.length > 0) {
+          console.log('[Search] Got', songs.length, 'related videos from API');
+          return songs;
+        }
       }
       
-      const data = await response.json();
-      
-      const songs: Song[] = (data.songs || []).map((video: any) => ({
-        youtubeId: video.youtubeId,
-        title: video.title,
-        thumbnail: video.thumbnail || `https://i.ytimg.com/vi/${video.youtubeId}/mqdefault.jpg`,
-        channelName: video.channelName || 'Unknown',
-        duration: video.duration || 0,
-      }));
-
-      console.log('[Search] Got', songs.length, 'related videos');
-      return songs;
+      console.log('[Search] API returned 0 results');
+      return [];
     } catch (error) {
       console.error('[Search] Related failed:', error);
       return [];
@@ -87,14 +90,50 @@ export class InvidiousService {
   }
 
   /**
-   * Get suggestions from multiple videos
+   * Get suggestions from multiple videos - use search as fallback
    */
-  async getSuggestionsFromVideos(videoIds: string[], maxResults: number = 10): Promise<Song[]> {
+  async getSuggestionsFromVideos(videoIds: string[], maxResults: number = 10, addedSongs?: Song[]): Promise<Song[]> {
     if (videoIds.length === 0) return [];
 
-    // Get related from the most recent video
+    // Try API first
     const recentId = videoIds[0];
-    const related = await this.getRelatedVideos(recentId, maxResults + 5);
+    let related = await this.getRelatedVideos(recentId, maxResults + 5);
+    
+    // If API fails and we have song info, search for similar
+    if (related.length === 0 && addedSongs && addedSongs.length > 0) {
+      console.log('[Search] API failed, trying search fallback');
+      const song = addedSongs[0];
+      
+      // Extract keywords from song title
+      const cleanTitle = song.title
+        .replace(/\(.*?\)|\[.*?\]/g, '')
+        .replace(/karaoke|beat|lyrics|official|mv|music video|chuẩn|mới nhất|nhạc|việt/gi, '')
+        .trim();
+      
+      const words = cleanTitle.split(/[\s\-|]+/).filter(w => w.length > 2);
+      const searchQuery = words.slice(0, 2).join(' ') + ' karaoke';
+      
+      if (searchQuery.length >= 5) {
+        console.log('[Search] Searching for similar:', searchQuery);
+        try {
+          const result = await this.search(searchQuery);
+          related = result.songs.filter(s => s.youtubeId !== song.youtubeId);
+        } catch (e) {
+          console.log('[Search] Search fallback failed:', e);
+        }
+      }
+      
+      // If still no results, try generic karaoke search
+      if (related.length === 0) {
+        console.log('[Search] Trying generic karaoke search');
+        try {
+          const result = await this.search('karaoke việt nam hot');
+          related = result.songs.filter(s => !videoIds.includes(s.youtubeId));
+        } catch (e) {
+          console.log('[Search] Generic search failed:', e);
+        }
+      }
+    }
     
     // Filter out videos already in the list
     const seenIds = new Set(videoIds);

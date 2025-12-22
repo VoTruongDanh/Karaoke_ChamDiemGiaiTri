@@ -17,7 +17,7 @@ export interface ControllerScreenProps {
   /** Callback to search for songs */
   onSearch: (query: string, pageToken?: string) => Promise<{ songs: Song[]; nextPageToken?: string }>;
   /** Callback to get YouTube suggestions based on video IDs */
-  onGetSuggestions?: (videoIds: string[]) => Promise<Song[]>;
+  onGetSuggestions?: (videoIds: string[], addedSongs?: Song[]) => Promise<Song[]>;
   /** Callback when a song is added to queue */
   onAddToQueue: (song: Song) => void;
   /** Callback to view full queue */
@@ -205,32 +205,66 @@ export function ControllerScreen({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const currentQueryRef = useRef<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const suggestionsLoadedRef = useRef(false);
 
   const waitingCount = queue.filter(item => item.status === 'waiting').length;
 
-  // Load YouTube suggestions when songs are added
+  // Get songs from queue for suggestions (including current song)
+  const queueSongs = useMemo(() => {
+    const songs: Song[] = [];
+    if (currentSong) songs.push(currentSong.song);
+    queue.forEach(item => {
+      if (!songs.find(s => s.youtubeId === item.song.youtubeId)) {
+        songs.push(item.song);
+      }
+    });
+    return songs;
+  }, [queue, currentSong]);
+
+  // Load YouTube suggestions when songs are added OR when joining with existing queue
   useEffect(() => {
-    if (recentlyAddedSongs.length > 0 && onGetSuggestions) {
-      console.log('[Controller] Loading suggestions for:', recentlyAddedSongs.slice(0, 3).map(s => s.youtubeId));
-      setIsLoadingSuggestions(true);
-      const videoIds = recentlyAddedSongs.slice(0, 3).map(s => s.youtubeId);
-      onGetSuggestions(videoIds)
-        .then(suggestions => {
-          console.log('[Controller] Got suggestions:', suggestions.length);
-          // Filter out songs already in queue or recently added
-          const queueIds = new Set(queue.map(q => q.song.youtubeId));
-          const addedIds = new Set(recentlyAddedSongs.map(s => s.youtubeId));
-          const filtered = suggestions.filter(s => !queueIds.has(s.youtubeId) && !addedIds.has(s.youtubeId));
-          console.log('[Controller] Filtered suggestions:', filtered.length);
-          setYtSuggestions(filtered.slice(0, 6));
-        })
-        .catch((err) => {
-          console.error('[Controller] Suggestions error:', err);
-          setYtSuggestions([]);
-        })
-        .finally(() => setIsLoadingSuggestions(false));
+    if (!onGetSuggestions) return;
+    
+    // Use recentlyAddedSongs if available, otherwise use queue songs
+    const songsForSuggestions = recentlyAddedSongs.length > 0 ? recentlyAddedSongs : queueSongs;
+    
+    if (songsForSuggestions.length === 0) return;
+    
+    // Prevent duplicate loads for same songs
+    const songIds = songsForSuggestions.slice(0, 3).map(s => s.youtubeId).join(',');
+    if (suggestionsLoadedRef.current && ytSuggestions.length > 0) {
+      // Only reload if songs changed
+      return;
     }
-  }, [recentlyAddedSongs, onGetSuggestions]); // Remove queue dependency to avoid re-fetching
+    
+    console.log('[Controller] Loading suggestions for:', songsForSuggestions.slice(0, 3).map(s => s.youtubeId));
+    setIsLoadingSuggestions(true);
+    suggestionsLoadedRef.current = true;
+    
+    const videoIds = songsForSuggestions.slice(0, 3).map(s => s.youtubeId);
+    const addedIds = new Set([...recentlyAddedSongs.map(s => s.youtubeId), ...queueSongs.map(s => s.youtubeId)]);
+    
+    onGetSuggestions(videoIds, songsForSuggestions.slice(0, 3))
+      .then(suggestions => {
+        console.log('[Controller] Got suggestions:', suggestions.length, suggestions.map(s => s.title));
+        // Filter out songs already in queue or added
+        const filtered = suggestions.filter(s => !addedIds.has(s.youtubeId));
+        console.log('[Controller] Filtered suggestions:', filtered.length);
+        setYtSuggestions(filtered.slice(0, 6));
+      })
+      .catch((err) => {
+        console.error('[Controller] Suggestions error:', err);
+        setYtSuggestions([]);
+      })
+      .finally(() => setIsLoadingSuggestions(false));
+  }, [recentlyAddedSongs, queueSongs, onGetSuggestions]);
+
+  // Reset suggestions loaded flag when queue changes significantly
+  useEffect(() => {
+    if (queueSongs.length === 0) {
+      suggestionsLoadedRef.current = false;
+    }
+  }, [queueSongs.length]);
 
   // Generate smart keyword suggestions based on history
   const smartSuggestions = useMemo(() => 
@@ -531,41 +565,55 @@ export function ControllerScreen({
             {/* YouTube Suggestions */}
             {ytSuggestions.length > 0 && (
               <div>
-                <p className="text-xs text-slate-500 mb-2">🎵 YouTube đề xuất</p>
-                <div className="flex flex-col gap-2">
+                <p className="text-sm text-slate-500 mb-2">🎵 Gợi ý cho bạn</p>
+                <div className="grid grid-cols-2 gap-3">
                   {ytSuggestions.map((song) => (
                     <button
                       key={song.youtubeId}
                       onClick={() => handleAddToQueue(song)}
                       disabled={addedSongsSet.has(song.youtubeId)}
-                      className={`flex items-center gap-3 p-2 rounded-xl transition-all active:scale-[0.98] ${
+                      className={`flex flex-col rounded-xl overflow-hidden transition-all active:scale-[0.98] ${
                         addedSongsSet.has(song.youtubeId)
-                          ? 'bg-accent-green/10 ring-1 ring-accent-green'
-                          : 'bg-white dark:bg-tv-card hover:bg-slate-50 dark:hover:bg-tv-hover'
+                          ? 'bg-accent-green/10 ring-2 ring-accent-green'
+                          : 'bg-white dark:bg-tv-card hover:bg-slate-50 dark:hover:bg-tv-hover shadow-sm'
                       }`}
                     >
-                      <img
-                        src={song.thumbnail}
-                        alt=""
-                        className="w-16 h-12 object-cover rounded-lg"
-                      />
-                      <div className="flex-1 min-w-0 text-left">
-                        <p className="text-sm font-medium text-slate-800 dark:text-white line-clamp-1">{song.title}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{song.channelName}</p>
+                      <div className="relative w-full aspect-video">
+                        <img
+                          src={song.thumbnail}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                        {addedSongsSet.has(song.youtubeId) && (
+                          <div className="absolute inset-0 bg-accent-green/30 flex items-center justify-center">
+                            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                        )}
+                        {!addedSongsSet.has(song.youtubeId) && (
+                          <div className="absolute top-1 right-1 w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center">
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                          </div>
+                        )}
                       </div>
-                      {addedSongsSet.has(song.youtubeId) ? (
-                        <svg className="w-5 h-5 text-accent-green flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : (
-                        <svg className="w-5 h-5 text-primary-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                      )}
+                      <div className="p-2 text-left">
+                        <p className="text-sm font-medium text-slate-800 dark:text-white line-clamp-2 leading-tight">{song.title}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-1">{song.channelName}</p>
+                      </div>
                     </button>
                   ))}
                 </div>
               </div>
+            )}
+            
+            {/* Debug: Show suggestion count */}
+            {recentlyAddedSongs.length > 0 && ytSuggestions.length === 0 && !isLoadingSuggestions && (
+              <p className="text-xs text-slate-400 text-center py-2">
+                Đang tìm gợi ý cho "{recentlyAddedSongs[0]?.title?.slice(0, 20)}..."
+              </p>
             )}
 
             {isLoadingSuggestions && (
