@@ -42,8 +42,8 @@ function detectPitch(buffer: Float32Array, sampleRate: number): number {
   }
   rms = Math.sqrt(rms / SIZE);
   
-  // If signal is too quiet, return 0
-  if (rms < 0.01) return 0;
+  // Need stronger signal for voice detection (filter out background music)
+  if (rms < 0.03) return 0;
   
   // Autocorrelation
   const correlations = new Float32Array(MAX_SAMPLES);
@@ -55,35 +55,54 @@ function detectPitch(buffer: Float32Array, sampleRate: number): number {
     correlations[lag] = sum;
   }
   
+  // Normalize by first correlation value
+  const norm = correlations[0];
+  if (norm === 0) return 0;
+  for (let i = 0; i < MAX_SAMPLES; i++) {
+    correlations[i] /= norm;
+  }
+  
   // Find the first peak after the initial decline
-  // Skip the first few samples (too high frequency)
-  const minLag = Math.floor(sampleRate / 1000); // ~1000Hz max
-  const maxLag = Math.floor(sampleRate / 50);   // ~50Hz min
+  // Human voice range: 85Hz (bass) to 500Hz (soprano)
+  const minLag = Math.floor(sampleRate / 500); // ~500Hz max
+  const maxLag = Math.floor(sampleRate / 85);  // ~85Hz min
+  
+  // Find where correlation drops below threshold first
+  let foundDip = false;
+  for (let lag = 1; lag < minLag && lag < MAX_SAMPLES; lag++) {
+    if (correlations[lag] < 0.5) {
+      foundDip = true;
+      break;
+    }
+  }
+  if (!foundDip) return 0; // No clear periodicity
   
   let bestLag = 0;
-  let bestCorr = 0;
-  let foundPeak = false;
+  let bestCorr = 0.5; // Minimum correlation threshold for voice
   
   for (let lag = minLag; lag < Math.min(maxLag, MAX_SAMPLES); lag++) {
     if (correlations[lag] > bestCorr) {
       bestCorr = correlations[lag];
       bestLag = lag;
-      foundPeak = true;
     }
   }
   
-  if (!foundPeak || bestLag === 0) return 0;
+  if (bestLag === 0) return 0;
   
   // Parabolic interpolation for better accuracy
   const y1 = correlations[bestLag - 1] || 0;
   const y2 = correlations[bestLag];
   const y3 = correlations[bestLag + 1] || 0;
-  const refinedLag = bestLag + (y3 - y1) / (2 * (2 * y2 - y1 - y3));
+  
+  const denom = 2 * y2 - y1 - y3;
+  if (Math.abs(denom) < 0.0001) return sampleRate / bestLag;
+  
+  const refinedLag = bestLag + (y3 - y1) / (2 * denom);
   
   const frequency = sampleRate / refinedLag;
   
-  // Validate frequency is in human voice range (80Hz - 1000Hz)
-  if (frequency < 80 || frequency > 1000) return 0;
+  // Strict human voice range (85Hz - 500Hz)
+  if (frequency < 85 || frequency > 500) return 0;
   
   return frequency;
 }
@@ -236,18 +255,21 @@ export function useSilentScoring({
             ? stabilityScoresRef.current.reduce((a, b) => a + b, 0) / stabilityScoresRef.current.length
             : 0;
           
-          // Timing = percentage of time singing (with minimum threshold)
-          const singingRatio = totalFramesRef.current > 0 
+          // Timing = percentage of time with detected voice pitch
+          // Need 60% voice time for 100 score (realistic for karaoke)
+          const voiceRatio = totalFramesRef.current > 0 
             ? singingFramesRef.current / totalFramesRef.current 
             : 0;
-          // Expect at least 30% singing, scale to 100
-          const timing = Math.min(100, Math.round((singingRatio / 0.5) * 100));
+          const timing = Math.min(100, Math.round((voiceRatio / 0.6) * 100));
           
           // Pitch accuracy = stability score (how consistent the pitch is)
           const pitchAccuracy = Math.round(avgStability);
           
-          // Total score weighted
-          const totalScore = Math.round(pitchAccuracy * 0.6 + timing * 0.4);
+          // Total score: if no voice detected, score is low
+          const hasVoice = singingFramesRef.current > 10;
+          const totalScore = hasVoice 
+            ? Math.round(pitchAccuracy * 0.6 + timing * 0.4)
+            : Math.round(timing * 0.3); // Penalty for no voice
 
           const score = { pitchAccuracy, timing, totalScore };
           setCurrentScore(score);
@@ -290,12 +312,17 @@ export function useSilentScoring({
       ? stabilityScoresRef.current.reduce((a, b) => a + b, 0) / stabilityScoresRef.current.length
       : 0;
     
-    const singingRatio = totalFramesRef.current > 0 
+    const voiceRatio = totalFramesRef.current > 0 
       ? singingFramesRef.current / totalFramesRef.current 
       : 0;
-    const timing = Math.min(100, Math.round((singingRatio / 0.5) * 100));
+    // Need 60% voice time for 100 score
+    const timing = Math.min(100, Math.round((voiceRatio / 0.6) * 100));
     const pitchAccuracy = Math.round(avgStability);
-    const totalScore = Math.round(pitchAccuracy * 0.6 + timing * 0.4);
+    
+    const hasVoice = singingFramesRef.current > 10;
+    const totalScore = hasVoice 
+      ? Math.round(pitchAccuracy * 0.6 + timing * 0.4)
+      : Math.round(timing * 0.3);
     
     onScoreUpdateRef.current?.({ pitchAccuracy, timing, totalScore });
   }, []);
