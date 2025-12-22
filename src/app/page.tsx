@@ -154,7 +154,7 @@ function TVStatCard({ label, value, icon, delay }: { label: string; value: numbe
 }
 
 /**
- * Confetti particle component
+ * Confetti particle component for high scores
  */
 function Confetti({ isHighScore }: { isHighScore: boolean }) {
   if (!isHighScore) return null;
@@ -179,6 +179,56 @@ function Confetti({ isHighScore }: { isHighScore: boolean }) {
 }
 
 /**
+ * Sparkle effect for medium scores
+ */
+function Sparkles({ show }: { show: boolean }) {
+  if (!show) return null;
+  
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {[...Array(12)].map((_, i) => (
+        <div
+          key={i}
+          className="absolute w-1 h-1 bg-white rounded-full animate-sparkle"
+          style={{
+            left: `${10 + Math.random() * 80}%`,
+            top: `${10 + Math.random() * 80}%`,
+            animationDelay: `${Math.random() * 2}s`,
+            animationDuration: `${1.5 + Math.random() * 1}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Floating hearts for encouragement (low scores)
+ */
+function FloatingHearts({ show }: { show: boolean }) {
+  if (!show) return null;
+  
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {[...Array(6)].map((_, i) => (
+        <div
+          key={i}
+          className="absolute text-2xl animate-float-up"
+          style={{
+            left: `${15 + i * 15}%`,
+            bottom: '-30px',
+            animationDelay: `${i * 0.5}s`,
+            animationDuration: '4s',
+          }}
+        >
+          💪
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
  * TV Song Result Screen - Compact design for TV with effects
  */
 function TVSongResultScreen({ 
@@ -194,13 +244,45 @@ function TVSongResultScreen({
 }) {
   const gradeInfo = finalScore ? getScoreGrade(finalScore.totalScore) : null;
   const isHighScore = finalScore ? finalScore.totalScore >= 80 : false;
+  const isMediumScore = finalScore ? finalScore.totalScore >= 60 && finalScore.totalScore < 80 : false;
+  const isLowScore = finalScore ? finalScore.totalScore < 60 : false;
 
   // Play celebration sound for high scores
   useEffect(() => {
     if (isHighScore) {
-      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQYAQKPd7qJhAQBIqeXxmVQAAE2u6fKRRwAATrDq8o1CAABP');
-      audio.volume = 0.3;
-      audio.play().catch(() => {});
+      // Create a simple celebration sound using Web Audio API
+      try {
+        const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+        const masterGain = audioContext.createGain();
+        masterGain.gain.value = 0.3; // 30% volume
+        masterGain.connect(audioContext.destination);
+        
+        // Play a cheerful chord progression
+        const playNote = (freq: number, startTime: number, duration: number) => {
+          const osc = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.3, startTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+          osc.connect(gain);
+          gain.connect(masterGain);
+          osc.start(startTime);
+          osc.stop(startTime + duration);
+        };
+        
+        const now = audioContext.currentTime;
+        // C major chord arpeggio (celebration sound)
+        playNote(523.25, now, 0.15);        // C5
+        playNote(659.25, now + 0.1, 0.15);  // E5
+        playNote(783.99, now + 0.2, 0.15);  // G5
+        playNote(1046.50, now + 0.3, 0.3);  // C6 (longer)
+        
+        // Cleanup after sound finishes
+        setTimeout(() => audioContext.close(), 1000);
+      } catch {
+        // Fallback: silent if Web Audio not supported
+      }
     }
   }, [isHighScore]);
 
@@ -218,28 +300,40 @@ function TVSongResultScreen({
 
   return (
     <div className="h-screen bg-tv-bg flex items-center justify-center p-4 relative">
-      {/* Confetti effect for high scores */}
+      {/* Effects based on score level */}
       <Confetti isHighScore={isHighScore} />
+      <Sparkles show={isMediumScore} />
+      <FloatingHearts show={isLowScore} />
       
-      {/* Glow background for high scores */}
+      {/* Glow background effects based on score */}
       {isHighScore && (
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-yellow-500/20 rounded-full blur-[100px] animate-pulse" />
         </div>
       )}
+      {isMediumScore && (
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-blue-500/15 rounded-full blur-[80px] animate-pulse" style={{ animationDuration: '3s' }} />
+        </div>
+      )}
+      {isLowScore && (
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-rose-500/10 rounded-full blur-[60px]" />
+        </div>
+      )}
 
       <div className="flex items-center gap-8 max-w-3xl w-full relative z-10">
-        {/* Left - Thumbnail */}
+        {/* Left - Thumbnail (16:9 aspect ratio like YouTube) */}
         <div className="flex-shrink-0">
-          <div className={`relative p-1 rounded-2xl bg-gradient-to-br ${gradeInfo?.gradient || 'from-purple-500 to-pink-500'} ${isHighScore ? 'animate-pulse' : ''}`}>
+          <div className={`relative p-1.5 rounded-2xl bg-gradient-to-br ${gradeInfo?.gradient || 'from-purple-500 to-pink-500'} ${isHighScore ? 'animate-pulse' : ''}`}>
             <img 
               src={song.song.thumbnail} 
               alt="" 
-              className="w-40 h-40 rounded-xl object-cover"
+              className="w-80 h-44 rounded-xl object-cover"
             />
             {gradeInfo && (
-              <div className={`absolute -bottom-3 -right-3 w-12 h-12 rounded-full bg-gradient-to-br ${gradeInfo.gradient} flex items-center justify-center shadow-lg border-2 border-white dark:border-slate-900 ${isHighScore ? 'animate-bounce' : ''}`}>
-                <span className="text-xl font-black text-white">{gradeInfo.grade}</span>
+              <div className={`absolute -bottom-3 -right-3 w-14 h-14 rounded-full bg-gradient-to-br ${gradeInfo.gradient} flex items-center justify-center shadow-lg border-2 border-white dark:border-slate-900 ${isHighScore ? 'animate-bounce' : ''}`}>
+                <span className="text-2xl font-black text-white">{gradeInfo.grade}</span>
               </div>
             )}
           </div>
@@ -249,7 +343,7 @@ function TVSongResultScreen({
         <div className="flex-1 min-w-0">
           {/* Song title */}
           <p className="text-sm text-gray-500 mb-1">🎵 Hoàn thành</p>
-          <h2 className="text-lg font-bold truncate mb-3">{song.song.title}</h2>
+          <h2 className="text-xl font-bold line-clamp-2 mb-3">{song.song.title}</h2>
 
           {finalScore && gradeInfo ? (
             <>
