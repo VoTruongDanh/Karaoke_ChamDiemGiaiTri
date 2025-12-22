@@ -47,6 +47,15 @@
     outline: none;
   }
 
+  /* TV Browser D-pad focus support */
+  button:focus,
+  a:focus,
+  [tabindex="0"]:focus,
+  [data-focusable="true"]:focus {
+    outline: 4px solid var(--tv-focus-ring-color) !important;
+    outline-offset: 2px;
+  }
+
   /* Smooth scrolling for TV */
   html {
     scroll-behavior: smooth;

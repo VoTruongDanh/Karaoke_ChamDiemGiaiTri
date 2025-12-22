@@ -40,10 +40,10 @@ export interface FocusableButtonProps {
  * All sizes use TV-optimized spacing and font sizes from Tailwind config
  */
 const SIZE_CLASSES = {
-  sm: 'min-h-[56px] min-w-[140px] px-tv-3 py-tv-2 text-tv-xs',
-  md: 'min-h-[64px] min-w-[180px] px-tv-4 py-tv-2 text-tv-sm',
-  lg: 'min-h-[72px] min-w-[220px] px-tv-5 py-tv-3 text-tv-base',
-  xl: 'min-h-[88px] min-w-[280px] px-tv-6 py-tv-3 text-tv-lg',
+  sm: 'min-h-[44px] min-w-[100px] px-3 py-2 text-sm',
+  md: 'min-h-[48px] min-w-[120px] px-4 py-2 text-base',
+  lg: 'min-h-[56px] min-w-[160px] px-5 py-2.5 text-lg',
+  xl: 'min-h-[64px] min-w-[200px] px-6 py-3 text-xl',
 };
 
 /**
@@ -52,18 +52,18 @@ const SIZE_CLASSES = {
  */
 const VARIANT_CLASSES = {
   primary: {
-    base: 'bg-primary-600 text-white border-[3px] border-primary-500',
+    base: 'bg-primary-600 text-white border-2 border-primary-500 shadow-sm',
     focused: 'bg-primary-500 border-primary-300',
     disabled: 'bg-primary-900/50 text-primary-400 border-primary-900',
   },
   secondary: {
-    base: 'bg-white dark:bg-tv-card text-slate-800 dark:text-white border-[3px] border-slate-200 dark:border-tv-border',
+    base: 'bg-white dark:bg-tv-card text-slate-800 dark:text-white border-2 border-slate-200 dark:border-tv-border shadow-sm',
     focused: 'bg-slate-50 dark:bg-tv-hover border-primary-400',
     disabled: 'bg-slate-100 dark:bg-tv-surface/50 text-slate-400 dark:text-gray-500 border-slate-200 dark:border-tv-border/50',
   },
   ghost: {
-    base: 'bg-transparent text-slate-700 dark:text-white border-[3px] border-transparent',
-    focused: 'bg-slate-100 dark:bg-white/10 border-primary-400',
+    base: 'bg-transparent text-slate-700 dark:text-white border-2 border-transparent',
+    focused: 'bg-slate-100 dark:bg-white/10 border-primary-400/50',
     disabled: 'text-slate-400 dark:text-gray-600 border-transparent',
   },
 };
@@ -158,14 +158,13 @@ export function FocusableButton({
     sizeStyles,
     // Variant base styles
     variantStyles.base,
-    // Focus state styles (Requirements: 1.3 - scale animation and prominent highlight)
+    // Focus state styles - lighter, subtle
     isFocused && !disabled && variantStyles.focused,
     isFocused && !disabled && [
-      'scale-105', // Scale animation on focus
-      'shadow-tv-focus', // Prominent glow shadow
-      'ring-tv ring-primary-400', // Focus ring
-      'animate-focus-pulse', // Pulsing animation for visibility
-      'z-10', // Ensure focused button is above siblings
+      'scale-[1.02]', // Subtle scale
+      'shadow-md', // Light shadow
+      'ring-2 ring-primary-400/60', // Lighter ring
+      'z-10',
     ].join(' '),
     // Disabled state
     disabled && variantStyles.disabled,
@@ -180,17 +179,24 @@ export function FocusableButton({
     <button
       ref={buttonRef}
       type="button"
-      role="gridcell"
+      role="button"
+      tabIndex={0}
       aria-selected={isFocused}
       aria-disabled={disabled}
       aria-label={ariaLabel}
       data-focused={isFocused}
       data-row={row}
       data-col={col}
+      data-focusable="true"
       disabled={disabled}
       className={buttonClasses}
       onClick={handleSelect}
-      tabIndex={isFocused ? 0 : -1}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleSelect();
+        }
+      }}
     >
       {icon && <span className="flex-shrink-0">{icon}</span>}
       <span>{children}</span>

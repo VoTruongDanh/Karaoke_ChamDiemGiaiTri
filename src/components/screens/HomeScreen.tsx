@@ -21,7 +21,7 @@ export interface HomeScreenProps {
 
 function SearchIcon() {
   return (
-    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
     </svg>
   );
@@ -29,7 +29,7 @@ function SearchIcon() {
 
 function QueueIcon() {
   return (
-    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
     </svg>
   );
@@ -37,7 +37,7 @@ function QueueIcon() {
 
 function PlayIcon() {
   return (
-    <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
       <path d="M8 5v14l11-7z" />
     </svg>
   );
@@ -45,7 +45,7 @@ function PlayIcon() {
 
 function MusicIcon() {
   return (
-    <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
     </svg>
   );
@@ -64,7 +64,7 @@ function QRCodeDisplay({ code }: { code: string }) {
       setMobileUrl(url);
       
       QRCode.toDataURL(url, {
-        width: 280,
+        width: 336,
         margin: 2,
         color: { dark: '#000000', light: '#ffffff' },
       })
@@ -77,9 +77,9 @@ function QRCodeDisplay({ code }: { code: string }) {
     <div className="flex flex-col items-center text-center">
       <div className="bg-white p-3 rounded-xl mb-4 shadow-lg">
         {qrDataUrl ? (
-          <img src={qrDataUrl} alt="QR Code" className="w-52 h-52" />
+          <img src={qrDataUrl} alt="QR Code" className="w-[252px] h-[252px]" />
         ) : (
-          <div className="w-52 h-52 flex items-center justify-center bg-gray-100">
+          <div className="w-[252px] h-[252px] flex items-center justify-center bg-gray-100">
             <span className="text-gray-400 text-base">Đang tạo...</span>
           </div>
         )}
@@ -87,7 +87,7 @@ function QRCodeDisplay({ code }: { code: string }) {
       <p className="text-base text-gray-400 mb-1">Quét QR hoặc nhập mã</p>
       <p className="text-5xl font-bold text-primary-500 tracking-widest mb-2">{code}</p>
       {mobileUrl && (
-        <p className="text-sm text-gray-500 break-all leading-tight max-w-[220px]">
+        <p className="text-xs text-gray-500 break-all leading-tight max-w-[252px]">
           {mobileUrl}
         </p>
       )}
@@ -178,78 +178,90 @@ export function HomeScreen({
 
           {/* Right - Main content */}
           <div className="flex-1 flex flex-col gap-4 min-w-0">
-            {/* Now Playing - Top */}
-            <div className="bg-white/5 dark:bg-white/5 backdrop-blur rounded-2xl p-4">
-              <p className="text-base text-gray-400 mb-2">Đang phát</p>
-              {currentSong ? (
-                <div 
-                  className="flex items-center gap-4 cursor-pointer"
-                  onClick={onNowPlayingSelect}
-                >
-                  <LazyImage 
-                    src={currentSong.song.thumbnail} 
-                    alt={currentSong.song.title}
-                    className="w-32 h-20 lg:w-36 lg:h-24 rounded-lg object-cover flex-shrink-0"
-                    width={144}
-                    height={96}
-                    priority
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xl lg:text-2xl font-semibold truncate">{currentSong.song.title}</p>
-                    <p className="text-lg text-gray-400 truncate">{currentSong.song.channelName}</p>
+            {/* Now Playing - Top - 2 rows layout like search results */}
+            {currentSong ? (
+              <FocusableButton
+                row={0}
+                col={2}
+                onSelect={onNowPlayingSelect || (() => {})}
+                variant="ghost"
+                className="!p-0 !min-h-0 !min-w-0 w-full text-left !overflow-hidden"
+              >
+                <div className="bg-white/5 backdrop-blur rounded-2xl p-4 w-full overflow-hidden">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
+                    <p className="text-base text-green-500 font-medium">Đang phát</p>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                    <span className="text-base text-green-500 font-medium">LIVE</span>
+                  {/* 2 rows: image on top, text below */}
+                  <div className="flex flex-col">
+                    <LazyImage 
+                      src={currentSong.song.thumbnail} 
+                      alt={currentSong.song.title}
+                      className="w-full h-40 lg:h-48 rounded-xl object-cover mb-3"
+                      width={400}
+                      height={225}
+                      priority
+                    />
+                    <div className="overflow-hidden">
+                      <p className="text-xl lg:text-2xl font-semibold truncate mb-1">{currentSong.song.title}</p>
+                      <p className="text-base lg:text-lg text-gray-400 truncate">{currentSong.song.channelName}</p>
+                    </div>
                   </div>
                 </div>
-              ) : (
-                <div className="flex items-center gap-4 opacity-50">
-                  <div className="w-32 h-20 lg:w-36 lg:h-24 bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0">
+              </FocusableButton>
+            ) : (
+              <div className="bg-white/5 backdrop-blur rounded-2xl p-4">
+                <p className="text-base text-gray-400 mb-3">Đang phát</p>
+                <div className="flex flex-col items-center opacity-50 py-6">
+                  <div className="w-24 h-24 bg-gray-700 rounded-xl flex items-center justify-center mb-3">
                     <MusicIcon />
                   </div>
                   <p className="text-lg text-gray-400">Chưa có bài hát</p>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Action buttons */}
-            <div className="flex gap-3">
+            <div className="flex gap-4">
               <FocusableButton
-                row={0}
+                row={1}
                 col={0}
                 onSelect={onSearchSelect}
                 variant="primary"
                 size="md"
                 icon={<SearchIcon />}
                 autoFocus
-                className="flex-1 !whitespace-nowrap !text-sm"
+                className="flex-1 !whitespace-nowrap"
               >
-                <span className="whitespace-nowrap text-sm">Tìm kiếm</span>
+                Tìm kiếm
               </FocusableButton>
               
               <FocusableButton
-                row={0}
+                row={1}
                 col={1}
                 onSelect={onQueueSelect}
                 variant="secondary"
                 size="md"
                 icon={<QueueIcon />}
-                className="flex-1 !whitespace-nowrap !text-sm"
+                className="flex-1 !whitespace-nowrap"
               >
-                <span className="whitespace-nowrap text-sm">Hàng đợi {waitingCount > 0 && `(${waitingCount})`}</span>
+                Hàng đợi {waitingCount > 0 && `(${waitingCount})`}
               </FocusableButton>
             </div>
 
             {/* Play Now button */}
             {waitingCount > 0 && !currentSong && onPlayNow && (
-              <button
-                onClick={onPlayNow}
-                className="w-full py-4 bg-green-500 hover:bg-green-600 text-white text-xl font-bold rounded-xl flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
+              <FocusableButton
+                row={2}
+                col={0}
+                onSelect={onPlayNow}
+                variant="primary"
+                size="md"
+                icon={<PlayIcon />}
+                className="w-full !bg-green-500 hover:!bg-green-600"
               >
-                <PlayIcon />
                 Phát ngay ({waitingCount} bài)
-              </button>
+              </FocusableButton>
             )}
 
             {/* Queue preview */}

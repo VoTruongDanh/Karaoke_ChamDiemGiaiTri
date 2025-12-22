@@ -1,6 +1,7 @@
 /**
  * Silent Scoring Hook
  * Records audio in background with real pitch detection using autocorrelation
+ * Optimized: Only counts singing segments, ignores instrumental parts
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
@@ -108,23 +109,6 @@ function detectPitch(buffer: Float32Array, sampleRate: number): number {
 }
 
 /**
- * Convert frequency to musical note and calculate stability
- */
-function frequencyToNote(freq: number): { note: string; cents: number } {
-  if (freq <= 0) return { note: '', cents: 0 };
-  
-  const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-  const A4 = 440;
-  const semitones = 12 * Math.log2(freq / A4);
-  const noteIndex = Math.round(semitones) + 9; // A4 is index 9
-  const octave = Math.floor((noteIndex + 3) / 12) + 4;
-  const noteName = noteNames[(noteIndex % 12 + 12) % 12];
-  const cents = Math.round((semitones - Math.round(semitones)) * 100);
-  
-  return { note: `${noteName}${octave}`, cents };
-}
-
-/**
  * Calculate pitch stability score (how consistent the pitch is)
  */
 function calculateStability(pitchHistory: number[]): number {
@@ -149,6 +133,14 @@ function calculateStability(pitchHistory: number[]): number {
   return score;
 }
 
+// Singing segment detection
+interface SingingSegment {
+  startFrame: number;
+  endFrame: number;
+  pitches: number[];
+  stability: number;
+}
+
 export function useSilentScoring({ 
   isPlaying, 
   onScoreUpdate 
@@ -168,16 +160,75 @@ export function useSilentScoring({
   const isRecordingRef = useRef(false);
   const onScoreUpdateRef = useRef(onScoreUpdate);
   
-  // Scoring data
-  const pitchHistoryRef = useRef<number[]>([]);
-  const stabilityScoresRef = useRef<number[]>([]);
-  const singingFramesRef = useRef(0);
-  const totalFramesRef = useRef(0);
+  // Scoring data - segment based
+  const currentSegmentRef = useRef<number[]>([]); // Current singing segment pitches
+  const segmentsRef = useRef<SingingSegment[]>([]); // Completed segments
+  const silenceCountRef = useRef(0); // Consecutive silent frames
+  const frameCountRef = useRef(0);
+  const segmentStartRef = useRef(0);
+  
+  // Constants
+  const SILENCE_THRESHOLD = 15; // Frames of silence to end a segment (~250ms)
+  const MIN_SEGMENT_LENGTH = 10; // Minimum frames for valid segment (~166ms)
 
   // Keep callback ref updated
   useEffect(() => {
     onScoreUpdateRef.current = onScoreUpdate;
   });
+
+  // Calculate score from segments only (ignores instrumental parts)
+  const calculateSegmentScore = useCallback(() => {
+    const segments = segmentsRef.current;
+    const currentSegment = currentSegmentRef.current;
+    
+    // Include current segment if long enough
+    const allSegments = [...segments];
+    if (currentSegment.length >= MIN_SEGMENT_LENGTH) {
+      const stability = calculateStability(currentSegment);
+      allSegments.push({
+        startFrame: segmentStartRef.current,
+        endFrame: frameCountRef.current,
+        pitches: [...currentSegment],
+        stability,
+      });
+    }
+    
+    if (allSegments.length === 0) {
+      return { pitchAccuracy: 0, timing: 0, totalScore: 0 };
+    }
+    
+    // Pitch accuracy = weighted average of segment stabilities
+    // Weight by segment length (longer segments count more)
+    let totalWeight = 0;
+    let weightedStability = 0;
+    let totalSingingFrames = 0;
+    
+    for (const seg of allSegments) {
+      const weight = seg.pitches.length;
+      totalWeight += weight;
+      weightedStability += seg.stability * weight;
+      totalSingingFrames += seg.pitches.length;
+    }
+    
+    const pitchAccuracy = totalWeight > 0 
+      ? Math.round(weightedStability / totalWeight)
+      : 0;
+    
+    // Timing = based on singing consistency within segments
+    // (how much of each segment has valid pitch)
+    let validPitchCount = 0;
+    for (const seg of allSegments) {
+      validPitchCount += seg.pitches.filter(p => p > 0).length;
+    }
+    const timing = totalSingingFrames > 0
+      ? Math.round((validPitchCount / totalSingingFrames) * 100)
+      : 0;
+    
+    // Total score - only from singing parts
+    const totalScore = Math.round(pitchAccuracy * 0.7 + timing * 0.3);
+    
+    return { pitchAccuracy, timing, totalScore };
+  }, []);
 
   // Start recording
   const startRecording = useCallback(async () => {
@@ -195,7 +246,7 @@ export function useSilentScoring({
 
       audioContextRef.current = new AudioContext();
       analyserRef.current = audioContextRef.current.createAnalyser();
-      analyserRef.current.fftSize = 4096; // Larger for better pitch detection
+      analyserRef.current.fftSize = 4096;
 
       const source = audioContextRef.current.createMediaStreamSource(stream);
       source.connect(analyserRef.current);
@@ -205,73 +256,57 @@ export function useSilentScoring({
       setError(null);
       
       // Reset scoring data
-      pitchHistoryRef.current = [];
-      stabilityScoresRef.current = [];
-      singingFramesRef.current = 0;
-      totalFramesRef.current = 0;
+      currentSegmentRef.current = [];
+      segmentsRef.current = [];
+      silenceCountRef.current = 0;
+      frameCountRef.current = 0;
+      segmentStartRef.current = 0;
 
       // Start analysis loop
       const analyser = analyserRef.current;
       const sampleRate = audioContextRef.current.sampleRate;
       const bufferLength = analyser.fftSize;
       const dataArray = new Float32Array(bufferLength);
-      let frameCount = 0;
 
       const analyze = () => {
         if (!isRecordingRef.current) return;
 
         analyser.getFloatTimeDomainData(dataArray);
-        totalFramesRef.current++;
+        frameCountRef.current++;
 
         // Detect pitch
         const pitch = detectPitch(dataArray, sampleRate);
         
         if (pitch > 0) {
-          // Voice detected
-          singingFramesRef.current++;
-          pitchHistoryRef.current.push(pitch);
-          
-          // Keep last 100 pitches for stability calculation
-          if (pitchHistoryRef.current.length > 100) {
-            pitchHistoryRef.current = pitchHistoryRef.current.slice(-100);
+          // Voice detected - add to current segment
+          if (currentSegmentRef.current.length === 0) {
+            segmentStartRef.current = frameCountRef.current;
           }
+          currentSegmentRef.current.push(pitch);
+          silenceCountRef.current = 0;
+        } else {
+          // Silence
+          silenceCountRef.current++;
           
-          // Calculate stability every 10 frames
-          if (pitchHistoryRef.current.length >= 10 && pitchHistoryRef.current.length % 10 === 0) {
-            const stability = calculateStability(pitchHistoryRef.current.slice(-20));
-            stabilityScoresRef.current.push(stability);
-            
-            // Keep last 50 stability scores
-            if (stabilityScoresRef.current.length > 50) {
-              stabilityScoresRef.current = stabilityScoresRef.current.slice(-50);
+          // End segment if enough silence
+          if (silenceCountRef.current >= SILENCE_THRESHOLD && currentSegmentRef.current.length > 0) {
+            // Save segment if long enough
+            if (currentSegmentRef.current.length >= MIN_SEGMENT_LENGTH) {
+              const stability = calculateStability(currentSegmentRef.current);
+              segmentsRef.current.push({
+                startFrame: segmentStartRef.current,
+                endFrame: frameCountRef.current - SILENCE_THRESHOLD,
+                pitches: [...currentSegmentRef.current],
+                stability,
+              });
             }
+            currentSegmentRef.current = [];
           }
         }
 
-        // Calculate scores
-        frameCount++;
-        if (frameCount % 10 === 0) { // Update every ~166ms
-          const avgStability = stabilityScoresRef.current.length > 0
-            ? stabilityScoresRef.current.reduce((a, b) => a + b, 0) / stabilityScoresRef.current.length
-            : 0;
-          
-          // Timing = percentage of time with detected voice pitch
-          // Need 60% voice time for 100 score (realistic for karaoke)
-          const voiceRatio = totalFramesRef.current > 0 
-            ? singingFramesRef.current / totalFramesRef.current 
-            : 0;
-          const timing = Math.min(100, Math.round((voiceRatio / 0.6) * 100));
-          
-          // Pitch accuracy = stability score (how consistent the pitch is)
-          const pitchAccuracy = Math.round(avgStability);
-          
-          // Total score: if no voice detected, score is low
-          const hasVoice = singingFramesRef.current > 10;
-          const totalScore = hasVoice 
-            ? Math.round(pitchAccuracy * 0.6 + timing * 0.4)
-            : Math.round(timing * 0.3); // Penalty for no voice
-
-          const score = { pitchAccuracy, timing, totalScore };
+        // Update score every 15 frames (~250ms)
+        if (frameCountRef.current % 15 === 0) {
+          const score = calculateSegmentScore();
           setCurrentScore(score);
           onScoreUpdateRef.current?.(score);
         }
@@ -285,7 +320,7 @@ export function useSilentScoring({
       setError('Không thể truy cập microphone');
       setIsRecording(false);
     }
-  }, []);
+  }, [calculateSegmentScore]);
 
   // Stop recording
   const stopRecording = useCallback(() => {
@@ -307,25 +342,11 @@ export function useSilentScoring({
       audioContextRef.current = null;
     }
 
-    // Send final score
-    const avgStability = stabilityScoresRef.current.length > 0
-      ? stabilityScoresRef.current.reduce((a, b) => a + b, 0) / stabilityScoresRef.current.length
-      : 0;
-    
-    const voiceRatio = totalFramesRef.current > 0 
-      ? singingFramesRef.current / totalFramesRef.current 
-      : 0;
-    // Need 60% voice time for 100 score
-    const timing = Math.min(100, Math.round((voiceRatio / 0.6) * 100));
-    const pitchAccuracy = Math.round(avgStability);
-    
-    const hasVoice = singingFramesRef.current > 10;
-    const totalScore = hasVoice 
-      ? Math.round(pitchAccuracy * 0.6 + timing * 0.4)
-      : Math.round(timing * 0.3);
-    
-    onScoreUpdateRef.current?.({ pitchAccuracy, timing, totalScore });
-  }, []);
+    // Calculate and send final score
+    const finalScore = calculateSegmentScore();
+    setCurrentScore(finalScore);
+    onScoreUpdateRef.current?.(finalScore);
+  }, [calculateSegmentScore]);
 
   // Auto start/stop based on isPlaying
   useEffect(() => {

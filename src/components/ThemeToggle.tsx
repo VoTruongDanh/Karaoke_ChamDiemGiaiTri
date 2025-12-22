@@ -72,9 +72,16 @@ export function ThemeToggle() {
   return (
     <button
       onClick={toggleTheme}
-      className="p-2 rounded-tv bg-tv-card border border-tv-border hover:bg-tv-hover transition-colors"
+      tabIndex={0}
+      className="p-2 rounded-tv bg-tv-card border border-tv-border hover:bg-tv-hover transition-colors focus:outline-4 focus:outline-primary-400"
       aria-label={isDark ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'}
       title={isDark ? 'Chế độ sáng' : 'Chế độ tối'}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          toggleTheme();
+        }
+      }}
     >
       {isDark ? <SunIcon /> : <MoonIcon />}
     </button>

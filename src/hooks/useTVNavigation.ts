@@ -40,13 +40,31 @@ export interface TVNavigationResult {
 /**
  * Key codes for TV remote navigation
  * Requirements: 1.4 - Support only 5 keys: Up, Down, Left, Right, Enter
+ * Also supports TV-specific key codes from various manufacturers
  */
 const KEY_MAP: Record<string, NavigationDirection | 'select'> = {
+  // Standard keyboard
   ArrowUp: 'up',
   ArrowDown: 'down',
   ArrowLeft: 'left',
   ArrowRight: 'right',
   Enter: 'select',
+  ' ': 'select', // Space bar
+  
+  // Samsung/LG TV remote codes
+  '38': 'up',    // Up
+  '40': 'down',  // Down
+  '37': 'left',  // Left
+  '39': 'right', // Right
+  '13': 'select', // Enter/OK
+  
+  // Some TV browsers use these
+  'Up': 'up',
+  'Down': 'down',
+  'Left': 'left',
+  'Right': 'right',
+  'Select': 'select',
+  'Ok': 'select',
 };
 
 /**
@@ -236,10 +254,12 @@ export function useTVNavigation(config: TVNavigationConfig = {}): TVNavigationRe
     if (!enabled) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      const action = KEY_MAP[event.key];
+      // Try key first, then keyCode for older TV browsers
+      const action = KEY_MAP[event.key] || KEY_MAP[String(event.keyCode)];
       if (!action) return; // Ignore unsupported keys
 
       event.preventDefault();
+      event.stopPropagation();
 
       if (action === 'select') {
         selectCurrent();
@@ -248,8 +268,8 @@ export function useTVNavigation(config: TVNavigationConfig = {}): TVNavigationRe
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [enabled, moveFocus, selectCurrent]);
 
   /**
