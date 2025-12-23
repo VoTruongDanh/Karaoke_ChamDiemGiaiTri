@@ -172,14 +172,45 @@ export function HomeScreen({
   // Priority: lastPlayedVideoId (vừa hát xong) > currentSong (đang phát) > queue
   const primaryVideoId = lastPlayedVideoId || currentSong?.song.youtubeId || queueItems[0]?.song.youtubeId || '';
   const lastFetchedVideoIdRef = useRef<string>('');
+  const initialLoadDone = useRef(false);
 
   // Load suggestions based on last played or current song
+  // If no video, search for "karaoke 2025"
   useEffect(() => {
-    if (!onGetSuggestions || !primaryVideoId) {
-      setSuggestions([]);
-      loadedIdsRef.current.clear();
+    console.log('[Home] useEffect - onGetSuggestions:', !!onGetSuggestions, 'primaryVideoId:', primaryVideoId, 'initialLoadDone:', initialLoadDone.current);
+    
+    if (!onGetSuggestions) {
+      console.log('[Home] No onGetSuggestions callback');
       return;
     }
+    
+    // If no video yet, fetch popular karaoke (pass empty array to trigger search)
+    if (!primaryVideoId) {
+      if (initialLoadDone.current && suggestions.length > 0) {
+        console.log('[Home] Already loaded initial suggestions');
+        return;
+      }
+      
+      console.log('[Home] No video yet, fetching popular karaoke');
+      initialLoadDone.current = true;
+      setIsLoadingSuggestions(true);
+      
+      onGetSuggestions([], 12) // Empty array triggers search fallback
+        .then(results => {
+          console.log('[Home] Got popular karaoke:', results.length);
+          setSuggestions(results);
+          loadedIdsRef.current = new Set(results.map(s => s.youtubeId));
+        })
+        .catch((err) => {
+          console.error('[Home] Failed to get popular karaoke:', err);
+          setSuggestions([]);
+        })
+        .finally(() => setIsLoadingSuggestions(false));
+      return;
+    }
+    
+    // Reset initial load flag when we have a video
+    initialLoadDone.current = false;
     
     // Skip if we already fetched for this video
     if (primaryVideoId === lastFetchedVideoIdRef.current && suggestions.length > 0) {
@@ -439,18 +470,18 @@ export function HomeScreen({
               </div>
             )}
 
-            {/* Suggestions - show when queue has songs */}
+            {/* Suggestions - always show if available */}
             {suggestions.length > 0 && onAddToQueue && (
-              <div className="bg-white/5 dark:bg-white/5 backdrop-blur rounded-2xl p-4">
+              <div className="bg-white/5 dark:bg-white/5 backdrop-blur rounded-2xl p-4 overflow-visible">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-base text-gray-400">🎵 Gợi ý cho bạn</p>
                   <p className="text-xs text-gray-500">{suggestions.length} bài</p>
                 </div>
                 <div 
                   ref={suggestionsContainerRef}
-                  className="max-h-[400px] overflow-y-auto hide-scrollbar"
+                  className="max-h-[400px] overflow-y-auto hide-scrollbar p-2"
                 >
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 gap-3">
                     {suggestions.map((song, index) => {
                       const isAdded = addedIds.has(song.youtubeId);
                       // Calculate base row based on what's visible above
@@ -460,10 +491,9 @@ export function HomeScreen({
                       if (hasPlayNow) baseRow++;
                       if (hasQueuePreview) baseRow++;
                       
-                      // 4 columns on lg, 2 on smaller
-                      const cols = 4;
-                      const suggestionRow = baseRow + Math.floor(index / cols);
-                      const suggestionCol = index % cols;
+                      // 2 columns
+                      const suggestionRow = baseRow + Math.floor(index / 2);
+                      const suggestionCol = index % 2;
                       
                       return (
                         <FocusableButton
@@ -528,8 +558,8 @@ export function HomeScreen({
               </div>
             )}
 
-            {/* Loading suggestions */}
-            {isLoadingSuggestions && (queueItems.length > 0 || currentSong) && (
+            {/* Loading suggestions - show always when loading */}
+            {isLoadingSuggestions && (
               <div className="flex items-center justify-center gap-2 py-4">
                 <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
                 <span className="text-sm text-gray-400">Đang tải gợi ý...</span>

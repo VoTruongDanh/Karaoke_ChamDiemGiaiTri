@@ -1175,6 +1175,8 @@ function TVAppContent() {
             finalScore={resultData.finalScore}
             onNext={handleNextFromResult}
             hasNextSong={queueStore.getNext() !== null}
+            onGetSuggestions={songLibrary ? (videoIds, maxResults = 6) => songLibrary.getSuggestions(videoIds, maxResults) : undefined}
+            onAddToQueue={handleSongSelect}
           />
         );
 

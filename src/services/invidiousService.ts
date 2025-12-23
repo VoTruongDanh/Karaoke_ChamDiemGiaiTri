@@ -91,10 +91,19 @@ export class InvidiousService {
 
   /**
    * Get suggestions from multiple videos - YouTube's actual "Up next" recommendations
-   * No keyword search fallback - only real recommendations
+   * If no videoIds provided, search for popular karaoke
    */
   async getSuggestionsFromVideos(videoIds: string[], maxResults: number = 10): Promise<Song[]> {
-    if (videoIds.length === 0) return [];
+    // If no video IDs, search for popular karaoke 2025
+    if (videoIds.length === 0) {
+      console.log('[Search] No video IDs, searching popular karaoke');
+      try {
+        const result = await this.search('karaoke việt 2025 hot');
+        return result.songs.slice(0, maxResults);
+      } catch {
+        return [];
+      }
+    }
 
     // Get related videos from API (now optimized with parallel fetch + cache)
     const recentId = videoIds[0];

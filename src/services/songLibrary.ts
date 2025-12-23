@@ -105,13 +105,25 @@ export class SongLibrary {
   /**
    * Get YouTube's actual "Up next" suggestions based on recently played video
    * Uses optimized API with parallel fetch and caching
+   * If no videoIds provided, returns popular karaoke
    * 
    * @param videoIds - Array of YouTube video IDs from recently added songs
    * @param maxResults - Maximum number of suggestions
    * @returns Array of suggested songs (YouTube's real recommendations)
    */
   async getSuggestions(videoIds: string[], maxResults: number = 10): Promise<Song[]> {
-    if (videoIds.length === 0) return [];
+    // If no video IDs, get popular karaoke from invidiousService
+    if (videoIds.length === 0) {
+      console.log('[SongLibrary] No video IDs, getting popular karaoke');
+      try {
+        const result = await this.invidiousService.getSuggestionsFromVideos([], maxResults);
+        console.log('[SongLibrary] Got', result.length, 'popular karaoke');
+        return result;
+      } catch (error) {
+        console.error('[SongLibrary] Popular karaoke failed:', error);
+        return [];
+      }
+    }
     
     console.log('[SongLibrary] Getting suggestions for:', videoIds[0]);
     

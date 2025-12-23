@@ -2,8 +2,12 @@
 
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import confetti from 'canvas-confetti';
+import { NavigationGrid } from '@/components/NavigationGrid';
+import { FocusableButton } from '@/components/FocusableButton';
+import { LazyImage } from '@/components/LazyImage';
 import type { QueueItem } from '@/types/queue';
 import type { ScoreData } from '@/types/score';
+import type { Song } from '@/types/song';
 
 interface GradeInfo {
   grade: string;
@@ -314,18 +318,45 @@ interface Props {
   finalScore: ScoreData | null;
   onNext: () => void;
   hasNextSong: boolean;
+  onGetSuggestions?: (videoIds: string[], maxResults?: number) => Promise<Song[]>;
+  onAddToQueue?: (song: Song) => void;
 }
 
-export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong }: Props) {
+export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGetSuggestions, onAddToQueue }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [show, setShow] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const confettiDone = useRef(false);
+  
+  // Suggestions state
+  const [suggestions, setSuggestions] = useState<Song[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+  const [showSuggestions, setShowSuggestions] = useState(false); // Only show when pressing down
 
   const grade = finalScore ? getScoreGrade(finalScore.totalScore) : null;
   const quote = useMemo(() => grade ? getRandomQuote(grade) : '', [grade]);
   const isHigh = finalScore ? finalScore.totalScore >= 80 : false;
   const isMed = finalScore ? finalScore.totalScore >= 60 && finalScore.totalScore < 80 : false;
+  
+  // Load suggestions based on current song
+  useEffect(() => {
+    if (!onGetSuggestions) return;
+    
+    setIsLoadingSuggestions(true);
+    onGetSuggestions([song.song.youtubeId], 6)
+      .then(results => {
+        setSuggestions(results.filter(s => s.youtubeId !== song.song.youtubeId));
+      })
+      .catch(() => setSuggestions([]))
+      .finally(() => setIsLoadingSuggestions(false));
+  }, [song.song.youtubeId, onGetSuggestions]);
+  
+  const handleAddSuggestion = useCallback((s: Song) => {
+    if (!onAddToQueue) return;
+    onAddToQueue(s);
+    setAddedIds(prev => new Set(prev).add(s.youtubeId));
+  }, [onAddToQueue]);
 
   const fireConfetti = useCallback(() => {
     if (!canvasRef.current || confettiDone.current) return;
@@ -381,13 +412,23 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong }: Pr
   const onComplete = useCallback(() => { setRevealed(true); fireConfetti(); }, [fireConfetti]);
 
   useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onNext(); } };
+    const h = (e: KeyboardEvent) => { 
+      if (e.key === 'Enter' || e.key === ' ') { 
+        e.preventDefault(); 
+        onNext(); 
+      }
+      // Show suggestions when pressing down
+      if (e.key === 'ArrowDown' && suggestions.length > 0 && !showSuggestions) {
+        e.preventDefault();
+        setShowSuggestions(true);
+      }
+    };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [onNext]);
+  }, [onNext, suggestions.length, showSuggestions]);
 
   return (
-    <div className={`h-screen w-screen relative overflow-hidden bg-gradient-to-br ${grade?.bgGradient || 'from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800'}`}>
+    <NavigationGrid className={`h-screen w-screen relative overflow-hidden bg-gradient-to-br ${grade?.bgGradient || 'from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800'}`}>
       <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-50 w-full h-full" style={{ width: '100vw', height: '100vh' }} />
       
       {grade && (
@@ -401,17 +442,18 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong }: Pr
         </>
       )}
 
-      <div className={`relative z-10 h-full flex items-center justify-center p-8 transition-all duration-500 ${show ? 'opacity-100' : 'opacity-0'}`}>
-        <div className="flex items-center gap-10 max-w-4xl w-full">
+      <div className={`relative z-10 h-full flex flex-col p-6 transition-all duration-500 ${show ? 'opacity-100' : 'opacity-0'}`}>
+        {/* Main content */}
+        <div className="flex items-center gap-8 flex-1">
           
           {/* Thumbnail */}
           <div className="flex-shrink-0 relative">
             {grade && <div className="absolute inset-0 rounded-2xl blur-2xl opacity-40 animate-pulse" style={{ backgroundColor: grade.glowColor, transform: 'scale(1.15)' }} />}
             <div className={`relative p-1.5 rounded-2xl bg-gradient-to-br ${grade?.gradient || 'from-purple-500 to-pink-500'}`}>
-              <img src={song.song.thumbnail} alt="" className="w-80 h-44 rounded-xl object-cover relative z-10" />
+              <img src={song.song.thumbnail} alt="" className="w-72 h-40 rounded-xl object-cover relative z-10" />
               {grade && (
-                <div className={`absolute -bottom-4 -right-4 w-[72px] h-[72px] rounded-full bg-gradient-to-br ${grade.gradient} flex items-center justify-center shadow-2xl border-4 border-white dark:border-slate-900 z-20 ${revealed && isHigh ? 'animate-bounce' : ''}`}>
-                  <span className="text-3xl font-black text-white drop-shadow-lg">{grade.grade}</span>
+                <div className={`absolute -bottom-4 -right-4 w-16 h-16 rounded-full bg-gradient-to-br ${grade.gradient} flex items-center justify-center shadow-2xl border-4 border-white dark:border-slate-900 z-20 ${revealed && isHigh ? 'animate-bounce' : ''}`}>
+                  <span className="text-2xl font-black text-white drop-shadow-lg">{grade.grade}</span>
                 </div>
               )}
             </div>
@@ -422,65 +464,131 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong }: Pr
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />Hoàn thành
             </p>
-            <h2 className="text-2xl font-bold text-slate-800 dark:text-white line-clamp-2 mb-4">{song.song.title}</h2>
+            <h2 className="text-xl font-bold text-slate-800 dark:text-white line-clamp-2 mb-3">{song.song.title}</h2>
 
             {finalScore && grade ? (
               <>
-                {/* Title with animated text */}
-                <h1 className={`text-2xl font-bold mb-4 bg-gradient-to-r ${grade.gradient} bg-clip-text text-transparent flex items-center gap-2`}>
+                <h1 className={`text-xl font-bold mb-3 bg-gradient-to-r ${grade.gradient} bg-clip-text text-transparent flex items-center gap-2`}>
                   <span className={revealed && isHigh ? 'animate-bounce' : ''}>{grade.emoji}</span>
-                  <span className={revealed ? 'animate-text-shimmer' : ''}>{grade.title}</span>
+                  <span>{grade.title}</span>
                 </h1>
 
-                {/* Score display - simple and clean */}
-                <div className="relative mb-6">
+                <div className="relative mb-4">
                   <AnimatedCrown show={revealed && isHigh} />
                   <div className="flex items-baseline gap-2">
-                    <span className={`text-7xl font-black ${grade.textColor} ${revealed && isHigh ? 'animate-score-glow' : ''}`}
-                      style={{ textShadow: `-2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff, 2px 2px 0 #fff, 0 0 20px ${grade.glowColor}, 0 4px 8px rgba(0,0,0,0.3)` }}>
+                    <span className={`text-6xl font-black ${grade.textColor}`}
+                      style={{ textShadow: `-2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff, 2px 2px 0 #fff, 0 0 20px ${grade.glowColor}` }}>
                       <AnimatedScore target={finalScore.totalScore} onComplete={onComplete} />
                     </span>
-                    <span className="text-xl text-slate-600 dark:text-slate-300 font-semibold">điểm</span>
+                    <span className="text-lg text-slate-600 dark:text-slate-300 font-semibold">điểm</span>
                   </div>
                   
-                  {/* Grade badge */}
-                  <div className={`mt-3 transition-all duration-500 ${revealed ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2'}`}>
-                    <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r ${grade.gradient} text-white font-bold shadow-lg ${revealed && isHigh ? 'animate-bounce-subtle' : ''}`}>
+                  <div className={`mt-2 transition-all duration-500 ${revealed ? 'opacity-100' : 'opacity-0'}`}>
+                    <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r ${grade.gradient} text-white font-bold shadow-lg text-sm`}>
                       <span>{grade.emoji}</span> Hạng {grade.grade}
                     </span>
                   </div>
                   
-                  {/* Fun quote */}
-                  <div className={`mt-4 transition-all duration-700 delay-500 ${revealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-                    <p className="text-lg text-slate-600 dark:text-slate-300 italic font-medium">
-                      "{quote}"
-                    </p>
+                  <div className={`mt-3 transition-all duration-700 delay-500 ${revealed ? 'opacity-100' : 'opacity-0'}`}>
+                    <p className="text-base text-slate-600 dark:text-slate-300 italic">"{quote}"</p>
                   </div>
                 </div>
 
-                {/* Stats with icons */}
-                <div className="space-y-3 mb-6 max-w-xs">
+                <div className="space-y-2 mb-4 max-w-xs">
                   <StatBar label="Giọng hát" value={finalScore.pitchAccuracy} icon="🎤" color="#10b981" delay={2800} />
                   <StatBar label="Cảm xúc" value={finalScore.timing} icon="💖" color="#ec4899" delay={3200} />
                 </div>
               </>
             ) : (
-              <div className="mb-6">
-                <h1 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">Hoàn thành! 🎵</h1>
+              <div className="mb-4">
+                <h1 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Hoàn thành! 🎵</h1>
                 <p className="text-slate-500 dark:text-slate-400">Bài hát đã kết thúc</p>
               </div>
             )}
 
-            <button onClick={onNext} autoFocus
-              className={`px-8 py-4 rounded-xl text-lg font-bold transition-all focus:outline-none focus:ring-4 focus:scale-105 shadow-xl ${
-                isHigh ? `bg-gradient-to-r ${grade?.gradient} text-white hover:shadow-2xl focus:ring-yellow-300` : 'bg-primary-500 hover:bg-primary-600 text-white focus:ring-primary-300'
-              }`}>
+            <FocusableButton
+              row={0}
+              col={0}
+              onSelect={onNext}
+              autoFocus
+              variant="primary"
+              className={`!px-6 !py-3 !text-base ${isHigh ? `!bg-gradient-to-r ${grade?.gradient}` : ''}`}
+            >
               {hasNextSong ? 'Bài tiếp theo →' : 'Về trang chủ →'}
-            </button>
+            </FocusableButton>
           </div>
         </div>
+        
+        {/* Suggestions section - only show when pressing down */}
+        {showSuggestions && suggestions.length > 0 && onAddToQueue && (
+          <div className="mt-4 bg-black/20 backdrop-blur rounded-xl p-4 animate-fade-in">
+            <p className="text-sm text-gray-300 mb-3">🎵 Hát tiếp bài này</p>
+            <div className="flex gap-3 overflow-x-auto hide-scrollbar p-2">
+              {suggestions.slice(0, 6).map((s, index) => {
+                const isAdded = addedIds.has(s.youtubeId);
+                return (
+                  <FocusableButton
+                    key={s.youtubeId}
+                    row={1}
+                    col={index}
+                    onSelect={() => !isAdded && handleAddSuggestion(s)}
+                    variant="ghost"
+                    className={`!p-0 !min-h-0 !min-w-0 flex-shrink-0 w-40 text-left !rounded-lg ${isAdded ? 'ring-2 ring-green-500' : ''}`}
+                  >
+                    <div className="w-full">
+                      <div className="relative">
+                        <LazyImage 
+                          src={s.thumbnail} 
+                          alt={s.title}
+                          className="w-40 h-24 rounded-lg object-cover"
+                          width={160}
+                          height={96}
+                        />
+                        {isAdded ? (
+                          <div className="absolute inset-0 bg-green-500/50 rounded-lg flex items-center justify-center">
+                            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                        ) : (
+                          <div className="absolute top-1 right-1 w-5 h-5 bg-primary-500 rounded-full flex items-center justify-center">
+                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs font-medium line-clamp-2 mt-1 text-white">{s.title}</p>
+                    </div>
+                  </FocusableButton>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        
+        {/* Hint to show suggestions */}
+        {!showSuggestions && suggestions.length > 0 && (
+          <div className="mt-4 text-center">
+            <p className="text-sm text-gray-400">
+              <span className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                </svg>
+                Ấn xuống để xem gợi ý
+              </span>
+            </p>
+          </div>
+        )}
+        
+        {isLoadingSuggestions && (
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm text-gray-300">Đang tải gợi ý...</span>
+          </div>
+        )}
       </div>
-    </div>
+    </NavigationGrid>
   );
 }
 
