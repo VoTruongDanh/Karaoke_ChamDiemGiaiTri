@@ -77,97 +77,211 @@ function getRandomQuote(grade: GradeInfo): string {
 }
 
 
-// ============ ANIMATED SCORE - Smooth counting with sound ============
-function AnimatedScore({ target, duration = 2000, onComplete }: { target: number; duration?: number; onComplete?: () => void }) {
+// ============ ANIMATED SCORE WITH DRAMATIC EFFECT ============
+function AnimatedScoreDramatic({ target, onComplete }: { target: number; onComplete?: () => void }) {
   const [current, setCurrent] = useState(0);
-  const [done, setDone] = useState(false);
-  const frameRef = useRef<number | null>(null);
+  const [phase, setPhase] = useState<'wait' | 'fast' | 'slow' | 'done'>('wait');
   const audioRef = useRef<AudioContext | null>(null);
-  const lastTick = useRef(0);
 
   useEffect(() => {
-    const start = Date.now();
     try { audioRef.current = new (window.AudioContext || (window as any).webkitAudioContext)(); } catch {}
+    
+    const t1 = setTimeout(() => setPhase('fast'), 500);
+    return () => { clearTimeout(t1); audioRef.current?.close().catch(() => {}); };
+  }, []);
 
-    const tick = (p: number) => {
+  useEffect(() => {
+    if (phase === 'wait') return;
+    
+    const playTick = (freq: number, vol: number) => {
       if (!audioRef.current) return;
       try {
         const ctx = audioRef.current;
         const o = ctx.createOscillator();
         const g = ctx.createGain();
         o.type = 'sine';
-        o.frequency.value = 400 + p * 600;
-        g.gain.setValueAtTime(0.06, ctx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.025);
+        o.frequency.value = freq;
+        g.gain.setValueAtTime(vol, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
         o.connect(g); g.connect(ctx.destination);
-        o.start(); o.stop(ctx.currentTime + 0.025);
+        o.start(); o.stop(ctx.currentTime + 0.05);
       } catch {}
     };
 
-    const final = () => {
+    const playFanfare = () => {
       if (!audioRef.current) return;
-      try {
-        const ctx = audioRef.current;
-        const notes = [523, 659, 784, 880, 1047];
-        notes.forEach((f, i) => {
-          const o = ctx.createOscillator();
-          const g = ctx.createGain();
-          o.type = 'sine'; o.frequency.value = f;
-          g.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.08);
-          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.08 + 0.4);
-          o.connect(g); g.connect(ctx.destination);
-          o.start(ctx.currentTime + i * 0.08);
-          o.stop(ctx.currentTime + i * 0.08 + 0.4);
-        });
-      } catch {}
+      const ctx = audioRef.current;
+      const notes = [523, 659, 784, 1047];
+      notes.forEach((f, i) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'sine'; o.frequency.value = f;
+        g.gain.setValueAtTime(0.2, ctx.currentTime + i * 0.1);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.1 + 0.5);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(ctx.currentTime + i * 0.1);
+        o.stop(ctx.currentTime + i * 0.1 + 0.5);
+      });
     };
 
-    const anim = () => {
-      const elapsed = Date.now() - start;
-      const prog = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - prog, 4); // Quartic ease-out
-      const val = Math.round(target * eased);
-      if (val - lastTick.current >= 2) { lastTick.current = val; tick(val / target); }
-      setCurrent(val);
-      if (prog < 1) frameRef.current = requestAnimationFrame(anim);
-      else { setDone(true); final(); onComplete?.(); }
-    };
+    if (phase === 'fast') {
+      const fastTarget = Math.floor(target * 0.8);
+      let val = 0;
+      const interval = setInterval(() => {
+        val += Math.ceil(target / 20);
+        if (val >= fastTarget) {
+          val = fastTarget;
+          clearInterval(interval);
+          setPhase('slow');
+        }
+        setCurrent(val);
+        playTick(400 + (val / target) * 400, 0.05);
+      }, 50);
+      return () => clearInterval(interval);
+    }
 
-    const t = setTimeout(() => { frameRef.current = requestAnimationFrame(anim); }, 600);
-    return () => { clearTimeout(t); if (frameRef.current) cancelAnimationFrame(frameRef.current); audioRef.current?.close().catch(() => {}); };
-  }, [target, duration, onComplete]);
+    if (phase === 'slow') {
+      let val = Math.floor(target * 0.8);
+      const interval = setInterval(() => {
+        val += 1;
+        setCurrent(val);
+        playTick(600 + (val / target) * 500, 0.08);
+        if (val >= target) {
+          clearInterval(interval);
+          setPhase('done');
+          playFanfare();
+          onComplete?.();
+        }
+      }, 120);
+      return () => clearInterval(interval);
+    }
+  }, [phase, target, onComplete]);
 
-  return <span className={done ? 'animate-score-pop' : ''}>{current}</span>;
+  return <>{current}</>;
 }
 
 
-// ============ CINEMATIC SPOTLIGHT - Dramatic light effect ============
-function CinematicSpotlight({ color }: { color: string }) {
+// ============ MEGA CELEBRATION - Ultimate effect for high scores ============
+function MegaCelebration({ show, grade }: { show: boolean; grade: GradeInfo }) {
+  if (!show) return null;
+  
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {/* Screen shake effect via CSS */}
+      <div className="absolute inset-0 animate-screen-shake" />
+      
+      {/* Radial burst lines */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        {[...Array(24)].map((_, i) => (
+          <div key={i} className="absolute w-2 h-[50vh] origin-bottom animate-burst-line"
+            style={{ 
+              background: `linear-gradient(to top, ${grade.glowColor}, transparent)`,
+              transform: `rotate(${i * 15}deg)`,
+              animationDelay: `${i * 0.02}s`,
+            }} />
+        ))}
+      </div>
+      
+      {/* Flying emojis */}
+      {[...Array(20)].map((_, i) => (
+        <div key={i} className="absolute animate-fly-emoji"
+          style={{ 
+            left: `${Math.random() * 100}%`,
+            bottom: '-50px',
+            fontSize: `${30 + Math.random() * 30}px`,
+            animationDelay: `${Math.random() * 2}s`,
+            animationDuration: `${2 + Math.random() * 2}s`,
+          }}>
+          {grade.particles[i % grade.particles.length]}
+        </div>
+      ))}
+      
+      {/* Spotlight beams */}
+      <div className="absolute top-0 left-1/4 w-32 h-full animate-spotlight-beam"
+        style={{ background: `linear-gradient(180deg, ${grade.glowColor}60 0%, transparent 100%)`, transform: 'skewX(-15deg)' }} />
+      <div className="absolute top-0 right-1/4 w-32 h-full animate-spotlight-beam"
+        style={{ background: `linear-gradient(180deg, ${grade.glowColor}60 0%, transparent 100%)`, transform: 'skewX(15deg)', animationDelay: '0.3s' }} />
+    </div>
+  );
+}
+
+// ============ STAGE LIGHTS - Concert-style moving lights ============
+function StageLights({ color }: { color: string }) {
+  const lights = useMemo(() => [
+    { x: 5, delay: 0 }, { x: 20, delay: 0.2 }, { x: 35, delay: 0.4 }, { x: 50, delay: 0.6 }, 
+    { x: 65, delay: 0.8 }, { x: 80, delay: 1.0 }, { x: 95, delay: 1.2 }
+  ], []);
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {/* Main spotlight from top - brighter */}
-      <div 
-        className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[900px] opacity-40"
-        style={{
-          background: `conic-gradient(from 180deg at 50% 0%, transparent 25%, ${color}50 50%, transparent 75%)`,
-          animation: 'spotlightSweep 5s ease-in-out infinite',
-        }}
-      />
-      {/* Side spotlights - brighter */}
-      <div 
-        className="absolute top-0 left-0 w-[500px] h-[700px] opacity-30"
-        style={{
-          background: `conic-gradient(from 135deg at 0% 0%, transparent 35%, ${color}40 55%, transparent 75%)`,
-          animation: 'spotlightSweep 7s ease-in-out infinite reverse',
-        }}
-      />
-      <div 
-        className="absolute top-0 right-0 w-[500px] h-[700px] opacity-30"
-        style={{
-          background: `conic-gradient(from 225deg at 100% 0%, transparent 35%, ${color}40 55%, transparent 75%)`,
-          animation: 'spotlightSweep 6s ease-in-out infinite',
-        }}
-      />
+      {lights.map((l, i) => (
+        <div key={i} className="absolute top-0" style={{ left: `${l.x}%`, transform: 'translateX(-50%)' }}>
+          <div className="w-[250px] h-[700px] animate-stage-light-sweep origin-top"
+            style={{ background: `linear-gradient(180deg, ${color} 0%, ${color}80 15%, ${color}40 40%, transparent 100%)`,
+              clipPath: 'polygon(30% 0%, 70% 0%, 100% 100%, 0% 100%)', animationDelay: `${l.delay}s`, opacity: 0.6 }} />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-10 h-10 rounded-full animate-pulse"
+            style={{ backgroundColor: color, boxShadow: `0 0 40px ${color}, 0 0 80px ${color}` }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ============ ROTATING LIGHT RAYS - Epic background ============
+function RotatingRays({ color }: { color: string }) {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none flex items-center justify-center">
+      <div className="relative w-[1500px] h-[1500px] animate-spin-slow">
+        {[...Array(24)].map((_, i) => (
+          <div key={i} className="absolute left-1/2 top-1/2 w-4 h-[750px] origin-bottom -translate-x-1/2"
+            style={{ background: `linear-gradient(to top, ${color}60, ${color}20, transparent)`, transform: `rotate(${i * 15}deg)`, opacity: 0.5 }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============ NEON BORDER - Glowing frame ============
+function NeonBorder({ color, isHigh }: { color: string; isHigh: boolean }) {
+  if (!isHigh) return null;
+  return (
+    <>
+      <div className="absolute inset-3 rounded-3xl pointer-events-none animate-neon-pulse"
+        style={{ border: `5px solid ${color}`, boxShadow: `0 0 40px ${color}, 0 0 80px ${color}, 0 0 120px ${color}, inset 0 0 40px ${color}40` }} />
+      {/* Corner accents */}
+      <div className="absolute top-2 left-2 w-20 h-20 border-t-4 border-l-4 rounded-tl-2xl" style={{ borderColor: color, boxShadow: `0 0 30px ${color}` }} />
+      <div className="absolute top-2 right-2 w-20 h-20 border-t-4 border-r-4 rounded-tr-2xl" style={{ borderColor: color, boxShadow: `0 0 30px ${color}` }} />
+      <div className="absolute bottom-2 left-2 w-20 h-20 border-b-4 border-l-4 rounded-bl-2xl" style={{ borderColor: color, boxShadow: `0 0 30px ${color}` }} />
+      <div className="absolute bottom-2 right-2 w-20 h-20 border-b-4 border-r-4 rounded-br-2xl" style={{ borderColor: color, boxShadow: `0 0 30px ${color}` }} />
+    </>
+  );
+}
+
+// ============ MEGA FLASH - Screen flash effect ============
+function MegaFlash({ show, color }: { show: boolean; color: string }) {
+  const [flash, setFlash] = useState(false);
+  useEffect(() => {
+    if (show) {
+      setFlash(true);
+      const t = setTimeout(() => setFlash(false), 500);
+      return () => clearTimeout(t);
+    }
+  }, [show]);
+  if (!flash) return null;
+  return <div className="absolute inset-0 z-40 animate-mega-flash pointer-events-none" style={{ backgroundColor: color }} />;
+}
+
+// ============ ELECTRIC ARCS - Lightning effects ============
+function ElectricArcs({ show, color }: { show: boolean; color: string }) {
+  if (!show) return null;
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {[...Array(6)].map((_, i) => (
+        <svg key={i} className="absolute animate-electric-arc" style={{ left: `${10 + i * 15}%`, top: '10%', animationDelay: `${i * 0.3}s` }}
+          width="100" height="300" viewBox="0 0 100 300">
+          <path d={`M50,0 L${30 + Math.random() * 40},50 L${20 + Math.random() * 60},100 L${30 + Math.random() * 40},150 L${20 + Math.random() * 60},200 L50,300`}
+            stroke={color} strokeWidth="3" fill="none" style={{ filter: `drop-shadow(0 0 10px ${color}) drop-shadow(0 0 20px ${color})` }} />
+        </svg>
+      ))}
     </div>
   );
 }
@@ -176,22 +290,77 @@ function CinematicSpotlight({ color }: { color: string }) {
 function AmbientGlow({ color }: { color: string }) {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full blur-[150px] opacity-40 animate-pulse-slow"
+      <div className="absolute top-0 left-1/4 w-[700px] h-[700px] rounded-full blur-[200px] opacity-60 animate-pulse-slow"
         style={{ backgroundColor: color }} />
-      <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] rounded-full blur-[120px] opacity-35 animate-pulse-slow"
+      <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] rounded-full blur-[180px] opacity-55 animate-pulse-slow"
         style={{ backgroundColor: color, animationDelay: '1s' }} />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full blur-[180px] opacity-30"
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] rounded-full blur-[250px] opacity-45"
         style={{ backgroundColor: color }} />
+    </div>
+  );
+}
+
+// ============ CONFETTI RAIN - Continuous celebration ============
+function ConfettiRain({ show, colors }: { show: boolean; colors: string[] }) {
+  const particles = useMemo(() => [...Array(80)].map((_, i) => ({
+    id: i, x: Math.random() * 100, delay: Math.random() * 4, dur: 2.5 + Math.random() * 2,
+    size: 10 + Math.random() * 15, color: colors[i % colors.length], rotation: Math.random() * 360,
+    type: ['square', 'circle', 'ribbon'][i % 3],
+  })), [colors]);
+
+  if (!show) return null;
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {particles.map(p => (
+        <div key={p.id} className="absolute animate-confetti-fall"
+          style={{ left: `${p.x}%`, top: '-40px', animationDelay: `${p.delay}s`, animationDuration: `${p.dur}s` }}>
+          <div style={{ width: p.type === 'ribbon' ? p.size * 0.3 : p.size, height: p.type === 'ribbon' ? p.size * 2 : p.size, 
+            backgroundColor: p.color, transform: `rotate(${p.rotation}deg)`,
+            borderRadius: p.type === 'circle' ? '50%' : '3px', boxShadow: `0 0 10px ${p.color}` }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ============ SHOOTING STARS - Dramatic streaks ============
+function ShootingStars({ show }: { show: boolean }) {
+  const stars = useMemo(() => [...Array(8)].map((_, i) => ({
+    id: i, top: 5 + Math.random() * 50, delay: i * 0.8 + Math.random() * 0.3, size: 30 + Math.random() * 20,
+  })), []);
+
+  if (!show) return null;
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {stars.map(s => (
+        <div key={s.id} className="absolute left-0 animate-shooting-star" style={{ top: `${s.top}%`, animationDelay: `${s.delay}s` }}>
+          <div className="bg-gradient-to-r from-transparent via-white to-yellow-200 rounded-full"
+            style={{ width: `${s.size * 4}px`, height: '3px', boxShadow: '0 0 30px #fff, 0 0 60px #ffd700' }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ============ PULSING CIRCLES - Rhythmic effect ============
+function PulsingCircles({ color }: { color: string }) {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none flex items-center justify-center">
+      {[...Array(5)].map((_, i) => (
+        <div key={i} className="absolute rounded-full border-2 animate-pulse-circle"
+          style={{ width: `${200 + i * 150}px`, height: `${200 + i * 150}px`, borderColor: color, 
+            animationDelay: `${i * 0.3}s`, opacity: 0.3 }} />
+      ))}
     </div>
   );
 }
 
 // ============ SPARKLE FIELD - Twinkling stars ============
 function SparkleField({ intensity = 'normal' }: { intensity?: 'low' | 'normal' | 'high' }) {
-  const count = intensity === 'high' ? 50 : intensity === 'normal' ? 30 : 20;
+  const count = intensity === 'high' ? 60 : intensity === 'normal' ? 35 : 20;
   const stars = useMemo(() => [...Array(count)].map((_, i) => ({
     id: i, x: Math.random() * 100, y: Math.random() * 100,
-    size: 2 + Math.random() * 4, dur: 1 + Math.random() * 2, delay: Math.random() * 3,
+    size: 2 + Math.random() * 5, dur: 0.8 + Math.random() * 1.5, delay: Math.random() * 3,
   })), [count]);
 
   return (
@@ -199,7 +368,36 @@ function SparkleField({ intensity = 'normal' }: { intensity?: 'low' | 'normal' |
       {stars.map(s => (
         <div key={s.id} className="absolute rounded-full bg-white animate-twinkle"
           style={{ left: `${s.x}%`, top: `${s.y}%`, width: `${s.size}px`, height: `${s.size}px`,
-            animationDuration: `${s.dur}s`, animationDelay: `${s.delay}s`, boxShadow: '0 0 8px 2px #fff' }} />
+            animationDuration: `${s.dur}s`, animationDelay: `${s.delay}s`, boxShadow: '0 0 10px 3px #fff' }} />
+      ))}
+    </div>
+  );
+}
+
+// ============ DISCO BALL EFFECT - Party vibes ============
+function DiscoBallEffect({ show, color }: { show: boolean; color: string }) {
+  const beams = useMemo(() => [...Array(24)].map((_, i) => ({
+    id: i, angle: i * 15, color: ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff6bd6', '#a855f7'][i % 6],
+  })), []);
+
+  if (!show) return null;
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {/* Disco ball */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2">
+        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-gray-200 to-gray-400 animate-spin-slow shadow-2xl"
+          style={{ boxShadow: `0 0 40px ${color}` }}>
+          {[...Array(16)].map((_, i) => (
+            <div key={i} className="absolute w-2 h-2 bg-white/90 rounded-sm"
+              style={{ top: `${25 + Math.sin(i * 22.5 * Math.PI / 180) * 20}%`, left: `${25 + Math.cos(i * 22.5 * Math.PI / 180) * 20}%` }} />
+          ))}
+        </div>
+      </div>
+      {/* Light beams */}
+      {beams.map(b => (
+        <div key={b.id} className="absolute top-12 left-1/2 w-1 h-[500px] origin-top animate-disco-beam"
+          style={{ background: `linear-gradient(to bottom, ${b.color}80, transparent)`, transform: `rotate(${b.angle}deg)`,
+            animationDelay: `${b.id * 0.05}s`, opacity: 0.4 }} />
       ))}
     </div>
   );
@@ -209,20 +407,11 @@ function SparkleField({ intensity = 'normal' }: { intensity?: 'low' | 'normal' |
 function LaserBeams({ color }: { color: string }) {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {[...Array(8)].map((_, i) => (
-        <div
-          key={i}
-          className="absolute h-1 animate-laser"
-          style={{
-            background: `linear-gradient(90deg, transparent, ${color}, transparent)`,
-            top: `${10 + i * 12}%`,
-            left: '-100%',
-            width: '200%',
-            animationDelay: `${i * 0.25}s`,
-            boxShadow: `0 0 30px ${color}, 0 0 60px ${color}`,
-            opacity: 0.7,
-          }}
-        />
+      {[...Array(10)].map((_, i) => (
+        <div key={i} className="absolute h-1.5 animate-laser"
+          style={{ background: `linear-gradient(90deg, transparent, ${color}, ${color}, transparent)`,
+            top: `${8 + i * 10}%`, left: '-100%', width: '200%', animationDelay: `${i * 0.2}s`,
+            boxShadow: `0 0 30px ${color}, 0 0 60px ${color}`, opacity: 0.8 }} />
       ))}
     </div>
   );
@@ -230,24 +419,23 @@ function LaserBeams({ color }: { color: string }) {
 
 // ============ FIREWORK BURSTS - Continuous fireworks ============
 function FireworkBursts({ show, color }: { show: boolean; color: string }) {
-  const [bursts, setBursts] = useState<Array<{ id: number; x: number; y: number; color: string }>>([]);
+  const [bursts, setBursts] = useState<Array<{ id: number; x: number; y: number; color: string; size: number }>>([]);
   
   useEffect(() => {
     if (!show) return;
-    const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#A855F7', '#F472B6', '#22D3EE'];
+    const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#A855F7', '#F472B6', '#22D3EE', '#10B981'];
     let id = 0;
     
     const addBurst = () => {
       setBursts(prev => {
-        const newBurst = { id: id++, x: 15 + Math.random() * 70, y: 10 + Math.random() * 40, color: colors[Math.floor(Math.random() * colors.length)] };
-        return [...prev.slice(-6), newBurst];
+        const newBurst = { id: id++, x: 10 + Math.random() * 80, y: 8 + Math.random() * 45,
+          color: colors[Math.floor(Math.random() * colors.length)], size: 80 + Math.random() * 60 };
+        return [...prev.slice(-8), newBurst];
       });
     };
     
-    addBurst();
-    setTimeout(addBurst, 200);
-    setTimeout(addBurst, 400);
-    const interval = setInterval(addBurst, 800);
+    addBurst(); setTimeout(addBurst, 150); setTimeout(addBurst, 300); setTimeout(addBurst, 500);
+    const interval = setInterval(addBurst, 600);
     return () => clearInterval(interval);
   }, [show]);
 
@@ -256,16 +444,16 @@ function FireworkBursts({ show, color }: { show: boolean; color: string }) {
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
       {bursts.map(burst => (
         <div key={burst.id} className="absolute" style={{ left: `${burst.x}%`, top: `${burst.y}%` }}>
-          {[...Array(16)].map((_, i) => {
-            const angle = (i * 22.5) * (Math.PI / 180);
+          {[...Array(20)].map((_, i) => {
+            const angle = (i * 18) * (Math.PI / 180);
             return (
               <div key={i} className="absolute w-3 h-3 rounded-full animate-firework-particle"
-                style={{ backgroundColor: burst.color, boxShadow: `0 0 10px ${burst.color}`,
-                  '--tx': `${Math.cos(angle) * 100}px`, '--ty': `${Math.sin(angle) * 100}px` } as React.CSSProperties} />
+                style={{ backgroundColor: burst.color, boxShadow: `0 0 12px ${burst.color}, 0 0 24px ${burst.color}`,
+                  '--tx': `${Math.cos(angle) * burst.size}px`, '--ty': `${Math.sin(angle) * burst.size}px` } as React.CSSProperties} />
             );
           })}
-          <div className="absolute w-6 h-6 -translate-x-1/2 -translate-y-1/2 rounded-full animate-firework-center"
-            style={{ backgroundColor: burst.color, boxShadow: `0 0 30px ${burst.color}, 0 0 60px ${burst.color}` }} />
+          <div className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full animate-firework-center"
+            style={{ backgroundColor: burst.color, boxShadow: `0 0 40px ${burst.color}, 0 0 80px ${burst.color}` }} />
         </div>
       ))}
     </div>
@@ -275,18 +463,18 @@ function FireworkBursts({ show, color }: { show: boolean; color: string }) {
 
 // ============ GOLDEN RAIN - For S rank only ============
 function GoldenRain({ show }: { show: boolean }) {
-  const particles = useMemo(() => [...Array(40)].map((_, i) => ({
-    id: i, x: Math.random() * 100, delay: Math.random() * 3, dur: 2.5 + Math.random() * 2,
-    size: 10 + Math.random() * 15, rotation: Math.random() * 360,
+  const particles = useMemo(() => [...Array(50)].map((_, i) => ({
+    id: i, x: Math.random() * 100, delay: Math.random() * 2.5, dur: 2 + Math.random() * 1.5,
+    size: 12 + Math.random() * 18, rotation: Math.random() * 360, wobble: Math.random() * 20 - 10,
   })), []);
 
   if (!show) return null;
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
       {particles.map(p => (
-        <div key={p.id} className="absolute animate-glitter-fall"
-          style={{ left: `${p.x}%`, top: '-40px', animationDelay: `${p.delay}s`, animationDuration: `${p.dur}s` }}>
-          <svg viewBox="0 0 24 24" fill="none" style={{ width: p.size, height: p.size, transform: `rotate(${p.rotation}deg)`, filter: 'drop-shadow(0 0 8px #FFD700)' }}>
+        <div key={p.id} className="absolute animate-golden-fall"
+          style={{ left: `${p.x}%`, top: '-50px', animationDelay: `${p.delay}s`, animationDuration: `${p.dur}s`, '--wobble': `${p.wobble}px` } as React.CSSProperties}>
+          <svg viewBox="0 0 24 24" fill="none" style={{ width: p.size, height: p.size, transform: `rotate(${p.rotation}deg)`, filter: 'drop-shadow(0 0 10px #FFD700) drop-shadow(0 0 20px #FFD700)' }}>
             <path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5L12 0Z" fill="#FFD700" />
           </svg>
         </div>
@@ -295,17 +483,31 @@ function GoldenRain({ show }: { show: boolean }) {
   );
 }
 
+// ============ TROPHY ANIMATION - Spinning trophy for S rank ============
+function SpinningTrophy({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <div className="absolute top-6 right-6 z-20 animate-trophy-entrance">
+      <div className="relative">
+        <span className="text-6xl animate-trophy-spin filter drop-shadow-[0_0_30px_rgba(255,215,0,1)]">🏆</span>
+        <div className="absolute -top-2 left-1/2 -translate-x-1/2 text-xl animate-bounce">⭐</div>
+        <div className="absolute top-1/2 -left-4 text-lg animate-twinkle">✨</div>
+        <div className="absolute top-1/2 -right-4 text-lg animate-twinkle" style={{ animationDelay: '0.5s' }}>✨</div>
+      </div>
+    </div>
+  );
+}
+
 // ============ FLOATING CROWN - S rank special ============
 function FloatingCrown({ show }: { show: boolean }) {
   if (!show) return null;
   return (
-    <div className="absolute -top-20 left-1/2 -translate-x-1/2 z-20 animate-crown-bounce">
+    <div className="absolute -top-16 left-1/2 -translate-x-1/2 z-20 animate-crown-entrance">
       <div className="relative">
-        <span className="text-7xl filter drop-shadow-[0_0_40px_rgba(255,215,0,1)] drop-shadow-[0_0_80px_rgba(255,215,0,0.8)]">👑</span>
-        <div className="absolute -top-3 -left-4 text-2xl animate-twinkle">✨</div>
-        <div className="absolute -top-3 -right-4 text-2xl animate-twinkle" style={{ animationDelay: '0.3s' }}>✨</div>
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-8 text-xl animate-twinkle" style={{ animationDelay: '0.6s' }}>⭐</div>
-        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-lg animate-twinkle" style={{ animationDelay: '0.9s' }}>💫</div>
+        <span className="text-6xl filter drop-shadow-[0_0_40px_rgba(255,215,0,1)] drop-shadow-[0_0_80px_rgba(255,215,0,0.8)] animate-crown-float">👑</span>
+        <div className="absolute -top-2 -left-4 text-xl animate-twinkle">✨</div>
+        <div className="absolute -top-2 -right-4 text-xl animate-twinkle" style={{ animationDelay: '0.3s' }}>✨</div>
+        <div className="absolute top-1 left-1/2 -translate-x-1/2 -translate-y-6 text-lg animate-twinkle" style={{ animationDelay: '0.6s' }}>⭐</div>
       </div>
     </div>
   );
@@ -317,13 +519,22 @@ function ScoreBurst({ show, color }: { show: boolean; color: string }) {
   return (
     <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
       {/* Central flash - bigger */}
-      <div className="absolute w-48 h-48 rounded-full animate-score-flash"
-        style={{ background: `radial-gradient(circle, ${color} 0%, transparent 70%)` }} />
-      {/* Expanding rings - more */}
-      {[0, 1, 2, 3].map(i => (
-        <div key={i} className="absolute w-24 h-24 rounded-full border-4 animate-wave-expand"
-          style={{ borderColor: color, animationDelay: `${i * 0.12}s`, opacity: 0.7 }} />
+      <div className="absolute w-64 h-64 rounded-full animate-score-flash"
+        style={{ background: `radial-gradient(circle, ${color} 0%, ${color}80 30%, transparent 70%)` }} />
+      {/* Expanding rings - more dramatic */}
+      {[0, 1, 2, 3, 4].map(i => (
+        <div key={i} className="absolute w-32 h-32 rounded-full border-4 animate-wave-expand"
+          style={{ borderColor: color, animationDelay: `${i * 0.1}s`, opacity: 0.8 }} />
       ))}
+      {/* Particle burst */}
+      {[...Array(16)].map((_, i) => {
+        const angle = (i * 22.5) * (Math.PI / 180);
+        return (
+          <div key={i} className="absolute w-4 h-4 rounded-full animate-burst-particle"
+            style={{ backgroundColor: color, boxShadow: `0 0 15px ${color}`,
+              '--tx': `${Math.cos(angle) * 200}px`, '--ty': `${Math.sin(angle) * 200}px` } as React.CSSProperties} />
+        );
+      })}
     </div>
   );
 }
@@ -362,16 +573,16 @@ function StatBar({ label, value, icon, color, delay }: { label: string; value: n
 
   return (
     <div className={`transition-all duration-500 ${show ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'}`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-base font-semibold text-white flex items-center gap-2">
-          <span className="text-xl">{icon}</span>{label}
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-sm font-semibold text-white flex items-center gap-1.5">
+          <span className="text-base">{icon}</span>{label}
         </span>
-        <span className="text-xl font-black text-white">{value}</span>
+        <span className="text-base font-black text-white">{value}</span>
       </div>
-      <div className="h-3 bg-white/20 rounded-full overflow-hidden backdrop-blur-sm">
+      <div className="h-2 bg-white/20 rounded-full overflow-hidden backdrop-blur-sm">
         <div className="h-full rounded-full transition-all duration-1000 ease-out"
           style={{ width: `${w}%`, background: `linear-gradient(90deg, ${color}, ${color}cc)`,
-            boxShadow: `0 0 20px ${color}` }} />
+            boxShadow: `0 0 15px ${color}` }} />
       </div>
     </div>
   );
@@ -468,11 +679,6 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
     return () => clearTimeout(t);
   }, []);
 
-  const onScoreComplete = useCallback(() => {
-    setPhase('revealed');
-    fireConfetti();
-  }, [fireConfetti]);
-
 
   // Keyboard navigation
   useEffect(() => {
@@ -496,46 +702,56 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
       
       {grade && (
         <>
-          {/* Background effects */}
+          {/* Background effects - always on */}
           <AmbientGlow color={grade.glowColor} />
           <SparkleField intensity={isHigh ? 'high' : 'normal'} />
-          <CinematicSpotlight color={grade.glowColor} />
+          <RotatingRays color={grade.glowColor} />
+          <PulsingCircles color={grade.glowColor} />
           
           {/* Floating particles */}
-          <FloatingParticles particles={grade.particles} count={isHigh ? 18 : 10} />
+          <FloatingParticles particles={grade.particles} count={isHigh ? 25 : 15} />
           
           {/* High score effects (80+) */}
+          {isHigh && <StageLights color={grade.glowColor} />}
           {isHigh && <LaserBeams color={grade.glowColor} />}
+          {isHigh && <NeonBorder color={grade.glowColor} isHigh={isHigh} />}
           {isHigh && <FireworkBursts show={isRevealed} color={grade.glowColor} />}
+          {isHigh && <ShootingStars show={isRevealed} />}
+          {isHigh && <ConfettiRain show={isRevealed} colors={['#FFD700', '#FF6B6B', '#4ECDC4', '#A855F7', '#F472B6', '#22D3EE']} />}
+          {isHigh && <ElectricArcs show={isRevealed} color={grade.glowColor} />}
           
           {/* S Rank special effects (90+) */}
           {isSRank && <GoldenRain show={isRevealed} />}
+          {isSRank && <DiscoBallEffect show={isRevealed} color={grade.glowColor} />}
+          {isSRank && <SpinningTrophy show={isRevealed} />}
           
-          {/* Score reveal burst */}
+          {/* Score reveal effects */}
+          <MegaFlash show={isRevealed} color={grade.glowColor} />
           <ScoreBurst show={isRevealed} color={grade.glowColor} />
+          {isHigh && <MegaCelebration show={isRevealed} grade={grade} />}
         </>
       )}
 
       {/* Main content */}
-      <div className={`relative z-10 h-full flex flex-col p-8 transition-all duration-700 ${phase !== 'enter' ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-        <div className="flex items-center gap-10 flex-1">
+      <div className={`relative z-10 h-full flex flex-col p-6 transition-all duration-700 ${phase !== 'enter' ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+        <div className="flex items-center gap-8 flex-1">
           
           {/* Thumbnail with glow */}
           <div className="flex-shrink-0 relative">
             {grade && (
-              <div className="absolute inset-0 rounded-3xl blur-[60px] opacity-60 animate-pulse-slow"
-                style={{ backgroundColor: grade.glowColor, transform: 'scale(1.3)' }} />
+              <div className="absolute inset-0 rounded-2xl blur-[50px] opacity-60 animate-pulse-slow"
+                style={{ backgroundColor: grade.glowColor, transform: 'scale(1.2)' }} />
             )}
-            <div className={`relative p-2 rounded-3xl bg-gradient-to-br ${grade?.gradient || 'from-purple-500 to-pink-500'} shadow-2xl`}
-              style={{ boxShadow: grade ? `0 0 60px ${grade.glowColor}` : undefined }}>
-              <img src={song.song.thumbnail} alt="" className="w-96 h-56 rounded-2xl object-cover" />
+            <div className={`relative p-1.5 rounded-2xl bg-gradient-to-br ${grade?.gradient || 'from-purple-500 to-pink-500'} shadow-2xl`}
+              style={{ boxShadow: grade ? `0 0 50px ${grade.glowColor}` : undefined }}>
+              <img src={song.song.thumbnail} alt="" className="w-72 h-40 rounded-xl object-cover" />
               {/* Grade badge */}
               {grade && (
-                <div className={`absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-gradient-to-br ${grade.gradient} 
+                <div className={`absolute -bottom-4 -right-4 w-16 h-16 rounded-full bg-gradient-to-br ${grade.gradient} 
                   flex items-center justify-center shadow-2xl border-4 border-black z-20
                   ${isRevealed && isHigh ? 'animate-bounce' : ''}`}
-                  style={{ boxShadow: `0 0 40px ${grade.glowColor}, 0 0 80px ${grade.glowColor}50` }}>
-                  <span className="text-4xl font-black text-white drop-shadow-lg">{grade.grade}</span>
+                  style={{ boxShadow: `0 0 30px ${grade.glowColor}, 0 0 60px ${grade.glowColor}50` }}>
+                  <span className="text-2xl font-black text-white drop-shadow-lg">{grade.grade}</span>
                 </div>
               )}
             </div>
@@ -544,70 +760,79 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
 
           {/* Score and info */}
           <div className="flex-1 min-w-0">
-            <p className="text-base text-white/80 mb-2 flex items-center gap-2 font-medium">
-              <span className="w-3 h-3 rounded-full bg-green-400 animate-pulse shadow-[0_0_10px_#4ade80]" />Hoàn thành
+            <p className="text-sm text-white/80 mb-1 flex items-center gap-2 font-medium">
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_8px_#4ade80]" />Hoàn thành
             </p>
-            <h2 className="text-3xl font-bold text-white line-clamp-2 mb-5 drop-shadow-lg">{song.song.title}</h2>
+            <h2 className="text-xl font-bold text-white line-clamp-2 mb-3 drop-shadow-lg">{song.song.title}</h2>
 
             {finalScore && grade ? (
               <>
                 {/* Title with emoji */}
-                <h1 className={`text-3xl font-black mb-5 bg-gradient-to-r ${grade.gradient} bg-clip-text text-transparent flex items-center gap-3 drop-shadow-lg`}
-                  style={{ filter: `drop-shadow(0 0 20px ${grade.glowColor})` }}>
-                  <span className={`text-4xl ${isRevealed && isHigh ? 'animate-bounce' : ''}`}>{grade.emoji}</span>
+                <h1 className={`text-xl font-black mb-3 bg-gradient-to-r ${grade.gradient} bg-clip-text text-transparent flex items-center gap-2 drop-shadow-lg`}
+                  style={{ filter: `drop-shadow(0 0 15px ${grade.glowColor})` }}>
+                  <span className={`text-2xl ${isRevealed && isHigh ? 'animate-bounce' : ''}`}>{grade.emoji}</span>
                   <span>{grade.title}</span>
                 </h1>
 
                 {/* Score display */}
-                <div className="relative mb-8">
+                <div className="relative mb-5">
                   <FloatingCrown show={isRevealed && isSRank} />
-                  <div className={`flex items-baseline gap-4 ${isRevealed && isSRank ? 'animate-victory-dance' : ''}`}>
-                    <span className={`font-black text-white ${isRevealed && isSRank ? 'animate-mega-glow' : ''}`}
+                  
+                  <div className={`flex items-baseline gap-3 ${isRevealed && isSRank ? 'animate-victory-dance' : ''}`}>
+                    <span className={`font-black ${isRevealed ? 'animate-score-celebrate' : ''}`}
                       style={{ 
-                        fontSize: isSRank ? '120px' : '100px',
-                        textShadow: `0 0 60px ${grade.glowColor}, 0 0 120px ${grade.glowColor}, 0 4px 0 rgba(0,0,0,0.3)`,
+                        fontSize: isSRank ? '100px' : '85px',
+                        color: '#FFFFFF',
+                        textShadow: `
+                          0 0 15px ${grade.glowColor},
+                          0 0 30px ${grade.glowColor},
+                          0 0 60px ${grade.glowColor},
+                          0 0 100px ${grade.glowColor},
+                          0 5px 0 rgba(0,0,0,0.5)
+                        `,
                         lineHeight: 1,
-                        WebkitTextStroke: `2px ${grade.glowColor}`,
+                        fontFamily: 'system-ui, -apple-system, sans-serif',
+                        fontWeight: 900,
                       }}>
-                      <AnimatedScore target={finalScore.totalScore} onComplete={onScoreComplete} />
+                      <AnimatedScoreDramatic target={finalScore.totalScore} onComplete={() => { setPhase('revealed'); fireConfetti(); }} />
                     </span>
-                    <span className="text-2xl text-white font-bold drop-shadow-lg">điểm</span>
+                    <span className="text-2xl text-white font-bold" style={{ textShadow: '0 3px 15px rgba(0,0,0,0.8)' }}>điểm</span>
                   </div>
                   
                   {/* Grade badge */}
-                  <div className={`mt-5 transition-all duration-500 ${isRevealed ? 'opacity-100 animate-zoom-in-bounce' : 'opacity-0'}`}>
-                    <span className={`inline-flex items-center gap-3 px-6 py-3 rounded-full bg-gradient-to-r ${grade.gradient} 
-                      text-white font-black shadow-2xl text-xl ${isRevealed && isHigh ? 'animate-electric-pulse' : ''}`}
-                      style={{ boxShadow: `0 0 40px ${grade.glowColor}, 0 0 80px ${grade.glowColor}50` }}>
-                      <span className="text-3xl">{grade.emoji}</span> Hạng {grade.grade}
+                  <div className={`mt-4 transition-all duration-500 ${isRevealed ? 'opacity-100 animate-zoom-in-bounce' : 'opacity-0'}`}>
+                    <span className={`inline-flex items-center gap-2 px-5 py-2 rounded-full bg-gradient-to-r ${grade.gradient} 
+                      text-white font-black shadow-2xl text-base border-2 border-white/30 ${isRevealed && isHigh ? 'animate-electric-pulse' : ''}`}
+                      style={{ boxShadow: `0 0 30px ${grade.glowColor}, 0 0 60px ${grade.glowColor}50` }}>
+                      <span className="text-xl">{grade.emoji}</span> Hạng {grade.grade}
                     </span>
                   </div>
                   
                   {/* Quote */}
-                  <div className={`mt-5 transition-all duration-700 delay-300 ${isRevealed ? 'opacity-100' : 'opacity-0'}`}>
-                    <p className={`text-xl text-white font-medium ${isRevealed && isSRank ? 'animate-rainbow' : ''}`}
-                      style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
+                  <div className={`mt-3 transition-all duration-700 delay-300 ${isRevealed ? 'opacity-100' : 'opacity-0'}`}>
+                    <p className={`text-base text-white font-medium ${isRevealed && isSRank ? 'animate-rainbow' : ''}`}
+                      style={{ textShadow: '0 2px 15px rgba(0,0,0,0.8)' }}>
                       "{quote}"
                     </p>
                   </div>
                 </div>
 
                 {/* Stats */}
-                <div className="space-y-4 mb-8 max-w-md">
+                <div className="space-y-2 mb-5 max-w-xs">
                   <StatBar label="Giọng hát" value={finalScore.pitchAccuracy} icon="🎤" color="#10b981" delay={2500} />
                   <StatBar label="Cảm xúc" value={finalScore.timing} icon="💖" color="#ec4899" delay={2900} />
                 </div>
               </>
             ) : (
-              <div className="mb-8">
-                <h1 className="text-3xl font-bold text-white mb-3">Hoàn thành!</h1>
-                <p className="text-white/70 text-lg">Bài hát đã kết thúc</p>
+              <div className="mb-5">
+                <h1 className="text-xl font-bold text-white mb-2">Hoàn thành!</h1>
+                <p className="text-white/70">Bài hát đã kết thúc</p>
               </div>
             )}
 
             {/* Next button */}
             <FocusableButton row={0} col={0} onSelect={onNext} autoFocus variant="primary"
-              className={`!px-10 !py-5 !text-xl !font-bold !rounded-2xl ${isHigh ? `!bg-gradient-to-r ${grade?.gradient}` : ''}`}>
+              className={`!px-6 !py-3 !text-base !font-bold !rounded-xl ${isHigh ? `!bg-gradient-to-r ${grade?.gradient}` : ''}`}>
               {hasNextSong ? 'Bài tiếp theo →' : 'Về trang chủ →'}
             </FocusableButton>
           </div>
@@ -616,33 +841,33 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
         
         {/* Suggestions section */}
         {showSuggestions && suggestions.length > 0 && onAddToQueue && (
-          <div className="mt-6 bg-black/50 backdrop-blur-xl rounded-2xl p-6 animate-fade-in border border-white/20">
-            <p className="text-base text-white mb-4 font-bold">🎵 Hát tiếp bài này</p>
-            <div className="flex gap-4 overflow-x-auto hide-scrollbar pb-2">
+          <div className="mt-4 bg-black/50 backdrop-blur-xl rounded-xl p-4 animate-fade-in border border-white/20">
+            <p className="text-sm text-white mb-3 font-bold">🎵 Hát tiếp bài này</p>
+            <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-1">
               {suggestions.slice(0, 6).map((s, index) => {
                 const isAdded = addedIds.has(s.youtubeId);
                 return (
                   <FocusableButton key={s.youtubeId} row={1} col={index}
                     onSelect={() => !isAdded && handleAddSuggestion(s)} variant="ghost"
-                    className={`!p-0 !min-h-0 !min-w-0 flex-shrink-0 w-48 text-left !rounded-xl ${isAdded ? 'ring-2 ring-green-400' : ''}`}>
+                    className={`!p-0 !min-h-0 !min-w-0 flex-shrink-0 w-36 text-left !rounded-lg ${isAdded ? 'ring-2 ring-green-400' : ''}`}>
                     <div className="w-full">
                       <div className="relative">
-                        <LazyImage src={s.thumbnail} alt={s.title} className="w-48 h-28 rounded-xl object-cover" width={192} height={112} />
+                        <LazyImage src={s.thumbnail} alt={s.title} className="w-36 h-20 rounded-lg object-cover" width={144} height={80} />
                         {isAdded ? (
-                          <div className="absolute inset-0 bg-green-500/70 rounded-xl flex items-center justify-center">
-                            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <div className="absolute inset-0 bg-green-500/70 rounded-lg flex items-center justify-center">
+                            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                             </svg>
                           </div>
                         ) : (
-                          <div className="absolute top-2 right-2 w-7 h-7 bg-primary-500 rounded-full flex items-center justify-center shadow-lg">
-                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <div className="absolute top-1 right-1 w-5 h-5 bg-primary-500 rounded-full flex items-center justify-center shadow-lg">
+                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                             </svg>
                           </div>
                         )}
                       </div>
-                      <p className="text-sm font-semibold line-clamp-2 mt-2 text-white">{s.title}</p>
+                      <p className="text-xs font-medium line-clamp-2 mt-1 text-white">{s.title}</p>
                     </div>
                   </FocusableButton>
                 );
