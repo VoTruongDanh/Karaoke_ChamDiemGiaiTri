@@ -32,15 +32,31 @@ export class AudioService {
   async requestMicrophoneAccess(): Promise<boolean> {
     this.status = 'requesting';
     this.errorMessage = null;
+    
+    console.log('[AudioService] ========================================');
+    console.log('[AudioService] Requesting microphone access...');
+    console.log('[AudioService] navigator.mediaDevices:', !!navigator.mediaDevices);
+    console.log('[AudioService] getUserMedia:', !!(navigator.mediaDevices?.getUserMedia));
 
     try {
       // Check if getUserMedia is supported
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         this.status = 'error';
         this.errorMessage = 'Microphone access is not supported in this browser';
+        console.error('[AudioService] getUserMedia not supported');
         return false;
       }
 
+      // Check existing permissions first
+      try {
+        const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+        console.log('[AudioService] Current permission state:', permissionStatus.state);
+      } catch (e) {
+        console.log('[AudioService] Cannot query permission (normal on some browsers)');
+      }
+
+      console.log('[AudioService] Calling getUserMedia with audio constraints...');
+      
       // Request microphone access
       this.mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -49,6 +65,9 @@ export class AudioService {
           autoGainControl: true,
         },
       });
+      
+      console.log('[AudioService] Microphone access granted!');
+      console.log('[AudioService] Stream tracks:', this.mediaStream.getTracks().map(t => ({ kind: t.kind, label: t.label, enabled: t.enabled })));
 
       // Create audio context
       this.audioContext = new AudioContext();
@@ -63,8 +82,14 @@ export class AudioService {
       this.sourceNode.connect(this.analyser);
 
       this.status = 'granted';
+      console.log('[AudioService] Audio setup complete, mic ready!');
+      console.log('[AudioService] ========================================');
       return true;
     } catch (error) {
+      console.error('[AudioService] ========================================');
+      console.error('[AudioService] Microphone error:', error);
+      console.error('[AudioService] Error name:', (error as Error).name);
+      console.error('[AudioService] Error message:', (error as Error).message);
       if (error instanceof DOMException) {
         if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
           this.status = 'denied';

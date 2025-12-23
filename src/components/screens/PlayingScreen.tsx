@@ -197,6 +197,9 @@ function YouTubePlayer({
             iv_load_policy: 3,
             disablekb: 1,
             showinfo: 0,
+            // Performance optimizations
+            enablejsapi: 1,
+            vq: 'hd720', // Limit quality to 720p for smoother playback on TV
           },
           events: {
             onReady: () => { 
@@ -339,24 +342,28 @@ export function PlayingScreen({
     setErrorFocused(0);
   }, [currentSong.id]);
 
-  // Update time periodically
+  // Update time periodically - use longer interval to reduce re-renders
   useEffect(() => {
     const updateTime = () => {
       const player = playerRef.current;
-      if (player && !isSeeking) {
+      if (player && !isSeeking && showControls) { // Only update when controls visible
         try {
-          setCurrentTime(player.getCurrentTime() || 0);
+          const newTime = player.getCurrentTime() || 0;
           const dur = player.getDuration();
-          if (dur > 0) setDuration(dur);
+          // Only update state if changed significantly (reduce re-renders)
+          setCurrentTime(prev => Math.abs(prev - newTime) > 0.5 ? newTime : prev);
+          if (dur > 0 && duration === 0) setDuration(dur);
         } catch {}
       }
     };
     
-    timeUpdateRef.current = setInterval(updateTime, 500);
+    // Longer interval when controls hidden
+    const interval = showControls ? 500 : 2000;
+    timeUpdateRef.current = setInterval(updateTime, interval);
     return () => {
       if (timeUpdateRef.current) clearInterval(timeUpdateRef.current);
     };
-  }, [isSeeking]);
+  }, [isSeeking, showControls, duration]);
 
   // Auto-hide controls after 5s
   const resetHideTimer = useCallback(() => {

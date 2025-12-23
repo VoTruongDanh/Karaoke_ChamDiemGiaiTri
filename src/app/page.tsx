@@ -760,7 +760,7 @@ function TVAppContent() {
     return null;
   }, []);
   
-  const { 
+  const {
     isConnected, 
     session, 
     error: socketError,
@@ -938,7 +938,10 @@ function TVAppContent() {
 
   const handleSongEnd = useCallback((score?: ScoreData) => {
     const current = queueStore.getCurrent();
+    
+    // Use mobile score if available
     const finalScore = score || mobileScoreRef.current || undefined;
+    
     if (current) {
       queueStore.setItemStatus(current.id, 'completed');
       notifySongEnded(current.id, finalScore);
@@ -960,6 +963,7 @@ function TVAppContent() {
     }
     queueStore.setItemStatus(next.id, 'playing');
     notifySongStarted(next);
+    
     setTimeout(() => setCurrentScreen('playing'), 100);
   }, [queueStore, notifySongStarted, addToast]);
 

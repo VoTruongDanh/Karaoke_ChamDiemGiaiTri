@@ -14,51 +14,99 @@ interface GradeInfo {
   textColor: string;
   glowColor: string;
   particles: string[];
+  quotes: string[];
 }
 
 function getScoreGrade(score: number): GradeInfo {
   if (score >= 90) return {
-    grade: 'S', title: 'XUẤT SẮC!', emoji: '👑',
+    grade: 'S', title: 'XUAT SAC!', emoji: '👑',
     gradient: 'from-yellow-400 via-amber-500 to-orange-500',
     bgGradient: 'from-yellow-100 via-amber-50 to-orange-100 dark:from-yellow-900/30 dark:via-amber-900/20 dark:to-orange-900/30',
-    textColor: 'text-yellow-500', glowColor: 'rgba(234,179,8,0.8)',
-    particles: ['⭐', '✨', '🌟', '💫', '👑', '🏆']
+    textColor: 'text-amber-600 dark:text-yellow-400', glowColor: 'rgba(234,179,8,0.8)',
+    particles: ['⭐', '✨', '🌟', '💫', '👑', '🏆'],
+    quotes: [
+      'Giong ca vang day roi! 🎤✨',
+      'Qua dinh! Di thi The Voice duoc roi! 🌟',
+      'Sieu sao am nhac la day! 👑',
+      'Huyen thoai! Mic chay luon! 🔥',
+      'Perfect! Khong con gi de che! 💯',
+    ]
   };
   if (score >= 80) return {
-    grade: 'A', title: 'TUYỆT VỜI!', emoji: '🌟',
+    grade: 'A', title: 'TUYET VOI!', emoji: '🌟',
     gradient: 'from-emerald-400 via-green-500 to-teal-500',
     bgGradient: 'from-emerald-100 via-green-50 to-teal-100 dark:from-emerald-900/30 dark:via-green-900/20 dark:to-teal-900/30',
-    textColor: 'text-emerald-600', glowColor: 'rgba(16,185,129,0.8)',
-    particles: ['🎉', '✨', '🎊', '💚']
+    textColor: 'text-emerald-700 dark:text-emerald-400', glowColor: 'rgba(16,185,129,0.8)',
+    particles: ['🎉', '✨', '🎊', '💚'],
+    quotes: [
+      'Hay qua troi! Hat nua di! 🎶',
+      'Giong ngot nhu mia lui! 🍬',
+      'Tuyệt vời! Cả xóm phải nghe! 📢',
+      'Pro singer đây rồi! 🎤',
+      'Quá mượt! Nghe phê quá! 😍',
+    ]
   };
   if (score >= 70) return {
     grade: 'B', title: 'RẤT TỐT!', emoji: '✨',
     gradient: 'from-cyan-400 via-sky-500 to-blue-500',
     bgGradient: 'from-cyan-100 via-sky-50 to-blue-100 dark:from-cyan-900/30 dark:via-sky-900/20 dark:to-blue-900/30',
-    textColor: 'text-cyan-600', glowColor: 'rgba(6,182,212,0.8)',
-    particles: ['💎', '✨', '💙']
+    textColor: 'text-sky-700 dark:text-cyan-400', glowColor: 'rgba(6,182,212,0.8)',
+    particles: ['💎', '✨', '💙'],
+    quotes: [
+      'Ngon lành! Tiếp tục phát huy! 💪',
+      'Hát hay đấy! Thêm bài nữa nào! 🎵',
+      'Ổn áp! Cứ thế mà tiến! 🚀',
+      'Được lắm! Có tiềm năng đó! ⭐',
+      'Nice! Hát thêm vài bài nữa! 🎤',
+    ]
   };
   if (score >= 60) return {
     grade: 'C', title: 'KHÁ TỐT', emoji: '👍',
     gradient: 'from-blue-400 via-indigo-500 to-violet-500',
     bgGradient: 'from-blue-100 via-indigo-50 to-violet-100 dark:from-blue-900/30 dark:via-indigo-900/20 dark:to-violet-900/30',
-    textColor: 'text-blue-600', glowColor: 'rgba(59,130,246,0.8)',
-    particles: ['💜', '✨']
+    textColor: 'text-indigo-700 dark:text-blue-400', glowColor: 'rgba(59,130,246,0.8)',
+    particles: ['💜', '✨'],
+    quotes: [
+      'Tạm ổn! Luyện thêm tí nữa! 📚',
+      'Được rồi! Cố thêm chút nữa! 💪',
+      'OK đó! Bài sau sẽ hay hơn! 🎯',
+      'Cũng được! Đừng bỏ cuộc! 🌈',
+      'Không tệ! Tiếp tục cố gắng! 🎵',
+    ]
   };
   if (score >= 50) return {
     grade: 'D', title: 'CỐ GẮNG THÊM', emoji: '💪',
     gradient: 'from-orange-400 via-amber-500 to-yellow-500',
     bgGradient: 'from-orange-100 via-amber-50 to-yellow-100 dark:from-orange-900/30 dark:via-amber-900/20 dark:to-yellow-900/30',
-    textColor: 'text-orange-600', glowColor: 'rgba(249,115,22,0.8)',
-    particles: ['🔥', '💪']
+    textColor: 'text-orange-700 dark:text-orange-400', glowColor: 'rgba(249,115,22,0.8)',
+    particles: ['🔥', '💪'],
+    quotes: [
+      'Cố lên! Ai cũng từng như vậy! 💪',
+      'Đừng nản! Hát nhiều sẽ hay! 🎤',
+      'Thử bài khác xem sao! 🎵',
+      'Luyện tập sẽ tiến bộ thôi! 📈',
+      'Chill thôi! Vui là chính! 😄',
+    ]
   };
   return {
     grade: 'F', title: 'THỬ LẠI NHÉ', emoji: '🎤',
     gradient: 'from-rose-400 via-red-500 to-pink-500',
     bgGradient: 'from-rose-100 via-red-50 to-pink-100 dark:from-rose-900/30 dark:via-red-900/20 dark:to-pink-900/30',
-    textColor: 'text-rose-600', glowColor: 'rgba(225,29,72,0.8)',
-    particles: ['❤️', '🎤']
+    textColor: 'text-rose-700 dark:text-rose-400', glowColor: 'rgba(225,29,72,0.8)',
+    particles: ['❤️', '🎤'],
+    quotes: [
+      'Không sao! Vui là được! 😊',
+      'Thử bài dễ hơn nha! 🎵',
+      'Hát karaoke mà, chill thôi! 🍻',
+      'Lần sau sẽ tốt hơn! 🌟',
+      'Đừng lo! Ai cũng có lúc vậy! 💕',
+    ]
   };
+}
+
+// Get random quote from grade
+function getRandomQuote(grade: GradeInfo): string {
+  return grade.quotes[Math.floor(Math.random() * grade.quotes.length)];
 }
 
 
@@ -81,7 +129,7 @@ function AnimatedScore({ target, duration = 2500, onComplete }: { target: number
         const g = ctx.createGain();
         o.type = 'sine';
         o.frequency.value = 600 + p * 400;
-        g.gain.setValueAtTime(0.05, ctx.currentTime);
+        g.gain.setValueAtTime(0.075, ctx.currentTime);
         g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03);
         o.connect(g); g.connect(ctx.destination);
         o.start(); o.stop(ctx.currentTime + 0.03);
@@ -96,7 +144,7 @@ function AnimatedScore({ target, duration = 2500, onComplete }: { target: number
           const o = ctx.createOscillator();
           const g = ctx.createGain();
           o.type = 'sine'; o.frequency.value = f;
-          g.gain.setValueAtTime(0.1, ctx.currentTime + i * 0.08);
+          g.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.08);
           g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.08 + 0.4);
           o.connect(g); g.connect(ctx.destination);
           o.start(ctx.currentTime + i * 0.08);
@@ -123,6 +171,16 @@ function AnimatedScore({ target, duration = 2500, onComplete }: { target: number
   return <span className={done ? '' : 'animate-pulse'}>{current}</span>;
 }
 
+// Animated crown for high scores
+function AnimatedCrown({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-4xl animate-crown-drop z-20">
+      👑
+    </div>
+  );
+}
+
 function ParticleField({ particles, count }: { particles: string[]; count: number }) {
   const items = useMemo(() => [...Array(count)].map((_, i) => ({
     id: i, x: Math.random() * 100, y: Math.random() * 100,
@@ -136,6 +194,74 @@ function ParticleField({ particles, count }: { particles: string[]; count: numbe
         <div key={p.id} className="absolute animate-float-particle opacity-70"
           style={{ left: `${p.x}%`, top: `${p.y}%`, fontSize: `${p.size}px`, animationDuration: `${p.dur}s`, animationDelay: `${p.delay}s` }}>
           {p.emoji}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Rising bubbles from bottom
+function RisingBubbles({ color, count }: { color: string; count: number }) {
+  const bubbles = useMemo(() => [...Array(count)].map((_, i) => ({
+    id: i, x: 5 + (i * 100 / count), size: 8 + Math.random() * 20, dur: 4 + Math.random() * 4, delay: Math.random() * 3,
+  })), [count]);
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {bubbles.map(b => (
+        <div key={b.id} className="absolute bottom-0 rounded-full animate-rise-bubble"
+          style={{ left: `${b.x}%`, width: `${b.size}px`, height: `${b.size}px`, backgroundColor: color, opacity: 0.3, animationDuration: `${b.dur}s`, animationDelay: `${b.delay}s` }} />
+      ))}
+    </div>
+  );
+}
+
+// Sparkle stars
+function SparkleStars({ count }: { count: number }) {
+  const stars = useMemo(() => [...Array(count)].map((_, i) => ({
+    id: i, x: Math.random() * 100, y: Math.random() * 100, size: 2 + Math.random() * 4, dur: 1 + Math.random() * 2, delay: Math.random() * 2,
+  })), [count]);
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {stars.map(s => (
+        <div key={s.id} className="absolute rounded-full bg-white animate-twinkle"
+          style={{ left: `${s.x}%`, top: `${s.y}%`, width: `${s.size}px`, height: `${s.size}px`, animationDuration: `${s.dur}s`, animationDelay: `${s.delay}s` }} />
+      ))}
+    </div>
+  );
+}
+
+// Shooting stars
+function ShootingStars({ count }: { count: number }) {
+  const stars = useMemo(() => [...Array(count)].map((_, i) => ({
+    id: i, top: 10 + Math.random() * 40, delay: i * 1.5 + Math.random(),
+  })), [count]);
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {stars.map(s => (
+        <div key={s.id} className="absolute left-0 animate-shooting-star" style={{ top: `${s.top}%`, animationDelay: `${s.delay}s` }}>
+          <div className="w-24 h-0.5 bg-gradient-to-r from-transparent via-white to-yellow-200 rounded-full" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Floating music notes
+function FloatingNotes({ count }: { count: number }) {
+  const notes = useMemo(() => [...Array(count)].map((_, i) => ({
+    id: i, x: Math.random() * 100, y: 60 + Math.random() * 30, dur: 3 + Math.random() * 3, delay: Math.random() * 2,
+    note: ['🎵', '🎶', '♪', '♫'][i % 4],
+  })), [count]);
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {notes.map(n => (
+        <div key={n.id} className="absolute text-2xl animate-float-up opacity-50"
+          style={{ left: `${n.x}%`, top: `${n.y}%`, animationDuration: `${n.dur}s`, animationDelay: `${n.delay}s` }}>
+          {n.note}
         </div>
       ))}
     </div>
@@ -197,6 +323,7 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong }: Pr
   const confettiDone = useRef(false);
 
   const grade = finalScore ? getScoreGrade(finalScore.totalScore) : null;
+  const quote = useMemo(() => grade ? getRandomQuote(grade) : '', [grade]);
   const isHigh = finalScore ? finalScore.totalScore >= 80 : false;
   const isMed = finalScore ? finalScore.totalScore >= 60 && finalScore.totalScore < 80 : false;
 
@@ -206,20 +333,30 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong }: Pr
     const c = confetti.create(canvasRef.current, { resize: true, useWorker: true });
 
     if (isHigh) {
-      const end = Date.now() + 3500;
+      // Continuous side confetti
+      const end = Date.now() + 5000;
       const frame = () => {
-        c({ particleCount: 2, angle: 60, spread: 50, origin: { x: 0, y: 0.7 }, colors: ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff'] });
-        c({ particleCount: 2, angle: 120, spread: 50, origin: { x: 1, y: 0.7 }, colors: ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff'] });
+        c({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0, y: 0.6 }, colors: ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff6bd6'] });
+        c({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1, y: 0.6 }, colors: ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff6bd6'] });
         if (Date.now() < end) requestAnimationFrame(frame);
       };
       frame();
-      setTimeout(() => c({ particleCount: 80, spread: 100, origin: { x: 0.5, y: 0.5 }, startVelocity: 40 }), 300);
-      setTimeout(() => c({ particleCount: 60, spread: 80, origin: { x: 0.3, y: 0.4 }, startVelocity: 35 }), 1000);
-      setTimeout(() => c({ particleCount: 60, spread: 80, origin: { x: 0.7, y: 0.4 }, startVelocity: 35 }), 1600);
-      setTimeout(() => c({ particleCount: 40, spread: 360, origin: { x: 0.5, y: 0.35 }, shapes: ['star'], colors: ['#ffd700'], gravity: 0.6 }), 2200);
+
+      // Multiple firework bursts
+      setTimeout(() => c({ particleCount: 100, spread: 120, origin: { x: 0.5, y: 0.5 }, startVelocity: 45, colors: ['#ffd700', '#ff6b6b', '#4d96ff'] }), 200);
+      setTimeout(() => c({ particleCount: 80, spread: 100, origin: { x: 0.25, y: 0.35 }, startVelocity: 40, colors: ['#6bcb77', '#ffd93d'] }), 800);
+      setTimeout(() => c({ particleCount: 80, spread: 100, origin: { x: 0.75, y: 0.35 }, startVelocity: 40, colors: ['#ff6bd6', '#4d96ff'] }), 1200);
+      setTimeout(() => c({ particleCount: 60, spread: 80, origin: { x: 0.5, y: 0.7 }, startVelocity: 35 }), 1600);
+      setTimeout(() => c({ particleCount: 50, spread: 360, origin: { x: 0.5, y: 0.4 }, shapes: ['star'], colors: ['#ffd700', '#ffec8b'], gravity: 0.5, startVelocity: 30 }), 2000);
+      setTimeout(() => c({ particleCount: 70, spread: 100, origin: { x: 0.3, y: 0.5 }, startVelocity: 38 }), 2500);
+      setTimeout(() => c({ particleCount: 70, spread: 100, origin: { x: 0.7, y: 0.5 }, startVelocity: 38 }), 3000);
+      setTimeout(() => c({ particleCount: 100, spread: 180, origin: { x: 0.5, y: 0.6 }, startVelocity: 50, colors: ['#ffd700', '#ff6b6b', '#6bcb77', '#4d96ff', '#ff6bd6'] }), 3500);
+      // Final big burst
+      setTimeout(() => c({ particleCount: 150, spread: 360, origin: { x: 0.5, y: 0.5 }, startVelocity: 55, gravity: 0.8, colors: ['#ffd700', '#ff6b6b', '#6bcb77', '#4d96ff', '#ff6bd6', '#a855f7'] }), 4200);
     } else if (isMed) {
-      c({ particleCount: 50, spread: 60, origin: { x: 0.5, y: 0.6 } });
-      setTimeout(() => c({ particleCount: 30, spread: 50, origin: { x: 0.5, y: 0.5 } }), 600);
+      c({ particleCount: 60, spread: 70, origin: { x: 0.5, y: 0.6 }, colors: ['#6bcb77', '#4d96ff', '#ffd93d'] });
+      setTimeout(() => c({ particleCount: 40, spread: 60, origin: { x: 0.5, y: 0.5 } }), 500);
+      setTimeout(() => c({ particleCount: 50, spread: 80, origin: { x: 0.5, y: 0.55 } }), 1000);
     }
   }, [isHigh, isMed]);
 
@@ -255,8 +392,12 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong }: Pr
       
       {grade && (
         <>
-          <GlowOrbs color={grade.glowColor} count={isHigh ? 4 : 2} />
-          <ParticleField particles={grade.particles} count={isHigh ? 25 : 12} />
+          <GlowOrbs color={grade.glowColor} count={isHigh ? 5 : 3} />
+          <ParticleField particles={grade.particles} count={isHigh ? 30 : 15} />
+          <RisingBubbles color={grade.glowColor} count={isHigh ? 20 : 10} />
+          <SparkleStars count={isHigh ? 30 : 15} />
+          <FloatingNotes count={isHigh ? 12 : 6} />
+          {isHigh && <ShootingStars count={4} />}
         </>
       )}
 
@@ -285,22 +426,42 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong }: Pr
 
             {finalScore && grade ? (
               <>
+                {/* Title with animated text */}
                 <h1 className={`text-2xl font-bold mb-4 bg-gradient-to-r ${grade.gradient} bg-clip-text text-transparent flex items-center gap-2`}>
                   <span className={revealed && isHigh ? 'animate-bounce' : ''}>{grade.emoji}</span>
-                  {grade.title}
+                  <span className={revealed ? 'animate-text-shimmer' : ''}>{grade.title}</span>
                 </h1>
 
-                <div className="flex items-baseline gap-3 mb-6">
-                  <span className={`text-8xl font-black ${grade.textColor}`}
-                    style={{ textShadow: `-2px -2px 0 rgba(0,0,0,0.4), 2px -2px 0 rgba(0,0,0,0.4), -2px 2px 0 rgba(0,0,0,0.4), 2px 2px 0 rgba(0,0,0,0.4), 0 0 30px ${grade.glowColor}` }}>
-                    <AnimatedScore target={finalScore.totalScore} onComplete={onComplete} />
-                  </span>
-                  <span className="text-2xl text-slate-500 dark:text-slate-400 font-semibold">điểm</span>
+                {/* Score display - simple and clean */}
+                <div className="relative mb-6">
+                  <AnimatedCrown show={revealed && isHigh} />
+                  <div className="flex items-baseline gap-2">
+                    <span className={`text-7xl font-black ${grade.textColor} ${revealed && isHigh ? 'animate-score-glow' : ''}`}
+                      style={{ textShadow: `-2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff, 2px 2px 0 #fff, 0 0 20px ${grade.glowColor}, 0 4px 8px rgba(0,0,0,0.3)` }}>
+                      <AnimatedScore target={finalScore.totalScore} onComplete={onComplete} />
+                    </span>
+                    <span className="text-xl text-slate-600 dark:text-slate-300 font-semibold">điểm</span>
+                  </div>
+                  
+                  {/* Grade badge */}
+                  <div className={`mt-3 transition-all duration-500 ${revealed ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2'}`}>
+                    <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r ${grade.gradient} text-white font-bold shadow-lg ${revealed && isHigh ? 'animate-bounce-subtle' : ''}`}>
+                      <span>{grade.emoji}</span> Hạng {grade.grade}
+                    </span>
+                  </div>
+                  
+                  {/* Fun quote */}
+                  <div className={`mt-4 transition-all duration-700 delay-500 ${revealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                    <p className="text-lg text-slate-600 dark:text-slate-300 italic font-medium">
+                      "{quote}"
+                    </p>
+                  </div>
                 </div>
 
-                <div className="space-y-4 mb-6 max-w-sm">
-                  <StatBar label="Cao độ" value={finalScore.pitchAccuracy} icon="🎵" color="#10b981" delay={2600} />
-                  <StatBar label="Nhịp điệu" value={finalScore.timing} icon="🥁" color="#3b82f6" delay={3000} />
+                {/* Stats with icons */}
+                <div className="space-y-3 mb-6 max-w-xs">
+                  <StatBar label="Giọng hát" value={finalScore.pitchAccuracy} icon="🎤" color="#10b981" delay={2800} />
+                  <StatBar label="Cảm xúc" value={finalScore.timing} icon="💖" color="#ec4899" delay={3200} />
                 </div>
               </>
             ) : (

@@ -52,6 +52,14 @@ function DeleteIcon() {
   );
 }
 
+function ReplayIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
+  );
+}
+
 function MusicIcon() {
   return (
     <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -195,10 +203,12 @@ export function QueueScreen({ onBack }: QueueScreenProps) {
   const items = useQueueStore((state) => state.items);
   const reorder = useQueueStore((state) => state.reorder);
   const remove = useQueueStore((state) => state.remove);
+  const replay = useQueueStore((state) => state.replay);
   const getCurrent = useQueueStore((state) => state.getCurrent);
 
   const currentSong = getCurrent();
   const waitingItems = items.filter(item => item.status === 'waiting');
+  const completedItems = items.filter(item => item.status === 'completed');
 
   const handleMoveUp = useCallback((itemId: string, currentIndex: number) => {
     if (currentIndex > 0) reorder(itemId, currentIndex - 1);
@@ -211,6 +221,13 @@ export function QueueScreen({ onBack }: QueueScreenProps) {
   const handleRemove = useCallback((itemId: string) => {
     remove(itemId);
   }, [remove]);
+
+  const handleReplay = useCallback((item: QueueItem) => {
+    replay(item.song, 'TV User');
+  }, [replay]);
+
+  // Calculate row offset for completed items section
+  const completedRowOffset = waitingItems.length + 2; // +2 for header and spacing
 
   return (
     <NavigationGrid className="min-h-screen bg-tv-bg p-6">
@@ -248,7 +265,7 @@ export function QueueScreen({ onBack }: QueueScreenProps) {
               <p className="text-sm mt-2">Hàng đợi trống</p>
             </div>
           ) : (
-            <div className="max-h-[400px] overflow-y-auto hide-scrollbar">
+            <div className="max-h-[300px] overflow-y-auto hide-scrollbar">
               {waitingItems.map((item, index) => (
                 <QueueItemRow
                   key={item.id}
@@ -265,6 +282,50 @@ export function QueueScreen({ onBack }: QueueScreenProps) {
             </div>
           )}
         </div>
+
+        {/* Completed songs - can replay */}
+        {completedItems.length > 0 && (
+          <div className="bg-white/5 backdrop-blur rounded-2xl p-4 mt-4">
+            <p className="text-sm text-gray-400 mb-3">Đã hát ({completedItems.length})</p>
+            <div className="max-h-[200px] overflow-y-auto hide-scrollbar">
+              {completedItems.map((item, index) => (
+                <div key={item.id} className="flex items-center gap-3 p-2 bg-white/5 rounded-xl mb-2 opacity-70 hover:opacity-100 transition-opacity">
+                  <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm text-green-400">✓</span>
+                  </div>
+
+                  <LazyImage 
+                    src={item.song.thumbnail} 
+                    alt={item.song.title}
+                    className="w-16 h-10 rounded-lg object-cover flex-shrink-0"
+                    width={64}
+                    height={40}
+                  />
+                  
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{item.song.title}</p>
+                    <p className="text-xs text-gray-400 truncate">
+                      {item.song.channelName} • {formatDuration(item.song.duration)}
+                    </p>
+                  </div>
+
+                  <FocusableButton
+                    row={completedRowOffset + index}
+                    col={0}
+                    onSelect={() => handleReplay(item)}
+                    variant="secondary"
+                    size="sm"
+                    className="!min-w-[80px] !px-3 text-primary-400"
+                    ariaLabel="Hát lại"
+                  >
+                    <ReplayIcon />
+                    <span className="ml-1">Hát lại</span>
+                  </FocusableButton>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Total time */}
         {waitingItems.length > 0 && (

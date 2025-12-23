@@ -62,6 +62,14 @@ interface QueueState {
   setItemStatus: (itemId: string, status: QueueItemStatus) => void;
   
   /**
+   * Replay a song - add it back to queue as waiting
+   * @param song - The song to replay
+   * @param userId - The user replaying the song
+   * @returns The new queue item
+   */
+  replay: (song: Song, userId: string) => QueueItem;
+  
+  /**
    * Clear all completed items from the queue
    */
   clearCompleted: () => void;
@@ -155,6 +163,22 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     set((state) => ({
       items: state.items.filter((item) => item.status !== 'completed'),
     }));
+  },
+  
+  replay: (song: Song, userId: string): QueueItem => {
+    const newItem: QueueItem = {
+      id: generateId(),
+      song,
+      addedBy: userId,
+      addedAt: new Date(),
+      status: 'waiting',
+    };
+    
+    set((state) => ({
+      items: [...state.items, newItem],
+    }));
+    
+    return newItem;
   },
   
   setQueue: (items: QueueItem[]): void => {
