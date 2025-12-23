@@ -103,22 +103,20 @@ export class SongLibrary {
   }
 
   /**
-   * Get YouTube's suggested/related videos based on recently added songs
-   * Uses local API proxy for suggestions
+   * Get YouTube's actual "Up next" suggestions based on recently played video
+   * Uses optimized API with parallel fetch and caching
    * 
    * @param videoIds - Array of YouTube video IDs from recently added songs
    * @param maxResults - Maximum number of suggestions
-   * @param addedSongs - Optional array of Song objects for search fallback
-   * @returns Array of suggested songs
+   * @returns Array of suggested songs (YouTube's real recommendations)
    */
-  async getSuggestions(videoIds: string[], maxResults: number = 10, addedSongs?: Song[]): Promise<Song[]> {
+  async getSuggestions(videoIds: string[], maxResults: number = 10): Promise<Song[]> {
     if (videoIds.length === 0) return [];
     
-    console.log('[SongLibrary] Getting suggestions for:', videoIds.slice(0, 2));
+    console.log('[SongLibrary] Getting suggestions for:', videoIds[0]);
     
-    // Always use Invidious (local API proxy) for suggestions - more reliable
     try {
-      const result = await this.invidiousService.getSuggestionsFromVideos(videoIds, maxResults, addedSongs);
+      const result = await this.invidiousService.getSuggestionsFromVideos(videoIds, maxResults);
       console.log('[SongLibrary] Got', result.length, 'suggestions');
       return result;
     } catch (error) {

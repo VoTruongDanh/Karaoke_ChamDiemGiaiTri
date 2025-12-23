@@ -17,7 +17,7 @@ export interface ControllerScreenProps {
   /** Callback to search for songs */
   onSearch: (query: string, pageToken?: string) => Promise<{ songs: Song[]; nextPageToken?: string }>;
   /** Callback to get YouTube suggestions based on video IDs */
-  onGetSuggestions?: (videoIds: string[], addedSongs?: Song[]) => Promise<Song[]>;
+  onGetSuggestions?: (videoIds: string[]) => Promise<Song[]>;
   /** Callback when a song is added to queue */
   onAddToQueue: (song: Song) => void;
   /** Callback to view full queue */
@@ -244,7 +244,7 @@ export function ControllerScreen({
     const videoIds = songsForSuggestions.slice(0, 3).map(s => s.youtubeId);
     const addedIds = new Set([...recentlyAddedSongs.map(s => s.youtubeId), ...queueSongs.map(s => s.youtubeId)]);
     
-    onGetSuggestions(videoIds, songsForSuggestions.slice(0, 3))
+    onGetSuggestions(videoIds)
       .then(suggestions => {
         console.log('[Controller] Got suggestions:', suggestions.length, suggestions.map(s => s.title));
         // Filter out songs already in queue or added

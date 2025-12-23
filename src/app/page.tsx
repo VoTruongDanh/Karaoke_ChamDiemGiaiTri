@@ -1112,8 +1112,9 @@ function TVAppContent() {
             onNowPlayingSelect={currentSong ? () => navigateTo('playing') : undefined}
             onSummarySelect={completedSongs.length > 0 ? handleShowSummary : undefined}
             onPlayNow={handleStartPlaying}
-            onGetSuggestions={songLibrary ? (videoIds, addedSongs) => songLibrary.getSuggestions(videoIds, 4, addedSongs) : undefined}
+            onGetSuggestions={songLibrary ? (videoIds, maxResults = 12) => songLibrary.getSuggestions(videoIds, maxResults) : undefined}
             onAddToQueue={handleSongSelect}
+            lastPlayedVideoId={completedSongs.length > 0 ? completedSongs[completedSongs.length - 1].queueItem.song.youtubeId : undefined}
           />
         );
 

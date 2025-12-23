@@ -90,50 +90,15 @@ export class InvidiousService {
   }
 
   /**
-   * Get suggestions from multiple videos - use search as fallback
+   * Get suggestions from multiple videos - YouTube's actual "Up next" recommendations
+   * No keyword search fallback - only real recommendations
    */
-  async getSuggestionsFromVideos(videoIds: string[], maxResults: number = 10, addedSongs?: Song[]): Promise<Song[]> {
+  async getSuggestionsFromVideos(videoIds: string[], maxResults: number = 10): Promise<Song[]> {
     if (videoIds.length === 0) return [];
 
-    // Try API first
+    // Get related videos from API (now optimized with parallel fetch + cache)
     const recentId = videoIds[0];
-    let related = await this.getRelatedVideos(recentId, maxResults + 5);
-    
-    // If API fails and we have song info, search for similar
-    if (related.length === 0 && addedSongs && addedSongs.length > 0) {
-      console.log('[Search] API failed, trying search fallback');
-      const song = addedSongs[0];
-      
-      // Extract keywords from song title
-      const cleanTitle = song.title
-        .replace(/\(.*?\)|\[.*?\]/g, '')
-        .replace(/karaoke|beat|lyrics|official|mv|music video|chuẩn|mới nhất|nhạc|việt/gi, '')
-        .trim();
-      
-      const words = cleanTitle.split(/[\s\-|]+/).filter(w => w.length > 2);
-      const searchQuery = words.slice(0, 2).join(' ') + ' karaoke';
-      
-      if (searchQuery.length >= 5) {
-        console.log('[Search] Searching for similar:', searchQuery);
-        try {
-          const result = await this.search(searchQuery);
-          related = result.songs.filter(s => s.youtubeId !== song.youtubeId);
-        } catch (e) {
-          console.log('[Search] Search fallback failed:', e);
-        }
-      }
-      
-      // If still no results, try generic karaoke search
-      if (related.length === 0) {
-        console.log('[Search] Trying generic karaoke search');
-        try {
-          const result = await this.search('karaoke việt nam hot');
-          related = result.songs.filter(s => !videoIds.includes(s.youtubeId));
-        } catch (e) {
-          console.log('[Search] Generic search failed:', e);
-        }
-      }
-    }
+    const related = await this.getRelatedVideos(recentId, maxResults + 5);
     
     // Filter out videos already in the list
     const seenIds = new Set(videoIds);

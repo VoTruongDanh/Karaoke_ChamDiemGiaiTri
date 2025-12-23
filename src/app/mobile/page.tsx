@@ -92,10 +92,10 @@ function MobileAppContent() {
     }
   }, [songLibrary]);
 
-  const handleGetSuggestions = useCallback(async (videoIds: string[], addedSongs?: Song[]): Promise<Song[]> => {
+  const handleGetSuggestions = useCallback(async (videoIds: string[]): Promise<Song[]> => {
     if (videoIds.length > 0) {
       try {
-        return await songLibrary.getSuggestions(videoIds, 6, addedSongs);
+        return await songLibrary.getSuggestions(videoIds, 6);
       } catch {
         return [];
       }

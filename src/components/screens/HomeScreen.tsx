@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import QRCode from 'qrcode';
 import { NavigationGrid } from '@/components/NavigationGrid';
 import { FocusableButton } from '@/components/FocusableButton';
@@ -18,8 +18,9 @@ export interface HomeScreenProps {
   onNowPlayingSelect?: () => void;
   onSummarySelect?: () => void;
   onPlayNow?: () => void;
-  onGetSuggestions?: (videoIds: string[], addedSongs?: Song[]) => Promise<Song[]>;
+  onGetSuggestions?: (videoIds: string[], maxResults?: number) => Promise<Song[]>;
   onAddToQueue?: (song: Song) => void;
+  lastPlayedVideoId?: string; // Video vừa hát xong - dùng để lấy gợi ý
 }
 
 function SearchIcon() {
@@ -153,6 +154,7 @@ export function HomeScreen({
   onPlayNow,
   onGetSuggestions,
   onAddToQueue,
+  lastPlayedVideoId,
 }: HomeScreenProps) {
   const currentSong = useQueueStore((state) => state.getCurrent());
   const queueItems = useQueueStore((state) => state.items);
@@ -161,32 +163,115 @@ export function HomeScreen({
   // Suggestions state
   const [suggestions, setSuggestions] = useState<Song[]>([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+  const suggestionsContainerRef = useRef<HTMLDivElement>(null);
+  const loadedIdsRef = useRef<Set<string>>(new Set());
 
-  // Load suggestions based on queue
+  // Track current video ID to detect changes
+  // Priority: lastPlayedVideoId (vừa hát xong) > currentSong (đang phát) > queue
+  const primaryVideoId = lastPlayedVideoId || currentSong?.song.youtubeId || queueItems[0]?.song.youtubeId || '';
+  const lastFetchedVideoIdRef = useRef<string>('');
+
+  // Load suggestions based on last played or current song
   useEffect(() => {
-    if (!onGetSuggestions) return;
-    
-    const queueSongs = queueItems.map(item => item.song);
-    if (currentSong) queueSongs.unshift(currentSong.song);
-    
-    if (queueSongs.length === 0) {
+    if (!onGetSuggestions || !primaryVideoId) {
       setSuggestions([]);
+      loadedIdsRef.current.clear();
       return;
     }
     
-    setIsLoadingSuggestions(true);
-    const videoIds = queueSongs.slice(0, 3).map(s => s.youtubeId);
-    const existingIds = new Set(queueSongs.map(s => s.youtubeId));
+    // Skip if we already fetched for this video
+    if (primaryVideoId === lastFetchedVideoIdRef.current && suggestions.length > 0) {
+      return;
+    }
     
-    onGetSuggestions(videoIds, queueSongs.slice(0, 3))
+    console.log('[Home] Fetching suggestions for:', primaryVideoId);
+    lastFetchedVideoIdRef.current = primaryVideoId;
+    
+    setIsLoadingSuggestions(true);
+    setSuggestions([]); // Clear old suggestions
+    loadedIdsRef.current.clear();
+    
+    // Build video IDs list - primary video first
+    const videoIds = [primaryVideoId];
+    if (currentSong && currentSong.song.youtubeId !== primaryVideoId) {
+      videoIds.push(currentSong.song.youtubeId);
+    }
+    
+    // Exclude videos already in queue
+    const existingIds = new Set([
+      primaryVideoId,
+      ...queueItems.map(item => item.song.youtubeId),
+    ]);
+    
+    onGetSuggestions(videoIds, 12)
       .then(results => {
         const filtered = results.filter(s => !existingIds.has(s.youtubeId));
-        setSuggestions(filtered.slice(0, 4));
+        setSuggestions(filtered);
+        loadedIdsRef.current = new Set(filtered.map(s => s.youtubeId));
       })
       .catch(() => setSuggestions([]))
       .finally(() => setIsLoadingSuggestions(false));
-  }, [queueItems, currentSong, onGetSuggestions]);
+  }, [primaryVideoId, queueItems, onGetSuggestions]);
+
+  // Load more suggestions when scrolling
+  const loadMoreSuggestions = useCallback(async () => {
+    if (!onGetSuggestions || isLoadingMore || suggestions.length === 0) return;
+    
+    const queueSongs = queueItems.map(item => item.song);
+    if (currentSong) queueSongs.unshift(currentSong.song);
+    if (queueSongs.length === 0) return;
+    
+    setIsLoadingMore(true);
+    
+    // Use last suggestion as seed for more
+    const lastSuggestion = suggestions[suggestions.length - 1];
+    const videoIds = [lastSuggestion.youtubeId];
+    
+    try {
+      const results = await onGetSuggestions(videoIds, 8);
+      const existingIds = new Set([
+        ...queueSongs.map(s => s.youtubeId),
+        ...Array.from(loadedIdsRef.current),
+      ]);
+      
+      const newSuggestions = results.filter(s => !existingIds.has(s.youtubeId));
+      
+      if (newSuggestions.length > 0) {
+        setSuggestions(prev => [...prev, ...newSuggestions]);
+        newSuggestions.forEach(s => loadedIdsRef.current.add(s.youtubeId));
+      }
+    } catch (e) {
+      console.log('[Home] Load more failed');
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [onGetSuggestions, isLoadingMore, suggestions, queueItems, currentSong]);
+
+  // Infinite scroll handler - auto load when near bottom (with debounce)
+  const lastLoadTimeRef = useRef(0);
+  
+  useEffect(() => {
+    const container = suggestionsContainerRef.current;
+    if (!container) return;
+    
+    const handleScroll = () => {
+      // Debounce: only load every 2 seconds
+      const now = Date.now();
+      if (now - lastLoadTimeRef.current < 2000) return;
+      
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      // Load more when scrolled 70% down
+      if (scrollTop + clientHeight >= scrollHeight * 0.7 && !isLoadingMore) {
+        lastLoadTimeRef.current = now;
+        loadMoreSuggestions();
+      }
+    };
+    
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [loadMoreSuggestions, isLoadingMore]);
 
   const handleAddSuggestion = useCallback((song: Song) => {
     if (!onAddToQueue) return;
@@ -357,64 +442,88 @@ export function HomeScreen({
             {/* Suggestions - show when queue has songs */}
             {suggestions.length > 0 && onAddToQueue && (
               <div className="bg-white/5 dark:bg-white/5 backdrop-blur rounded-2xl p-4">
-                <p className="text-base text-gray-400 mb-3">🎵 Gợi ý cho bạn</p>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  {suggestions.map((song, index) => {
-                    const isAdded = addedIds.has(song.youtubeId);
-                    // Calculate base row based on what's visible above
-                    const hasPlayNow = waitingCount > 0 && !currentSong && onPlayNow;
-                    const hasQueuePreview = waitingCount > 0;
-                    let baseRow = 2;
-                    if (hasPlayNow) baseRow++;
-                    if (hasQueuePreview) baseRow++;
-                    
-                    // 2 columns layout: index 0,1 = row 0, index 2,3 = row 1
-                    // So pressing down from first row goes to second row
-                    const suggestionRow = baseRow + Math.floor(index / 2);
-                    const suggestionCol = index % 2;
-                    
-                    return (
-                      <FocusableButton
-                        key={song.youtubeId}
-                        row={suggestionRow}
-                        col={suggestionCol}
-                        onSelect={() => !isAdded && handleAddSuggestion(song)}
-                        variant="ghost"
-                        className={`!p-0 !min-h-0 !min-w-0 w-full text-left !rounded-xl !overflow-hidden ${
-                          isAdded ? 'ring-2 ring-green-500' : ''
-                        }`}
-                      >
-                        <div className="flex flex-col bg-white/5 w-full">
-                          <div className="relative w-full aspect-video">
-                            <LazyImage 
-                              src={song.thumbnail} 
-                              alt={song.title}
-                              className="w-full h-full object-cover"
-                              width={200}
-                              height={112}
-                            />
-                            {isAdded ? (
-                              <div className="absolute inset-0 bg-green-500/50 flex items-center justify-center">
-                                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                </svg>
-                              </div>
-                            ) : (
-                              <div className="absolute top-1 right-1 w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center">
-                                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
-                              </div>
-                            )}
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-base text-gray-400">🎵 Gợi ý cho bạn</p>
+                  <p className="text-xs text-gray-500">{suggestions.length} bài</p>
+                </div>
+                <div 
+                  ref={suggestionsContainerRef}
+                  className="max-h-[400px] overflow-y-auto hide-scrollbar"
+                >
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    {suggestions.map((song, index) => {
+                      const isAdded = addedIds.has(song.youtubeId);
+                      // Calculate base row based on what's visible above
+                      const hasPlayNow = waitingCount > 0 && !currentSong && onPlayNow;
+                      const hasQueuePreview = waitingCount > 0;
+                      let baseRow = 2;
+                      if (hasPlayNow) baseRow++;
+                      if (hasQueuePreview) baseRow++;
+                      
+                      // 4 columns on lg, 2 on smaller
+                      const cols = 4;
+                      const suggestionRow = baseRow + Math.floor(index / cols);
+                      const suggestionCol = index % cols;
+                      
+                      return (
+                        <FocusableButton
+                          key={song.youtubeId}
+                          row={suggestionRow}
+                          col={suggestionCol}
+                          onSelect={() => {
+                            if (!isAdded) {
+                              handleAddSuggestion(song);
+                            }
+                            // Trigger load more when selecting items near the end
+                            if (index >= suggestions.length - 4) {
+                              loadMoreSuggestions();
+                            }
+                          }}
+                          variant="ghost"
+                          className={`!p-0 !min-h-0 !min-w-0 w-full text-left !rounded-xl !overflow-hidden ${
+                            isAdded ? 'ring-2 ring-green-500' : ''
+                          }`}
+                        >
+                          <div className="flex flex-col bg-white/5 w-full">
+                            <div className="relative w-full aspect-video">
+                              <LazyImage 
+                                src={song.thumbnail} 
+                                alt={song.title}
+                                className="w-full h-full object-cover"
+                                width={200}
+                                height={112}
+                              />
+                              {isAdded ? (
+                                <div className="absolute inset-0 bg-green-500/50 flex items-center justify-center">
+                                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </div>
+                              ) : (
+                                <div className="absolute top-1 right-1 w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center">
+                                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
+                            <div className="p-2">
+                              <p className="text-sm font-medium line-clamp-2 leading-tight">{song.title}</p>
+                              <p className="text-xs text-gray-400 truncate mt-1">{song.channelName}</p>
+                            </div>
                           </div>
-                          <div className="p-2">
-                            <p className="text-sm font-medium line-clamp-2 leading-tight">{song.title}</p>
-                            <p className="text-xs text-gray-400 truncate mt-1">{song.channelName}</p>
-                          </div>
-                        </div>
-                      </FocusableButton>
-                    );
-                  })}
+                        </FocusableButton>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Load more indicator */}
+                  {isLoadingMore && (
+                    <div className="flex items-center justify-center gap-2 py-4">
+                      <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-sm text-gray-400">Đang tải thêm...</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
