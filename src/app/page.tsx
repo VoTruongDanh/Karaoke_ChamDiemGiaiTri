@@ -8,6 +8,7 @@ import {
   PlayingScreen,
   SessionSummaryScreen 
 } from '@/components/screens';
+import { TVSongResultScreen } from '@/components/screens/TVSongResultScreen';
 import { NetworkStatus } from '@/components/NetworkStatus';
 import { ToastProvider, useToast } from '@/components/Toast';
 import { ScreenTransition } from '@/components/ScreenTransition';
@@ -33,14 +34,38 @@ interface GradeInfo {
   particles: string[];
 }
 
-// Get score color based on grade
-function getScoreColor(score: number): { text: string; glow: string } {
-  if (score >= 90) return { text: 'text-yellow-400', glow: 'drop-shadow-[0_0_20px_rgba(250,204,21,0.8)]' }; // S - Vàng
-  if (score >= 80) return { text: 'text-emerald-400', glow: 'drop-shadow-[0_0_20px_rgba(52,211,153,0.8)]' }; // A - Xanh lục
-  if (score >= 70) return { text: 'text-cyan-400', glow: 'drop-shadow-[0_0_20px_rgba(34,211,238,0.8)]' }; // B - Xanh dương
-  if (score >= 60) return { text: 'text-blue-400', glow: 'drop-shadow-[0_0_20px_rgba(96,165,250,0.8)]' }; // C - Xanh
-  if (score >= 50) return { text: 'text-orange-400', glow: 'drop-shadow-[0_0_20px_rgba(251,146,60,0.8)]' }; // D - Cam
-  return { text: 'text-rose-500', glow: 'drop-shadow-[0_0_20px_rgba(244,63,94,0.8)]' }; // F - Đỏ
+// Get score color based on grade - darker colors with stroke for visibility
+function getScoreColor(score: number): { text: string; glow: string; stroke: string } {
+  if (score >= 90) return { 
+    text: 'text-yellow-500', 
+    glow: 'drop-shadow-[0_0_30px_rgba(234,179,8,0.9)]',
+    stroke: '[text-shadow:_-2px_-2px_0_#000,_2px_-2px_0_#000,_-2px_2px_0_#000,_2px_2px_0_#000,_0_0_20px_rgba(234,179,8,0.8)]'
+  }; // S - Vàng đậm
+  if (score >= 80) return { 
+    text: 'text-emerald-500', 
+    glow: 'drop-shadow-[0_0_30px_rgba(16,185,129,0.9)]',
+    stroke: '[text-shadow:_-2px_-2px_0_#000,_2px_-2px_0_#000,_-2px_2px_0_#000,_2px_2px_0_#000,_0_0_20px_rgba(16,185,129,0.8)]'
+  }; // A - Xanh lục đậm
+  if (score >= 70) return { 
+    text: 'text-cyan-500', 
+    glow: 'drop-shadow-[0_0_30px_rgba(6,182,212,0.9)]',
+    stroke: '[text-shadow:_-2px_-2px_0_#000,_2px_-2px_0_#000,_-2px_2px_0_#000,_2px_2px_0_#000,_0_0_20px_rgba(6,182,212,0.8)]'
+  }; // B - Xanh dương đậm
+  if (score >= 60) return { 
+    text: 'text-blue-500', 
+    glow: 'drop-shadow-[0_0_30px_rgba(59,130,246,0.9)]',
+    stroke: '[text-shadow:_-2px_-2px_0_#000,_2px_-2px_0_#000,_-2px_2px_0_#000,_2px_2px_0_#000,_0_0_20px_rgba(59,130,246,0.8)]'
+  }; // C - Xanh đậm
+  if (score >= 50) return { 
+    text: 'text-orange-500', 
+    glow: 'drop-shadow-[0_0_30px_rgba(249,115,22,0.9)]',
+    stroke: '[text-shadow:_-2px_-2px_0_#000,_2px_-2px_0_#000,_-2px_2px_0_#000,_2px_2px_0_#000,_0_0_20px_rgba(249,115,22,0.8)]'
+  }; // D - Cam đậm
+  return { 
+    text: 'text-rose-600', 
+    glow: 'drop-shadow-[0_0_30px_rgba(225,29,72,0.9)]',
+    stroke: '[text-shadow:_-2px_-2px_0_#000,_2px_-2px_0_#000,_-2px_2px_0_#000,_2px_2px_0_#000,_0_0_20px_rgba(225,29,72,0.8)]'
+  }; // F - Đỏ đậm
 }
 
 function getScoreGrade(score: number): GradeInfo {
@@ -703,168 +728,6 @@ function WaveText({ text, show }: { text: string; show: boolean }) {
   );
 }
 
-/**
- * TV Song Result Screen - Compact design for TV with effects
- */
-function TVSongResultScreen({ 
-  song, 
-  finalScore, 
-  onNext,
-  hasNextSong,
-}: { 
-  song: QueueItem;
-  finalScore: ScoreData | null;
-  onNext: () => void;
-  hasNextSong: boolean;
-}) {
-  const gradeInfo = finalScore ? getScoreGrade(finalScore.totalScore) : null;
-  const isHighScore = finalScore ? finalScore.totalScore >= 80 : false;
-  const isMediumScore = finalScore ? finalScore.totalScore >= 60 && finalScore.totalScore < 80 : false;
-  const isLowScore = finalScore ? finalScore.totalScore < 60 : false;
-
-  // Handle Enter key to go next
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        onNext();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onNext]);
-
-  return (
-    <div className="h-screen bg-tv-bg flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background effects layer */}
-      <TwinklingStars show={true} />
-      <RotatingGlow show={isHighScore} color="yellow" />
-      <RotatingGlow show={isMediumScore} color="blue" />
-      
-      {/* Effects based on score level */}
-      <Confetti show={isHighScore} intensity={50} />
-      <Fireworks show={isHighScore} />
-      <ShootingStars show={isHighScore} />
-      <EmojiRain show={isHighScore} emojis={['🎉', '🎊', '👑', '⭐', '🏆']} />
-      <SpiralParticles show={isHighScore} />
-      
-      <RisingStars show={isMediumScore || isHighScore} />
-      <FloatingNotes show={true} />
-      <FloatingBubbles show={isMediumScore || isHighScore} />
-      <Sparkles show={isMediumScore} />
-      
-      <FloatingHearts show={isLowScore} />
-      
-      {/* Glow background effects based on score */}
-      {isHighScore && (
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-yellow-500/20 rounded-full blur-[120px] animate-pulse" />
-          <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-orange-500/15 rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '0.5s' }} />
-          <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-amber-500/15 rounded-full blur-[60px] animate-pulse" style={{ animationDelay: '1s' }} />
-        </div>
-      )}
-      {isMediumScore && (
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-cyan-500/15 rounded-full blur-[100px] animate-pulse" style={{ animationDuration: '3s' }} />
-          <div className="absolute top-1/3 right-1/3 w-48 h-48 bg-blue-500/10 rounded-full blur-[60px] animate-pulse" style={{ animationDelay: '0.7s' }} />
-        </div>
-      )}
-      {isLowScore && (
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-rose-500/10 rounded-full blur-[80px]" />
-        </div>
-      )}
-
-      <div className="flex items-center gap-8 max-w-3xl w-full relative z-10">
-        {/* Left - Thumbnail (16:9 aspect ratio like YouTube) */}
-        <div className="flex-shrink-0">
-          <div className={`relative p-1.5 rounded-2xl bg-gradient-to-br ${gradeInfo?.gradient || 'from-purple-500 to-pink-500'} ${isHighScore ? 'animate-pulse' : ''}`}>
-            {/* Shimmer effect on thumbnail border */}
-            {isHighScore && <div className="absolute inset-0 rounded-2xl animate-shimmer" />}
-            <img 
-              src={song.song.thumbnail} 
-              alt="" 
-              className="w-80 h-44 rounded-xl object-cover relative z-10"
-            />
-            {gradeInfo && (
-              <div className={`absolute -bottom-3 -right-3 w-16 h-16 rounded-full bg-gradient-to-br ${gradeInfo.gradient} flex items-center justify-center shadow-xl border-3 border-white dark:border-slate-900 ${isHighScore ? 'animate-bounce' : ''} z-20`}>
-                <span className="text-2xl font-black text-white drop-shadow-lg">{gradeInfo.grade}</span>
-              </div>
-            )}
-            {/* Pulse rings around grade badge for high scores */}
-            {isHighScore && gradeInfo && (
-              <div className="absolute -bottom-3 -right-3 w-16 h-16 z-10">
-                <PulseRings show={true} color="yellow" />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right - Score info */}
-        <div className="flex-1 min-w-0">
-          {/* Song title */}
-          <p className="text-sm text-gray-500 mb-1">🎵 Hoàn thành</p>
-          <h2 className="text-xl font-bold line-clamp-2 mb-3">{song.song.title}</h2>
-
-          {finalScore && gradeInfo ? (
-            <>
-              <h1 className={`text-xl font-bold mb-3 bg-gradient-to-r ${gradeInfo.textGradient} bg-clip-text text-transparent`}>
-                <WaveText text={gradeInfo.title} show={isHighScore} />
-                {!isHighScore && gradeInfo.title} {gradeInfo.emoji}
-              </h1>
-
-              <div className="flex items-baseline gap-3 mb-4 relative">
-                {/* Score with effects */}
-                <div className="relative">
-                  {isHighScore && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-24 h-24 rounded-full bg-yellow-400/20 animate-pulse-ring" />
-                    </div>
-                  )}
-                  {(() => {
-                    const scoreColor = getScoreColor(finalScore.totalScore);
-                    return (
-                      <span className={`text-7xl font-black ${scoreColor.text} ${scoreColor.glow} relative z-10 ${isHighScore ? 'animate-bounce-in' : ''}`}>
-                        <TVAnimatedScore target={finalScore.totalScore} duration={2500} withSound={true} />
-                      </span>
-                    );
-                  })()}
-                </div>
-                <span className="text-lg text-gray-400">điểm</span>
-              </div>
-
-              <div className="flex gap-4 text-sm mb-4">
-                <div className={`bg-white/10 rounded-lg px-4 py-2 backdrop-blur-sm border border-white/10 ${isMediumScore || isHighScore ? 'animate-fade-in' : ''}`} style={{ animationDelay: '0.3s' }}>
-                  <span className="text-gray-400">🎵 Cao độ:</span>
-                  <span className="ml-2 font-bold text-lg">{finalScore.pitchAccuracy}</span>
-                </div>
-                <div className={`bg-white/10 rounded-lg px-4 py-2 backdrop-blur-sm border border-white/10 ${isMediumScore || isHighScore ? 'animate-fade-in' : ''}`} style={{ animationDelay: '0.5s' }}>
-                  <span className="text-gray-400">🥁 Nhịp:</span>
-                  <span className="ml-2 font-bold text-lg">{finalScore.timing}</span>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="mb-4">
-              <h1 className="text-xl font-bold mb-2">Hoàn thành! 🎵</h1>
-              <p className="text-base text-gray-500">Bài hát đã kết thúc</p>
-            </div>
-          )}
-
-          {/* Manual next button */}
-          <button
-            onClick={onNext}
-            autoFocus
-            className={`px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl text-base font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-primary-400 focus:scale-105 shadow-lg ${isHighScore ? 'animate-pulse' : ''}`}
-          >
-            {hasNextSong ? 'Bài tiếp theo →' : 'Về trang chủ →'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 async function mockSearch(query: string): Promise<Song[]> {
   await new Promise(resolve => setTimeout(resolve, 500));
   return [
@@ -883,6 +746,10 @@ function TVAppContent() {
   // Back button protection - require double press
   const [showBackConfirm, setShowBackConfirm] = useState(false);
   const backPressTimeRef = useRef<number>(0);
+  // Preview mode for testing result screen
+  const [previewScore, setPreviewScore] = useState<number | null>(null);
+  // Hidden button click counter - need 6 clicks without moving mouse
+  const hiddenClickRef = useRef<{ count: number; lastTime: number; lastX: number; lastY: number }>({ count: 0, lastTime: 0, lastX: 0, lastY: 0 });
   
   const { addToast } = useToast();
   
@@ -1153,7 +1020,83 @@ function TVAppContent() {
 
   const sessionCode = session?.code || '----';
 
+  // Mock song for preview
+  const previewSong: QueueItem = useMemo(() => ({
+    id: 'preview-1',
+    song: {
+      youtubeId: 'dQw4w9WgXcQ',
+      title: 'Bài hát demo để xem thử hiệu ứng điểm số - Karaoke Version',
+      thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg',
+      channelName: 'Demo Channel',
+      duration: 213,
+    },
+    addedBy: 'Preview',
+    addedAt: new Date(),
+    status: 'completed',
+  }), []);
+
+  // Handle preview score change with keyboard
+  useEffect(() => {
+    if (previewScore === null) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setPreviewScore(prev => Math.min((prev || 0) + 10, 100));
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setPreviewScore(prev => Math.max((prev || 0) - 10, 0));
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setPreviewScore(null);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previewScore]);
+
   const renderScreen = () => {
+    // Preview mode - show result screen with adjustable score
+    if (previewScore !== null) {
+      return (
+        <div className="relative">
+          <TVSongResultScreen
+            song={previewSong}
+            finalScore={{
+              totalScore: previewScore,
+              pitchAccuracy: Math.round(previewScore * 0.9 + Math.random() * 10),
+              timing: Math.round(previewScore * 0.95 + Math.random() * 5),
+            }}
+            onNext={() => setPreviewScore(null)}
+            hasNextSong={false}
+          />
+          {/* Preview controls overlay */}
+          <div className="absolute top-4 left-4 bg-black/80 backdrop-blur-sm rounded-xl p-4 z-50">
+            <p className="text-yellow-400 text-sm font-bold mb-2">🔧 CHẾ ĐỘ XEM THỬ</p>
+            <p className="text-white text-lg font-bold mb-1">Điểm: {previewScore}</p>
+            <p className="text-gray-400 text-xs">↑↓ thay đổi điểm</p>
+            <p className="text-gray-400 text-xs">ESC để thoát</p>
+            <div className="flex gap-2 mt-3 flex-wrap">
+              {[95, 85, 75, 65, 45, 25].map(score => (
+                <button
+                  key={score}
+                  onClick={() => setPreviewScore(score)}
+                  className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                    previewScore === score 
+                      ? 'bg-primary-500 text-white' 
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  {score}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     switch (currentScreen) {
       case 'home':
         return (
@@ -1236,16 +1179,46 @@ function TVAppContent() {
   };
 
   return (
-    <main className="min-h-screen bg-tv-bg">
+    <main className="min-h-screen bg-tv-bg relative">
       <NetworkStatus
         isConnected={isConnected}
         isReconnecting={isReconnecting}
         error={socketError}
         onRetry={createSession}
       />
-      <ScreenTransition transitionKey={currentScreen} type="fade" duration={200}>
+      <ScreenTransition transitionKey={previewScore !== null ? `preview-${previewScore}` : currentScreen} type="fade" duration={200}>
         {renderScreen()}
       </ScreenTransition>
+      
+      {/* Hidden link to preview result screen - click 6 times rapidly without moving mouse */}
+      {currentScreen === 'home' && previewScore === null && (
+        <div
+          onClick={(e) => {
+            const now = Date.now();
+            const ref = hiddenClickRef.current;
+            const timeDiff = now - ref.lastTime;
+            const posDiff = Math.abs(e.clientX - ref.lastX) + Math.abs(e.clientY - ref.lastY);
+            
+            // Reset if too slow (>500ms) or mouse moved (>5px)
+            if (timeDiff > 500 || posDiff > 5) {
+              ref.count = 1;
+            } else {
+              ref.count++;
+            }
+            
+            ref.lastTime = now;
+            ref.lastX = e.clientX;
+            ref.lastY = e.clientY;
+            
+            // Need 6 rapid clicks without moving
+            if (ref.count >= 6) {
+              ref.count = 0;
+              setPreviewScore(85);
+            }
+          }}
+          className="absolute bottom-0 right-0 w-12 h-12 z-50 cursor-default"
+        />
+      )}
     </main>
   );
 }
