@@ -185,7 +185,7 @@ export function SongResultScreen({
 
         {/* Song title */}
         <div className={`text-center mb-4 transition-all duration-700 delay-200 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">🎵 Hoàn thành</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Hoàn thành</p>
           <p className="font-semibold text-slate-800 dark:text-white text-lg max-w-xs truncate">{song.song.title}</p>
         </div>
 
@@ -214,7 +214,7 @@ export function SongResultScreen({
           </div>
         ) : (
           <div className={`text-center transition-all duration-700 delay-400 ${showContent ? 'opacity-100' : 'opacity-0'}`}>
-            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Hoàn thành! 🎵</h2>
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Hoàn thành!</h2>
             <p className="text-slate-500 dark:text-slate-400 mt-2">Bài hát đã kết thúc</p>
           </div>
         )}

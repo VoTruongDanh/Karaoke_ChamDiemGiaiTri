@@ -183,7 +183,7 @@ export function ScoringScreen({ currentSong, onSendScore, onSendFeedback, onBack
         <button onClick={onBack} className="text-white p-2">
           ← Quay lại
         </button>
-        <span className="text-white text-sm">🎤 Chấm điểm</span>
+        <span className="text-white text-sm">Chấm điểm</span>
       </div>
 
       {/* Song info */}

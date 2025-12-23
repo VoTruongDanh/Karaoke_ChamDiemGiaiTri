@@ -290,7 +290,7 @@ export function SearchScreen({
         {/* Voice error */}
         {voiceError && (
           <div className="mb-2 text-center text-red-400 text-sm flex-shrink-0 bg-red-500/10 py-2 rounded-lg">
-            ⚠️ {voiceError}
+            {voiceError}
           </div>
         )}
 
@@ -322,7 +322,7 @@ export function SearchScreen({
               <div className="mt-1.5 space-y-1.5">
                 {recentSearches.length > 0 && (
                   <div>
-                    <p className="text-[10px] text-gray-400 mb-0.5">🕐 Gần đây</p>
+                    <p className="text-[10px] text-gray-400 mb-0.5">Gần đây</p>
                     <div className="flex flex-wrap gap-0.5">
                       {recentSearches.slice(0, 4).map((search, index) => (
                         <FocusableButton
@@ -342,7 +342,7 @@ export function SearchScreen({
                 )}
                 
                 <div>
-                  <p className="text-[10px] text-gray-400 mb-0.5">🔥 Phổ biến</p>
+                  <p className="text-[10px] text-gray-400 mb-0.5">Phổ biến</p>
                   <div className="flex flex-wrap gap-0.5">
                     {POPULAR_KEYWORDS.map((keyword, index) => (
                       <FocusableButton
@@ -367,7 +367,7 @@ export function SearchScreen({
           <div className="flex-1 min-w-0 overflow-hidden">
             <div className="bg-white/5 backdrop-blur rounded-lg p-3 h-full flex flex-col overflow-hidden">
               <p className="text-[10px] text-gray-400 mb-2 flex-shrink-0">
-                {isSearching ? '🔍 Đang tìm...' : hasSearched ? `Kết quả (${results.length})` : suggestions.length > 0 ? '✨ Đề xuất cho bạn' : 'Kết quả'}
+                {isSearching ? 'Đang tìm...' : hasSearched ? `Kết quả (${results.length})` : suggestions.length > 0 ? 'Đề xuất cho bạn' : 'Kết quả'}
               </p>
 
               {isSearching ? (
@@ -395,7 +395,7 @@ export function SearchScreen({
                 </div>
               ) : (
                 <div className="text-center py-2 text-gray-400 flex-1 flex flex-col items-center justify-center">
-                  <div className="text-4xl mb-2">🎤</div>
+                  <MicIcon />
                   <p className="text-sm font-medium mb-1">Nhấn nút Mic để tìm bằng giọng nói</p>
                   <p className="text-[10px]">Hoặc gõ bàn phím bên trái</p>
                 </div>

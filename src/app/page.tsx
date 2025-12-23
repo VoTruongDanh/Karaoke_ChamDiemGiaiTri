@@ -1223,7 +1223,8 @@ function TVAppContent() {
               setPreviewScore(85);
             }
           }}
-          className="absolute bottom-0 right-0 w-12 h-12 z-50 cursor-default"
+          className="fixed bottom-0 left-0 w-16 h-16 z-[9999] cursor-default"
+          style={{ pointerEvents: 'auto' }}
         />
       )}
     </main>

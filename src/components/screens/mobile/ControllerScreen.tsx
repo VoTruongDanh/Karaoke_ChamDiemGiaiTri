@@ -299,7 +299,7 @@ export function ControllerScreen({
           setSearchResults([]);
           // Check for quota error
           if (err?.type === 'quota_exceeded' || err?.message?.includes('quota')) {
-            setApiError('⚠️ YouTube API đã hết quota hôm nay. Vui lòng thử lại sau hoặc liên hệ admin.');
+            setApiError('YouTube API đã hết quota hôm nay. Vui lòng thử lại sau hoặc liên hệ admin.');
           }
         }
       } finally {
@@ -565,7 +565,7 @@ export function ControllerScreen({
             {/* YouTube Suggestions */}
             {ytSuggestions.length > 0 && (
               <div>
-                <p className="text-sm text-slate-500 mb-2">🎵 Gợi ý cho bạn</p>
+                <p className="text-sm text-slate-500 mb-2">Gợi ý cho bạn</p>
                 <div className="grid grid-cols-2 gap-3">
                   {ytSuggestions.map((song) => (
                     <button
@@ -625,7 +625,7 @@ export function ControllerScreen({
 
             {searchHistory.length > 0 && (
               <div>
-                <p className="text-xs text-slate-500 mb-2">🕐 Tìm gần đây</p>
+                <p className="text-xs text-slate-500 mb-2">Tìm gần đây</p>
                 <div className="flex flex-wrap gap-2">
                   {searchHistory.slice(0, 5).map((query, i) => (
                     <button
@@ -642,7 +642,7 @@ export function ControllerScreen({
 
             {!currentSong && waitingCount === 0 && (
               <div className="text-center py-8">
-                <span className="text-4xl mb-3 block">🎵</span>
+                <span className="text-4xl mb-3 block">♪</span>
                 <p className="text-slate-500">Tìm và thêm bài hát để bắt đầu</p>
               </div>
             )}

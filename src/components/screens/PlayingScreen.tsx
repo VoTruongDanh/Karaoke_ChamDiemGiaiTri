@@ -272,7 +272,7 @@ function YouTubePlayer({
     return (
       <div className="w-full h-full bg-black flex items-center justify-center">
         <div className="text-center p-4">
-          <p className="text-red-400 text-base mb-2">⚠️ {error}</p>
+          <p className="text-red-400 text-base mb-2">{error}</p>
         </div>
       </div>
     );
@@ -656,7 +656,7 @@ export function PlayingScreen({
       {error && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/95 z-30">
           <div className="text-center p-6 max-w-md">
-            <div className="text-6xl mb-4">⚠️</div>
+            <div className="text-6xl mb-4 text-red-500">!</div>
             <p className="text-red-400 text-xl mb-2">{error}</p>
             <p className="text-gray-400 text-sm mb-6">Video này không thể phát trên ứng dụng</p>
             <div className="flex gap-4 justify-center">

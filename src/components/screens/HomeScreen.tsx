@@ -7,7 +7,6 @@ import { FocusableButton } from '@/components/FocusableButton';
 import { LazyImage } from '@/components/LazyImage';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useQueueStore } from '@/stores/queueStore';
-import type { QueueItem } from '@/types/queue';
 import type { Song } from '@/types/song';
 
 export interface HomeScreenProps {
@@ -99,52 +98,7 @@ function QRCodeDisplay({ code }: { code: string }) {
   );
 }
 
-function NowPlayingPreview({ 
-  currentSong, 
-  onSelect 
-}: { 
-  currentSong: QueueItem | null;
-  onSelect?: () => void;
-}) {
-  if (!currentSong) {
-    return (
-      <div className="tv-card flex items-center gap-tv-3 opacity-50">
-        <div className="w-24 h-24 bg-tv-surface rounded-tv flex items-center justify-center">
-          <MusicIcon />
-        </div>
-        <div>
-          <p className="text-tv-xs text-secondary">Đang phát</p>
-          <p className="text-tv-sm text-secondary">Chưa có bài hát</p>
-        </div>
-      </div>
-    );
-  }
 
-  return (
-    <div 
-      className="tv-card flex items-center gap-tv-3 cursor-pointer hover:bg-tv-hover transition-colors"
-      onClick={onSelect}
-    >
-      <LazyImage 
-        src={currentSong.song.thumbnail} 
-        alt={currentSong.song.title}
-        className="w-24 h-24 rounded-tv"
-        width={120}
-        height={90}
-        priority
-      />
-      <div className="flex-1 min-w-0">
-        <p className="text-tv-xs text-primary-500">Đang phát</p>
-        <p className="text-tv-sm font-semibold truncate">{currentSong.song.title}</p>
-        <p className="text-tv-xs text-secondary truncate">{currentSong.song.channelName}</p>
-      </div>
-      <div className="flex items-center gap-2">
-        <span className="w-3 h-3 bg-accent-green rounded-full animate-pulse" />
-        <span className="text-tv-xs text-accent-green">LIVE</span>
-      </div>
-    </div>
-  );
-}
 
 export function HomeScreen({
   sessionCode,
@@ -474,7 +428,7 @@ export function HomeScreen({
             {suggestions.length > 0 && onAddToQueue && (
               <div className="bg-white/5 dark:bg-white/5 backdrop-blur rounded-2xl p-4 overflow-visible">
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-base text-gray-400">🎵 Gợi ý cho bạn</p>
+                  <p className="text-base text-gray-400">Gợi ý cho bạn</p>
                   <p className="text-xs text-gray-500">{suggestions.length} bài</p>
                 </div>
                 <div 

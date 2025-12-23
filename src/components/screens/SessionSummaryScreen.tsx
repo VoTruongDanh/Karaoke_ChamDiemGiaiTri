@@ -52,7 +52,7 @@ export function SessionSummaryScreen({ summary, onNewSession, onBack }: SessionS
     <NavigationGrid className="h-screen bg-tv-bg p-4 flex flex-col">
       {/* Header */}
       <div className="text-center mb-3">
-        <p className="text-base font-semibold">🎤 Kết thúc phiên hát</p>
+        <p className="text-base font-semibold">Kết thúc phiên hát</p>
       </div>
 
       {/* Stats */}
