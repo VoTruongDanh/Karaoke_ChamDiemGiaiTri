@@ -45,36 +45,8 @@ function getEnterClasses(type: TransitionType): string {
 }
 
 /**
- * Get CSS classes for exit animation
- */
-function getExitClasses(type: TransitionType): string {
-  switch (type) {
-    case 'fade':
-      return 'animate-fade-out';
-    case 'slide-left':
-      return 'animate-slide-out-left';
-    case 'slide-right':
-      return 'animate-slide-out-right';
-    case 'slide-up':
-      return 'animate-slide-out-down';
-    case 'zoom':
-      return 'animate-zoom-out';
-    case 'none':
-    default:
-      return '';
-  }
-}
-
-/**
- * ScreenTransition component - Animated screen transitions
- * 
- * Requirements: 6.2 - Smooth animations for transitions and interactions
- * 
- * Features:
- * - Multiple transition types (fade, slide, zoom)
- * - Configurable duration
- * - Smooth enter/exit animations
- * - Hardware-accelerated transforms
+ * ScreenTransition component - Simplified animated screen transitions
+ * Only animates on enter, no exit animation to avoid removeChild issues
  */
 export function ScreenTransition({
   children,
@@ -83,65 +55,34 @@ export function ScreenTransition({
   duration = 200,
   className = '',
 }: ScreenTransitionProps) {
-  const [displayedKey, setDisplayedKey] = useState(transitionKey);
-  const [displayedChildren, setDisplayedChildren] = useState(children);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [animationPhase, setAnimationPhase] = useState<'enter' | 'exit' | 'idle'>('idle');
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [animationClass, setAnimationClass] = useState('');
+  const prevKeyRef = useRef(transitionKey);
 
   useEffect(() => {
-    if (transitionKey !== displayedKey) {
-      // Start exit animation
-      setIsAnimating(true);
-      setAnimationPhase('exit');
-
-      // After exit animation, update content and start enter animation
-      timeoutRef.current = setTimeout(() => {
-        setDisplayedKey(transitionKey);
-        setDisplayedChildren(children);
-        setAnimationPhase('enter');
-
-        // After enter animation, reset state
-        timeoutRef.current = setTimeout(() => {
-          setIsAnimating(false);
-          setAnimationPhase('idle');
-        }, duration);
+    if (transitionKey !== prevKeyRef.current) {
+      // Trigger enter animation on key change
+      setAnimationClass(getEnterClasses(type));
+      prevKeyRef.current = transitionKey;
+      
+      // Remove animation class after it completes
+      const timer = setTimeout(() => {
+        setAnimationClass('');
       }, duration);
-    } else {
-      // Key hasn't changed, just update children
-      setDisplayedChildren(children);
+      
+      return () => clearTimeout(timer);
     }
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, [transitionKey, displayedKey, children, duration]);
-
-  // Get animation classes based on phase
-  const animationClasses = (() => {
-    if (type === 'none') return '';
-    
-    switch (animationPhase) {
-      case 'enter':
-        return getEnterClasses(type);
-      case 'exit':
-        return getExitClasses(type);
-      default:
-        return '';
-    }
-  })();
+  }, [transitionKey, type, duration]);
 
   return (
     <div
-      className={`transform-gpu ${animationClasses} ${className}`}
+      key={transitionKey}
+      className={`transform-gpu ${animationClass} ${className}`}
       style={{ 
         animationDuration: `${duration}ms`,
         animationFillMode: 'both',
       }}
     >
-      {displayedChildren}
+      {children}
     </div>
   );
 }

@@ -95,23 +95,52 @@ export class ScoringService {
 
   /**
    * Process pitch analysis and generate feedback
+   * Simplified scoring: focus on singing presence and stability
    */
   private processPitchAnalysis(analysis: PitchAnalysis): void {
     const timestamp = Date.now() - this.startTime;
     const detectedPitch = analysis.currentPitch.frequency;
     
-    // Calculate accuracy for this sample
-    const accuracy = this.pitchDetectionService.calculatePitchAccuracy(
-      detectedPitch,
-      this.targetPitch
-    );
+    // Calculate stability score based on pitch consistency
+    // Instead of comparing to fixed target, we measure how stable the singing is
+    let accuracy = 0;
+    
+    if (detectedPitch !== null && detectedPitch > 80 && detectedPitch < 1000) {
+      // Valid singing detected - base score 60
+      accuracy = 60;
+      
+      // Bonus for pitch stability (compare with recent pitches)
+      if (this.pitchSamples.length > 0) {
+        const recentSamples = this.pitchSamples.slice(-10);
+        const recentPitches = recentSamples
+          .filter(s => s.detectedPitch !== null)
+          .map(s => s.detectedPitch as number);
+        
+        if (recentPitches.length > 0) {
+          // Calculate pitch variance
+          const avgPitch = recentPitches.reduce((a, b) => a + b, 0) / recentPitches.length;
+          const variance = recentPitches.reduce((sum, p) => sum + Math.pow(p - avgPitch, 2), 0) / recentPitches.length;
+          const stdDev = Math.sqrt(variance);
+          
+          // Lower variance = more stable = higher score
+          // stdDev < 20Hz = very stable, stdDev > 100Hz = unstable
+          const stabilityBonus = Math.max(0, 40 - (stdDev / 2.5));
+          accuracy += stabilityBonus;
+        }
+      }
+      
+      // Bonus for good volume (confidence)
+      if (analysis.currentPitch.confidence > 0.3) {
+        accuracy += 10;
+      }
+    }
 
     // Store sample for final score calculation
     this.pitchSamples.push({
       timestamp,
       detectedPitch,
       targetPitch: this.targetPitch,
-      accuracy,
+      accuracy: Math.min(100, accuracy),
     });
 
     // Generate real-time feedback
@@ -159,6 +188,7 @@ export class ScoringService {
   /**
    * Calculate the final score from collected samples
    * Requirements: 5.3 - Score from 0 to 100
+   * Simplified: Based on singing presence and stability
    */
   private calculateFinalScore(): ScoreData {
     if (this.pitchSamples.length === 0) {
@@ -169,25 +199,32 @@ export class ScoringService {
       };
     }
 
-    // Calculate pitch accuracy (average of all samples)
-    const validSamples = this.pitchSamples.filter(s => s.detectedPitch !== null);
+    // Calculate pitch accuracy (average of all samples with valid pitch)
+    const validSamples = this.pitchSamples.filter(s => s.detectedPitch !== null && s.accuracy > 0);
     const pitchAccuracy = validSamples.length > 0
       ? validSamples.reduce((sum, s) => sum + s.accuracy, 0) / validSamples.length
       : 0;
 
-    // Calculate timing score based on consistency of singing
-    // (percentage of time with valid pitch detected)
-    const timing = (validSamples.length / this.pitchSamples.length) * 100;
+    // Calculate timing score based on singing presence
+    // How much of the time was the user actually singing?
+    const singingPresence = (validSamples.length / this.pitchSamples.length) * 100;
+    
+    // Timing bonus: consistent singing throughout
+    const timing = Math.min(100, singingPresence * 1.2); // Boost slightly
 
     // Calculate total score (weighted average)
-    // Pitch accuracy: 70%, Timing: 30%
-    const totalScore = Math.round((pitchAccuracy * 0.7) + (timing * 0.3));
+    // Pitch stability: 50%, Singing presence: 50%
+    const rawScore = (pitchAccuracy * 0.5) + (timing * 0.5);
+    
+    // Apply curve to make scores more generous
+    // This makes it easier to get higher scores
+    const curvedScore = Math.round(Math.pow(rawScore / 100, 0.8) * 100);
 
     // Ensure score is within 0-100 range
     return {
       pitchAccuracy: Math.max(0, Math.min(100, Math.round(pitchAccuracy))),
       timing: Math.max(0, Math.min(100, Math.round(timing))),
-      totalScore: Math.max(0, Math.min(100, totalScore)),
+      totalScore: Math.max(0, Math.min(100, curvedScore)),
     };
   }
 

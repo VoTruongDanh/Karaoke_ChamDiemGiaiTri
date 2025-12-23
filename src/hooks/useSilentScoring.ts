@@ -43,8 +43,8 @@ function detectPitch(buffer: Float32Array, sampleRate: number): number {
   }
   rms = Math.sqrt(rms / SIZE);
   
-  // Need stronger signal for voice detection (filter out background music)
-  if (rms < 0.03) return 0;
+  // Need signal for voice detection (lowered threshold)
+  if (rms < 0.015) return 0;
   
   // Autocorrelation
   const correlations = new Float32Array(MAX_SAMPLES);
@@ -110,13 +110,14 @@ function detectPitch(buffer: Float32Array, sampleRate: number): number {
 
 /**
  * Calculate pitch stability score (how consistent the pitch is)
+ * More generous scoring
  */
 function calculateStability(pitchHistory: number[]): number {
-  if (pitchHistory.length < 5) return 0;
+  if (pitchHistory.length < 3) return 70; // Default good score for short segments
   
   // Filter out zeros (silence)
   const validPitches = pitchHistory.filter(p => p > 0);
-  if (validPitches.length < 3) return 0;
+  if (validPitches.length < 2) return 70;
   
   // Calculate variance in semitones
   const avgPitch = validPitches.reduce((a, b) => a + b, 0) / validPitches.length;
@@ -127,9 +128,10 @@ function calculateStability(pitchHistory: number[]): number {
   }
   variance = Math.sqrt(variance / validPitches.length);
   
-  // Convert variance to score (lower variance = higher score)
-  // variance of 0 = 100, variance of 2 semitones = 0
-  const score = Math.max(0, Math.min(100, 100 - variance * 50));
+  // Convert variance to score - much more generous
+  // variance of 0 = 100, variance of 5 semitones = 50
+  // Most singing has variance of 1-3 semitones which should score 70-90
+  const score = Math.max(50, Math.min(100, 100 - variance * 10));
   return score;
 }
 
@@ -210,8 +212,9 @@ export function useSilentScoring({
       totalSingingFrames += seg.pitches.length;
     }
     
+    // Pitch accuracy - boost minimum to 50 if singing detected
     const pitchAccuracy = totalWeight > 0 
-      ? Math.round(weightedStability / totalWeight)
+      ? Math.max(50, Math.round(weightedStability / totalWeight))
       : 0;
     
     // Timing = based on singing consistency within segments
@@ -224,8 +227,9 @@ export function useSilentScoring({
       ? Math.round((validPitchCount / totalSingingFrames) * 100)
       : 0;
     
-    // Total score - only from singing parts
-    const totalScore = Math.round(pitchAccuracy * 0.7 + timing * 0.3);
+    // Total score - balanced formula
+    // pitchAccuracy and timing both contribute equally
+    const totalScore = Math.round((pitchAccuracy + timing) / 2);
     
     return { pitchAccuracy, timing, totalScore };
   }, []);

@@ -46,7 +46,6 @@ export interface PlayingScreenProps {
   scoreData?: ScoreData | null;
   scoringEnabled?: boolean;
   onError?: (error: string) => void;
-  autoSkipDelay?: number;
 }
 
 function BackIcon() {
@@ -120,8 +119,10 @@ function YouTubePlayer({
   playerRef: React.MutableRefObject<YTPlayer | null>;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const playerDivRef = useRef<HTMLDivElement | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isMountedRef = useRef(true);
   
   const onEndRef = useRef(onEnd);
   const onReadyRef = useRef(onReady);
@@ -134,7 +135,7 @@ function YouTubePlayer({
   });
 
   useEffect(() => {
-    let isMounted = true;
+    isMountedRef.current = true;
     setIsLoading(true);
     setError(null);
 
@@ -160,28 +161,55 @@ function YouTubePlayer({
     const initPlayer = async () => {
       try {
         await loadYouTubeAPI();
-        if (!isMounted || !containerRef.current) return;
-        if (playerRef.current) { playerRef.current.destroy(); playerRef.current = null; }
+        if (!isMountedRef.current || !containerRef.current) return;
+        
+        // Cleanup old player safely
+        if (playerRef.current) { 
+          try { playerRef.current.destroy(); } catch {} 
+          playerRef.current = null; 
+        }
+        
+        // Remove old player div if exists
+        if (playerDivRef.current && playerDivRef.current.parentNode) {
+          try { playerDivRef.current.parentNode.removeChild(playerDivRef.current); } catch {}
+        }
+        
+        // Create new div for player
+        const playerDiv = document.createElement('div');
+        playerDiv.style.width = '100%';
+        playerDiv.style.height = '100%';
+        containerRef.current.appendChild(playerDiv);
+        playerDivRef.current = playerDiv;
 
-        playerRef.current = new window.YT.Player(containerRef.current, {
+        playerRef.current = new window.YT.Player(playerDiv, {
           videoId,
           width: '100%',
           height: '100%',
-          playerVars: { autoplay: 1, controls: 0, modestbranding: 1, rel: 0, fs: 0, origin: window.location.origin, playsinline: 1, mute: 1 },
+          playerVars: { 
+            autoplay: 1, 
+            controls: 0, 
+            modestbranding: 1, 
+            rel: 0,
+            fs: 0, 
+            origin: window.location.origin, 
+            playsinline: 1, 
+            mute: 1,
+            iv_load_policy: 3,
+            disablekb: 1,
+            showinfo: 0,
+          },
           events: {
             onReady: () => { 
-              if (isMounted) { 
+              if (isMountedRef.current) { 
                 setIsLoading(false); 
                 onReadyRef.current?.(); 
-                // Force autoplay - muted first then unmute (bypass browser autoplay policy)
                 const player = playerRef.current;
                 if (player) {
                   try {
                     player.mute();
                     player.playVideo();
-                    // Check and unmute after playing starts
                     const checkAndUnmute = () => {
-                      if (!playerRef.current) return;
+                      if (!playerRef.current || !isMountedRef.current) return;
                       try {
                         const state = playerRef.current.getPlayerState();
                         if (state === window.YT.PlayerState.PLAYING) {
@@ -189,7 +217,6 @@ function YouTubePlayer({
                         } else if (state === window.YT.PlayerState.BUFFERING || state === window.YT.PlayerState.CUED) {
                           setTimeout(checkAndUnmute, 200);
                         } else {
-                          // Try play again
                           playerRef.current.playVideo();
                           setTimeout(checkAndUnmute, 300);
                         }
@@ -203,16 +230,18 @@ function YouTubePlayer({
               } 
             },
             onStateChange: (event) => { 
-              if (event.data === window.YT.PlayerState.ENDED) onEndRef.current(); 
+              if (event.data === window.YT.PlayerState.ENDED && isMountedRef.current) {
+                onEndRef.current(); 
+              }
             },
             onError: (event) => {
               const msg = YOUTUBE_ERROR_MESSAGES[event.data] || `Lỗi (${event.data})`;
-              if (isMounted) { setError(msg); setIsLoading(false); onErrorRef.current?.(msg); }
+              if (isMountedRef.current) { setError(msg); setIsLoading(false); onErrorRef.current?.(msg); }
             },
           },
         });
       } catch (err) {
-        if (isMounted) {
+        if (isMountedRef.current) {
           const msg = err instanceof Error ? err.message : 'Không thể tải video';
           setError(msg); setIsLoading(false); onErrorRef.current?.(msg);
         }
@@ -220,7 +249,20 @@ function YouTubePlayer({
     };
 
     initPlayer();
-    return () => { isMounted = false; if (playerRef.current) { try { playerRef.current.destroy(); } catch {} playerRef.current = null; } };
+    
+    return () => { 
+      isMountedRef.current = false;
+      // Destroy player first
+      if (playerRef.current) { 
+        try { playerRef.current.destroy(); } catch {} 
+        playerRef.current = null; 
+      }
+      // Then remove the div
+      if (playerDivRef.current && playerDivRef.current.parentNode) {
+        try { playerDivRef.current.parentNode.removeChild(playerDivRef.current); } catch {}
+        playerDivRef.current = null;
+      }
+    };
   }, [videoId, playerRef]);
 
   if (error) {
@@ -253,10 +295,8 @@ export function PlayingScreen({
   scoreData,
   scoringEnabled = false,
   onError,
-  autoSkipDelay = 5000,
 }: PlayingScreenProps) {
   const [error, setError] = useState<string | null>(null);
-  const [countdown, setCountdown] = useState(0);
   const [showControls, setShowControls] = useState(true);
   const [seekIndicator, setSeekIndicator] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(true);
@@ -265,9 +305,9 @@ export function PlayingScreen({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
+  const [errorFocused, setErrorFocused] = useState(0); // 0 = skip, 1 = back
   const playerRef = useRef<YTPlayer | null>(null);
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const timeUpdateRef = useRef<NodeJS.Timeout | null>(null);
   const seekTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -290,14 +330,13 @@ export function PlayingScreen({
   // Reset on song change
   useEffect(() => {
     setError(null);
-    setCountdown(0);
     setShowControls(true);
     setIsPlaying(true);
     setFocusedRow(1);
     setFocusedCol(1); // play button
     setCurrentTime(0);
     setDuration(0);
-    if (countdownRef.current) clearInterval(countdownRef.current);
+    setErrorFocused(0);
   }, [currentSong.id]);
 
   // Update time periodically
@@ -351,6 +390,25 @@ export function PlayingScreen({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const player = playerRef.current;
+      
+      // If error is showing, handle error screen navigation
+      if (error) {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          e.preventDefault();
+          setErrorFocused(prev => prev === 0 ? 1 : 0);
+          return;
+        }
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (errorFocused === 0) {
+            onSkip?.() || onSongEnd();
+          } else {
+            onBack();
+          }
+          return;
+        }
+        return;
+      }
       
       // Any key shows controls
       resetHideTimer();
@@ -510,34 +568,15 @@ export function PlayingScreen({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [resetHideTimer, showControls, focusedRow, focusedCol, togglePlayPause, onBack, onSkip, currentTime, duration]);
-
-  // Error auto-skip countdown
-  useEffect(() => {
-    if (error && autoSkipDelay > 0) {
-      const seconds = Math.ceil(autoSkipDelay / 1000);
-      setCountdown(seconds);
-      countdownRef.current = setInterval(() => {
-        setCountdown(prev => {
-          if (prev <= 1) {
-            if (countdownRef.current) clearInterval(countdownRef.current);
-            onSkip?.() || onSongEnd();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-      return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
-    }
-  }, [error, autoSkipDelay, onSkip, onSongEnd]);
+  }, [resetHideTimer, showControls, focusedRow, focusedCol, togglePlayPause, onBack, onSkip, currentTime, duration, error, errorFocused, onSongEnd]);
 
   const handleError = useCallback((msg: string) => {
     setError(msg);
+    setErrorFocused(0); // Focus on skip button by default
     onError?.(msg);
   }, [onError]);
 
   const handleSkipNow = useCallback(() => {
-    if (countdownRef.current) clearInterval(countdownRef.current);
     onSkip?.() || onSongEnd();
   }, [onSkip, onSongEnd]);
 
@@ -606,15 +645,36 @@ export function PlayingScreen({
         </div>
       )}
 
-      {/* Error overlay */}
+      {/* Error overlay - manual navigation only */}
       {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-30">
-          <div className="text-center p-4">
-            <p className="text-red-400 mb-2">⚠️ {error}</p>
-            {countdown > 0 && <p className="text-xs text-gray-400 mb-3">Chuyển bài sau {countdown}s</p>}
-            <button onClick={handleSkipNow} tabIndex={0} className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded text-sm">
-              Bỏ qua
-            </button>
+        <div className="absolute inset-0 flex items-center justify-center bg-black/95 z-30">
+          <div className="text-center p-6 max-w-md">
+            <div className="text-6xl mb-4">⚠️</div>
+            <p className="text-red-400 text-xl mb-2">{error}</p>
+            <p className="text-gray-400 text-sm mb-6">Video này không thể phát trên ứng dụng</p>
+            <div className="flex gap-4 justify-center">
+              <button 
+                onClick={handleSkipNow} 
+                className={`px-6 py-3 rounded-lg text-base font-medium transition-all ${
+                  errorFocused === 0 
+                    ? 'bg-primary-500 text-white ring-2 ring-primary-300 scale-105' 
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                Bỏ qua bài này
+              </button>
+              <button 
+                onClick={onBack} 
+                className={`px-6 py-3 rounded-lg text-base font-medium transition-all ${
+                  errorFocused === 1 
+                    ? 'bg-gray-600 text-white ring-2 ring-gray-400 scale-105' 
+                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                }`}
+              >
+                Quay lại
+              </button>
+            </div>
+            <p className="text-gray-500 text-xs mt-4">◀ ▶ để chọn • Enter để xác nhận</p>
           </div>
         </div>
       )}

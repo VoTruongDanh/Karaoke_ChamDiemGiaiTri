@@ -8,10 +8,8 @@ import { NextRequest, NextResponse } from 'next/server';
 const PIPED_INSTANCES = [
   'https://pipedapi.kavin.rocks',
   'https://pipedapi.adminforge.de',
-  'https://watchapi.whatever.social',
-  'https://pipedapi.syncpundit.io',
-  'https://api.piped.yt',
-  'https://pipedapi.r4fo.com',
+  'https://pipedapi.in.projectsegfau.lt',
+  'https://pipedapi.leptons.xyz',
 ];
 
 interface PipedRelatedVideo {
@@ -89,68 +87,48 @@ async function getRelatedFromYouTube(videoId: string): Promise<any[]> {
     
     const html = await response.text();
     
-    // Try multiple patterns to extract ytInitialData
-    let data: any = null;
-    
-    // Pattern 1: var ytInitialData = {...};
-    let match = html.match(/var\s+ytInitialData\s*=\s*(\{[\s\S]+?\});/);
-    if (match) {
-      try {
-        data = JSON.parse(match[1]);
-      } catch {}
-    }
-    
-    // Pattern 2: ytInitialData in script tag
-    if (!data) {
-      match = html.match(/ytInitialData['"]\s*\]\s*=\s*(\{[\s\S]+?\});/);
-      if (match) {
-        try {
-          data = JSON.parse(match[1]);
-        } catch {}
-      }
-    }
-    
-    if (!data) {
-      console.log('[API Related] Could not extract ytInitialData');
-      return [];
-    }
-    
-    // Find secondary results (related videos)
-    const secondaryResults = data?.contents?.twoColumnWatchNextResults?.secondaryResults
-      ?.secondaryResults?.results || [];
-    
-    console.log('[API Related] Found', secondaryResults.length, 'secondary results');
-    
+    // Try to extract video IDs and titles using regex patterns
     const videos: any[] = [];
-    for (const item of secondaryResults) {
-      const video = item.compactVideoRenderer;
-      if (!video) continue;
+    
+    // Pattern 1: Look for videoId in JSON
+    const videoIdRegex = /"videoId":"([a-zA-Z0-9_-]{11})"/g;
+    const seenIds = new Set<string>([videoId]); // Exclude current video
+    
+    let match;
+    while ((match = videoIdRegex.exec(html)) !== null) {
+      const id = match[1];
+      if (seenIds.has(id)) continue;
+      seenIds.add(id);
       
-      const id = video.videoId;
-      if (!id) continue;
+      // Try to find title for this video
+      const titleRegex = new RegExp(`"videoId":"${id}"[^}]*"title":\\s*\\{[^}]*"text":\\s*"([^"]+)"`, 'g');
+      const titleMatch = titleRegex.exec(html);
       
-      const title = video.title?.simpleText || video.title?.runs?.[0]?.text || '';
-      const channel = video.shortBylineText?.runs?.[0]?.text || 
-                      video.longBylineText?.runs?.[0]?.text || '';
-      const durationText = video.lengthText?.simpleText || '0:00';
+      let title = '';
+      if (titleMatch) {
+        title = titleMatch[1];
+      } else {
+        // Alternative: look for simpleText
+        const simpleRegex = new RegExp(`"videoId":"${id}"[^}]*"title":\\s*\\{[^}]*"simpleText":\\s*"([^"]+)"`, 'g');
+        const simpleMatch = simpleRegex.exec(html);
+        if (simpleMatch) title = simpleMatch[1];
+      }
       
-      // Parse duration
-      const parts = durationText.split(':').map(Number);
-      let duration = 0;
-      if (parts.length === 3) duration = parts[0] * 3600 + parts[1] * 60 + parts[2];
-      else if (parts.length === 2) duration = parts[0] * 60 + parts[1];
+      if (title) {
+        videos.push({
+          youtubeId: id,
+          title: title.replace(/\\u0026/g, '&').replace(/\\"/g, '"'),
+          thumbnail: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
+          channelName: 'YouTube',
+          duration: 0,
+        });
+      }
       
-      videos.push({
-        youtubeId: id,
-        title,
-        thumbnail: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
-        channelName: channel,
-        duration,
-      });
+      if (videos.length >= 15) break;
     }
     
     console.log('[API Related] Extracted', videos.length, 'videos from YouTube');
-    return videos.slice(0, 15);
+    return videos;
   } catch (error) {
     console.error('[API Related] YouTube scrape failed:', error);
     return [];
@@ -158,7 +136,8 @@ async function getRelatedFromYouTube(videoId: string): Promise<any[]> {
 }
 
 // Fallback 2: Search for similar karaoke videos based on title
-async function searchSimilarKaraoke(videoId: string): Promise<any[]> {
+// Uses the working /api/youtube/search endpoint
+async function searchSimilarKaraoke(videoId: string, baseUrl: string): Promise<any[]> {
   try {
     // Get video title from YouTube oEmbed
     const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
@@ -170,7 +149,7 @@ async function searchSimilarKaraoke(videoId: string): Promise<any[]> {
       },
     });
     
-    let searchQuery = 'karaoke việt nam';
+    let searchQuery = 'karaoke việt nam hot';
     
     if (infoRes.ok) {
       const info = await infoRes.json();
@@ -190,48 +169,22 @@ async function searchSimilarKaraoke(videoId: string): Promise<any[]> {
       }
     }
     
-    console.log('[API Related] Searching for:', searchQuery);
+    console.log('[API Related] Searching via internal API for:', searchQuery);
     
-    // Use Piped search API
-    for (const instance of PIPED_INSTANCES) {
-      try {
-        const searchUrl = `${instance}/search?q=${encodeURIComponent(searchQuery)}&filter=videos`;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-        
-        const res = await fetch(searchUrl, {
-          signal: controller.signal,
-          headers: { 'Accept': 'application/json' },
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (!res.ok) continue;
-        
+    // Use internal search API which is working
+    try {
+      const searchUrl = `${baseUrl}/api/youtube/search?q=${encodeURIComponent(searchQuery)}`;
+      const res = await fetch(searchUrl);
+      
+      if (res.ok) {
         const data = await res.json();
-        if (data.items && data.items.length > 0) {
-          console.log('[API Related] Piped search got', data.items.length, 'results');
-          // Filter out the original video
-          return data.items
-            .filter((v: any) => {
-              const id = v.url?.replace('/watch?v=', '') || '';
-              return id !== videoId;
-            })
-            .slice(0, 10)
-            .map((v: any) => {
-              const id = v.url?.replace('/watch?v=', '') || '';
-              return {
-                youtubeId: id,
-                title: v.title || '',
-                thumbnail: v.thumbnail || `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
-                channelName: v.uploaderName || 'Unknown',
-                duration: v.duration || 0,
-              };
-            });
+        if (data.songs && data.songs.length > 0) {
+          console.log('[API Related] Internal search got', data.songs.length, 'results');
+          return data.songs.filter((s: any) => s.youtubeId !== videoId).slice(0, 10);
         }
-      } catch (e: any) {
-        console.log('[API Related] Search instance failed:', instance, e.message);
       }
+    } catch (e: any) {
+      console.log('[API Related] Internal search failed:', e.message);
     }
     
     return [];
@@ -244,10 +197,9 @@ async function searchSimilarKaraoke(videoId: string): Promise<any[]> {
 // Fallback 3: Use Invidious API
 async function getRelatedFromInvidious(videoId: string): Promise<any[]> {
   const INVIDIOUS_INSTANCES = [
-    'https://invidious.snopyta.org',
-    'https://yewtu.be',
-    'https://vid.puffyan.us',
-    'https://invidious.kavin.rocks',
+    'https://inv.nadeko.net',
+    'https://invidious.privacyredirect.com',
+    'https://invidious.nerdvpn.de',
   ];
   
   for (const instance of INVIDIOUS_INSTANCES) {
@@ -256,7 +208,7 @@ async function getRelatedFromInvidious(videoId: string): Promise<any[]> {
       console.log('[API Related] Trying Invidious:', url);
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
       
       const response = await fetch(url, {
         signal: controller.signal,
@@ -295,6 +247,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ songs: [] });
   }
   
+  // Get base URL for internal API calls
+  const baseUrl = request.nextUrl.origin;
+  
   console.log('[API Related] Getting related for:', videoId);
   
   // Try Piped first
@@ -315,10 +270,10 @@ export async function GET(request: NextRequest) {
     console.log('[API Related] YouTube scrape returned:', songs.length, 'videos');
   }
   
-  // Fallback 4: Search for similar karaoke videos
+  // Fallback 4: Search for similar karaoke videos using internal API
   if (songs.length === 0) {
     console.log('[API Related] All methods failed, trying keyword search');
-    songs = await searchSimilarKaraoke(videoId);
+    songs = await searchSimilarKaraoke(videoId, baseUrl);
     console.log('[API Related] Keyword search returned:', songs.length, 'videos');
   }
   

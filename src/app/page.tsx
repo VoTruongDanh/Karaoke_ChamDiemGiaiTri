@@ -33,6 +33,16 @@ interface GradeInfo {
   particles: string[];
 }
 
+// Get score color based on grade
+function getScoreColor(score: number): { text: string; glow: string } {
+  if (score >= 90) return { text: 'text-yellow-400', glow: 'drop-shadow-[0_0_20px_rgba(250,204,21,0.8)]' }; // S - Vàng
+  if (score >= 80) return { text: 'text-emerald-400', glow: 'drop-shadow-[0_0_20px_rgba(52,211,153,0.8)]' }; // A - Xanh lục
+  if (score >= 70) return { text: 'text-cyan-400', glow: 'drop-shadow-[0_0_20px_rgba(34,211,238,0.8)]' }; // B - Xanh dương
+  if (score >= 60) return { text: 'text-blue-400', glow: 'drop-shadow-[0_0_20px_rgba(96,165,250,0.8)]' }; // C - Xanh
+  if (score >= 50) return { text: 'text-orange-400', glow: 'drop-shadow-[0_0_20px_rgba(251,146,60,0.8)]' }; // D - Cam
+  return { text: 'text-rose-500', glow: 'drop-shadow-[0_0_20px_rgba(244,63,94,0.8)]' }; // F - Đỏ
+}
+
 function getScoreGrade(score: number): GradeInfo {
   if (score >= 90) return { 
     grade: 'S', 
@@ -91,41 +101,120 @@ function getScoreGrade(score: number): GradeInfo {
 }
 
 /**
- * Animated score counter for TV with proper cleanup
+ * Animated score counter with rolling effect and sound
  */
-function TVAnimatedScore({ target, duration = 2000 }: { target: number; duration?: number }) {
+function TVAnimatedScore({ target, duration = 2500, withSound = false }: { target: number; duration?: number; withSound?: boolean }) {
   const [current, setCurrent] = useState(0);
+  const [isRolling, setIsRolling] = useState(true);
   const frameRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const lastTickRef = useRef(0);
 
   useEffect(() => {
     mountedRef.current = true;
+    setIsRolling(true);
     const startTime = Date.now();
+    
+    // Create audio context for tick sound
+    if (withSound) {
+      try {
+        audioContextRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      } catch {}
+    }
+    
+    // Play tick sound
+    const playTick = (pitch: number = 1) => {
+      if (!audioContextRef.current || !withSound) return;
+      try {
+        const ctx = audioContextRef.current;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = 800 * pitch; // Higher pitch as score increases
+        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.05);
+      } catch {}
+    };
+    
+    // Play final reveal sound
+    const playReveal = () => {
+      if (!audioContextRef.current || !withSound) return;
+      try {
+        const ctx = audioContextRef.current;
+        const now = ctx.currentTime;
+        
+        // Triumphant chord
+        [523.25, 659.25, 783.99].forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + i * 0.05);
+          osc.stop(now + 0.5);
+        });
+      } catch {}
+    };
     
     const animate = () => {
       if (!mountedRef.current) return;
       
       const elapsed = Date.now() - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 4);
-      setCurrent(Math.round(target * eased));
+      
+      // Ease out with dramatic slowdown at end
+      const eased = progress < 0.8 
+        ? progress * 1.25 * (1 - Math.pow(1 - progress / 0.8, 2)) * 0.8
+        : 0.8 + (1 - Math.pow(1 - (progress - 0.8) / 0.2, 3)) * 0.2;
+      
+      const newValue = Math.round(target * Math.min(eased * 1.25, 1));
+      
+      // Play tick sound every few points
+      if (withSound && newValue !== current && newValue - lastTickRef.current >= 3) {
+        lastTickRef.current = newValue;
+        playTick(0.8 + (newValue / target) * 0.4); // Pitch increases with score
+      }
+      
+      setCurrent(newValue);
       
       if (progress < 1 && mountedRef.current) {
         frameRef.current = requestAnimationFrame(animate);
+      } else {
+        setIsRolling(false);
+        if (withSound) playReveal();
       }
     };
     
-    frameRef.current = requestAnimationFrame(animate);
+    // Small delay before starting
+    const startDelay = setTimeout(() => {
+      frameRef.current = requestAnimationFrame(animate);
+    }, 300);
     
     return () => {
+      clearTimeout(startDelay);
       mountedRef.current = false;
       if (frameRef.current) {
         cancelAnimationFrame(frameRef.current);
       }
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {});
+      }
     };
-  }, [target, duration]);
+  }, [target, duration, withSound]);
 
-  return <>{current}</>;
+  return (
+    <span className={isRolling ? 'animate-pulse' : ''}>
+      {current}
+    </span>
+  );
 }
 
 /**
@@ -156,23 +245,150 @@ function TVStatCard({ label, value, icon, delay }: { label: string; value: numbe
 /**
  * Confetti particle component for high scores
  */
-function Confetti({ isHighScore }: { isHighScore: boolean }) {
-  if (!isHighScore) return null;
+function Confetti({ show, intensity = 30 }: { show: boolean; intensity?: number }) {
+  // Memoize random values to prevent re-render issues
+  const particles = useMemo(() => 
+    [...Array(intensity)].map((_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      delay: Math.random() * 3,
+      duration: 2.5 + Math.random() * 2,
+      color: ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff6bd6', '#a855f7'][i % 6],
+    })), [intensity]
+  );
+  
+  if (!show) return null;
   
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden">
-      {[...Array(30)].map((_, i) => (
+      {particles.map((p) => (
         <div
-          key={i}
-          className="absolute w-2 h-2 rounded-full animate-confetti"
+          key={p.id}
+          className="absolute w-3 h-3 rounded-full animate-confetti"
           style={{
-            left: `${Math.random() * 100}%`,
-            top: '-10px',
-            backgroundColor: ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff6bd6'][i % 5],
-            animationDelay: `${Math.random() * 2}s`,
-            animationDuration: `${2 + Math.random() * 2}s`,
+            left: `${p.left}%`,
+            top: '-20px',
+            backgroundColor: p.color,
+            animationDelay: `${p.delay}s`,
+            animationDuration: `${p.duration}s`,
           }}
         />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Firework burst effect - simplified version
+ */
+function Fireworks({ show }: { show: boolean }) {
+  // Fixed positions for fireworks
+  const positions = useMemo(() => [
+    { x: 25, y: 30 },
+    { x: 50, y: 25 },
+    { x: 75, y: 35 },
+    { x: 35, y: 45 },
+  ], []);
+  
+  if (!show) return null;
+  
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {positions.map((pos, idx) => (
+        <div
+          key={idx}
+          className="absolute"
+          style={{ 
+            left: `${pos.x}%`, 
+            top: `${pos.y}%`,
+            animationDelay: `${idx * 0.5}s`,
+          }}
+        >
+          {[...Array(8)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute w-2 h-2 rounded-full animate-firework"
+              style={{
+                backgroundColor: ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff6bd6'][i % 5],
+                transform: `rotate(${i * 45}deg) translateY(-10px)`,
+                animationDelay: `${idx * 0.5 + i * 0.03}s`,
+              }}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Rising stars effect
+ */
+function RisingStars({ show }: { show: boolean }) {
+  const stars = useMemo(() => 
+    [...Array(12)].map((_, i) => ({
+      id: i,
+      left: 5 + i * 8,
+      delay: i * 0.25,
+      duration: 3 + (i % 3),
+      emoji: ['⭐', '✨', '🌟', '💫'][i % 4],
+    })), []
+  );
+  
+  if (!show) return null;
+  
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {stars.map((s) => (
+        <div
+          key={s.id}
+          className="absolute text-2xl animate-rise-star"
+          style={{
+            left: `${s.left}%`,
+            bottom: '-30px',
+            animationDelay: `${s.delay}s`,
+            animationDuration: `${s.duration}s`,
+          }}
+        >
+          {s.emoji}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Floating music notes
+ */
+function FloatingNotes({ show }: { show: boolean }) {
+  const notes = useMemo(() => 
+    [...Array(8)].map((_, i) => ({
+      id: i,
+      left: 10 + i * 12,
+      top: 20 + (i % 4) * 20,
+      delay: i * 0.4,
+      duration: 4 + (i % 3),
+      emoji: ['🎵', '🎶', '♪', '♫'][i % 4],
+    })), []
+  );
+  
+  if (!show) return null;
+  
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {notes.map((n) => (
+        <div
+          key={n.id}
+          className="absolute text-3xl animate-float-note opacity-60"
+          style={{
+            left: `${n.left}%`,
+            top: `${n.top}%`,
+            animationDelay: `${n.delay}s`,
+            animationDuration: `${n.duration}s`,
+          }}
+        >
+          {n.emoji}
+        </div>
       ))}
     </div>
   );
@@ -182,19 +398,29 @@ function Confetti({ isHighScore }: { isHighScore: boolean }) {
  * Sparkle effect for medium scores
  */
 function Sparkles({ show }: { show: boolean }) {
+  const sparkles = useMemo(() => 
+    [...Array(12)].map((_, i) => ({
+      id: i,
+      left: 10 + (i % 4) * 25,
+      top: 10 + Math.floor(i / 4) * 30,
+      delay: i * 0.15,
+      duration: 1.5 + (i % 3) * 0.3,
+    })), []
+  );
+  
   if (!show) return null;
   
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden">
-      {[...Array(12)].map((_, i) => (
+      {sparkles.map((s) => (
         <div
-          key={i}
+          key={s.id}
           className="absolute w-1 h-1 bg-white rounded-full animate-sparkle"
           style={{
-            left: `${10 + Math.random() * 80}%`,
-            top: `${10 + Math.random() * 80}%`,
-            animationDelay: `${Math.random() * 2}s`,
-            animationDuration: `${1.5 + Math.random() * 1}s`,
+            left: `${s.left}%`,
+            top: `${s.top}%`,
+            animationDelay: `${s.delay}s`,
+            animationDuration: `${s.duration}s`,
           }}
         />
       ))}
@@ -206,18 +432,26 @@ function Sparkles({ show }: { show: boolean }) {
  * Floating hearts for encouragement (low scores)
  */
 function FloatingHearts({ show }: { show: boolean }) {
+  const hearts = useMemo(() => 
+    [...Array(6)].map((_, i) => ({
+      id: i,
+      left: 15 + i * 14,
+      delay: i * 0.4,
+    })), []
+  );
+  
   if (!show) return null;
   
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden">
-      {[...Array(6)].map((_, i) => (
+      {hearts.map((h) => (
         <div
-          key={i}
+          key={h.id}
           className="absolute text-2xl animate-float-up"
           style={{
-            left: `${15 + i * 15}%`,
+            left: `${h.left}%`,
             bottom: '-30px',
-            animationDelay: `${i * 0.5}s`,
+            animationDelay: `${h.delay}s`,
             animationDuration: '4s',
           }}
         >
@@ -225,6 +459,247 @@ function FloatingHearts({ show }: { show: boolean }) {
         </div>
       ))}
     </div>
+  );
+}
+
+/**
+ * Shooting stars effect for high scores
+ */
+function ShootingStars({ show }: { show: boolean }) {
+  const stars = useMemo(() => 
+    [...Array(5)].map((_, i) => ({
+      id: i,
+      top: 10 + i * 18,
+      delay: i * 0.8,
+    })), []
+  );
+  
+  if (!show) return null;
+  
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {stars.map((s) => (
+        <div
+          key={s.id}
+          className="absolute left-0 animate-shooting-star"
+          style={{
+            top: `${s.top}%`,
+            animationDelay: `${s.delay}s`,
+          }}
+        >
+          <div className="w-20 h-0.5 bg-gradient-to-r from-transparent via-white to-yellow-300 rounded-full" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Pulse rings around score
+ */
+function PulseRings({ show, color = 'yellow' }: { show: boolean; color?: string }) {
+  const rings = useMemo(() => [0, 0.5, 1], []);
+  
+  if (!show) return null;
+  
+  const colorClass = {
+    yellow: 'border-yellow-400/50',
+    green: 'border-emerald-400/50',
+    blue: 'border-cyan-400/50',
+    rose: 'border-rose-400/50',
+  }[color] || 'border-yellow-400/50';
+  
+  return (
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      {rings.map((delay, i) => (
+        <div
+          key={i}
+          className={`absolute w-32 h-32 rounded-full border-4 ${colorClass} animate-pulse-ring`}
+          style={{ animationDelay: `${delay}s` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Floating bubbles effect
+ */
+function FloatingBubbles({ show }: { show: boolean }) {
+  const bubbles = useMemo(() => 
+    [...Array(15)].map((_, i) => ({
+      id: i,
+      left: 5 + i * 6.5,
+      size: 8 + (i % 4) * 6,
+      delay: i * 0.3,
+      duration: 3 + (i % 3),
+    })), []
+  );
+  
+  if (!show) return null;
+  
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {bubbles.map((b) => (
+        <div
+          key={b.id}
+          className="absolute rounded-full bg-gradient-to-br from-white/30 to-white/10 animate-float-bubble"
+          style={{
+            left: `${b.left}%`,
+            bottom: '-50px',
+            width: `${b.size}px`,
+            height: `${b.size}px`,
+            animationDelay: `${b.delay}s`,
+            animationDuration: `${b.duration}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Spiral particles effect
+ */
+function SpiralParticles({ show }: { show: boolean }) {
+  const particles = useMemo(() => 
+    [...Array(12)].map((_, i) => ({
+      id: i,
+      delay: i * 0.2,
+      color: ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff6bd6', '#a855f7'][i % 6],
+    })), []
+  );
+  
+  if (!show) return null;
+  
+  return (
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
+      {particles.map((p) => (
+        <div
+          key={p.id}
+          className="absolute w-3 h-3 rounded-full animate-spiral"
+          style={{
+            backgroundColor: p.color,
+            animationDelay: `${p.delay}s`,
+            transform: `rotate(${p.id * 30}deg)`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Twinkling stars background
+ */
+function TwinklingStars({ show }: { show: boolean }) {
+  const stars = useMemo(() => 
+    [...Array(20)].map((_, i) => ({
+      id: i,
+      left: 5 + (i * 4.7),
+      top: 5 + ((i * 17) % 90),
+      size: 2 + (i % 3),
+      delay: i * 0.15,
+    })), []
+  );
+  
+  if (!show) return null;
+  
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {stars.map((s) => (
+        <div
+          key={s.id}
+          className="absolute rounded-full bg-white animate-twinkle"
+          style={{
+            left: `${s.left}%`,
+            top: `${s.top}%`,
+            width: `${s.size}px`,
+            height: `${s.size}px`,
+            animationDelay: `${s.delay}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Rotating glow ring effect
+ */
+function RotatingGlow({ show, color = 'yellow' }: { show: boolean; color?: string }) {
+  if (!show) return null;
+  
+  const gradientColors = {
+    yellow: 'from-yellow-400 via-orange-500 to-yellow-400',
+    green: 'from-emerald-400 via-teal-500 to-emerald-400',
+    blue: 'from-cyan-400 via-blue-500 to-cyan-400',
+    rose: 'from-rose-400 via-pink-500 to-rose-400',
+  }[color] || 'from-yellow-400 via-orange-500 to-yellow-400';
+  
+  return (
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <div className={`w-[500px] h-[500px] rounded-full bg-gradient-to-r ${gradientColors} opacity-20 blur-3xl animate-rotate-glow`} />
+    </div>
+  );
+}
+
+/**
+ * Emoji rain effect
+ */
+function EmojiRain({ show, emojis = ['🎉', '🎊', '✨', '🌟'] }: { show: boolean; emojis?: string[] }) {
+  const items = useMemo(() => 
+    [...Array(20)].map((_, i) => ({
+      id: i,
+      left: i * 5,
+      delay: i * 0.2,
+      duration: 3 + (i % 3),
+      emoji: emojis[i % emojis.length],
+      size: 16 + (i % 3) * 8,
+    })), [emojis]
+  );
+  
+  if (!show) return null;
+  
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {items.map((item) => (
+        <div
+          key={item.id}
+          className="absolute animate-confetti"
+          style={{
+            left: `${item.left}%`,
+            top: '-30px',
+            fontSize: `${item.size}px`,
+            animationDelay: `${item.delay}s`,
+            animationDuration: `${item.duration}s`,
+          }}
+        >
+          {item.emoji}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Wave text effect for title
+ */
+function WaveText({ text, show }: { text: string; show: boolean }) {
+  if (!show) return <span>{text}</span>;
+  
+  return (
+    <span className="inline-flex">
+      {text.split('').map((char, i) => (
+        <span
+          key={i}
+          className="animate-wave inline-block"
+          style={{ animationDelay: `${i * 0.05}s` }}
+        >
+          {char === ' ' ? '\u00A0' : char}
+        </span>
+      ))}
+    </span>
   );
 }
 
@@ -247,45 +722,6 @@ function TVSongResultScreen({
   const isMediumScore = finalScore ? finalScore.totalScore >= 60 && finalScore.totalScore < 80 : false;
   const isLowScore = finalScore ? finalScore.totalScore < 60 : false;
 
-  // Play celebration sound for high scores
-  useEffect(() => {
-    if (isHighScore) {
-      // Create a simple celebration sound using Web Audio API
-      try {
-        const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-        const masterGain = audioContext.createGain();
-        masterGain.gain.value = 0.3; // 30% volume
-        masterGain.connect(audioContext.destination);
-        
-        // Play a cheerful chord progression
-        const playNote = (freq: number, startTime: number, duration: number) => {
-          const osc = audioContext.createOscillator();
-          const gain = audioContext.createGain();
-          osc.type = 'sine';
-          osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0.3, startTime);
-          gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
-          osc.connect(gain);
-          gain.connect(masterGain);
-          osc.start(startTime);
-          osc.stop(startTime + duration);
-        };
-        
-        const now = audioContext.currentTime;
-        // C major chord arpeggio (celebration sound)
-        playNote(523.25, now, 0.15);        // C5
-        playNote(659.25, now + 0.1, 0.15);  // E5
-        playNote(783.99, now + 0.2, 0.15);  // G5
-        playNote(1046.50, now + 0.3, 0.3);  // C6 (longer)
-        
-        // Cleanup after sound finishes
-        setTimeout(() => audioContext.close(), 1000);
-      } catch {
-        // Fallback: silent if Web Audio not supported
-      }
-    }
-  }, [isHighScore]);
-
   // Handle Enter key to go next
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -299,26 +735,43 @@ function TVSongResultScreen({
   }, [onNext]);
 
   return (
-    <div className="h-screen bg-tv-bg flex items-center justify-center p-4 relative">
+    <div className="h-screen bg-tv-bg flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background effects layer */}
+      <TwinklingStars show={true} />
+      <RotatingGlow show={isHighScore} color="yellow" />
+      <RotatingGlow show={isMediumScore} color="blue" />
+      
       {/* Effects based on score level */}
-      <Confetti isHighScore={isHighScore} />
+      <Confetti show={isHighScore} intensity={50} />
+      <Fireworks show={isHighScore} />
+      <ShootingStars show={isHighScore} />
+      <EmojiRain show={isHighScore} emojis={['🎉', '🎊', '👑', '⭐', '🏆']} />
+      <SpiralParticles show={isHighScore} />
+      
+      <RisingStars show={isMediumScore || isHighScore} />
+      <FloatingNotes show={true} />
+      <FloatingBubbles show={isMediumScore || isHighScore} />
       <Sparkles show={isMediumScore} />
+      
       <FloatingHearts show={isLowScore} />
       
       {/* Glow background effects based on score */}
       {isHighScore && (
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-yellow-500/20 rounded-full blur-[100px] animate-pulse" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-yellow-500/20 rounded-full blur-[120px] animate-pulse" />
+          <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-orange-500/15 rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '0.5s' }} />
+          <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-amber-500/15 rounded-full blur-[60px] animate-pulse" style={{ animationDelay: '1s' }} />
         </div>
       )}
       {isMediumScore && (
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-blue-500/15 rounded-full blur-[80px] animate-pulse" style={{ animationDuration: '3s' }} />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-cyan-500/15 rounded-full blur-[100px] animate-pulse" style={{ animationDuration: '3s' }} />
+          <div className="absolute top-1/3 right-1/3 w-48 h-48 bg-blue-500/10 rounded-full blur-[60px] animate-pulse" style={{ animationDelay: '0.7s' }} />
         </div>
       )}
       {isLowScore && (
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-rose-500/10 rounded-full blur-[60px]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-rose-500/10 rounded-full blur-[80px]" />
         </div>
       )}
 
@@ -326,14 +779,22 @@ function TVSongResultScreen({
         {/* Left - Thumbnail (16:9 aspect ratio like YouTube) */}
         <div className="flex-shrink-0">
           <div className={`relative p-1.5 rounded-2xl bg-gradient-to-br ${gradeInfo?.gradient || 'from-purple-500 to-pink-500'} ${isHighScore ? 'animate-pulse' : ''}`}>
+            {/* Shimmer effect on thumbnail border */}
+            {isHighScore && <div className="absolute inset-0 rounded-2xl animate-shimmer" />}
             <img 
               src={song.song.thumbnail} 
               alt="" 
-              className="w-80 h-44 rounded-xl object-cover"
+              className="w-80 h-44 rounded-xl object-cover relative z-10"
             />
             {gradeInfo && (
-              <div className={`absolute -bottom-3 -right-3 w-14 h-14 rounded-full bg-gradient-to-br ${gradeInfo.gradient} flex items-center justify-center shadow-lg border-2 border-white dark:border-slate-900 ${isHighScore ? 'animate-bounce' : ''}`}>
-                <span className="text-2xl font-black text-white">{gradeInfo.grade}</span>
+              <div className={`absolute -bottom-3 -right-3 w-16 h-16 rounded-full bg-gradient-to-br ${gradeInfo.gradient} flex items-center justify-center shadow-xl border-3 border-white dark:border-slate-900 ${isHighScore ? 'animate-bounce' : ''} z-20`}>
+                <span className="text-2xl font-black text-white drop-shadow-lg">{gradeInfo.grade}</span>
+              </div>
+            )}
+            {/* Pulse rings around grade badge for high scores */}
+            {isHighScore && gradeInfo && (
+              <div className="absolute -bottom-3 -right-3 w-16 h-16 z-10">
+                <PulseRings show={true} color="yellow" />
               </div>
             )}
           </div>
@@ -347,25 +808,39 @@ function TVSongResultScreen({
 
           {finalScore && gradeInfo ? (
             <>
-              <h1 className={`text-xl font-bold mb-3 bg-gradient-to-r ${gradeInfo.textGradient} bg-clip-text text-transparent ${isHighScore ? 'animate-pulse' : ''}`}>
-                {gradeInfo.title} {gradeInfo.emoji}
+              <h1 className={`text-xl font-bold mb-3 bg-gradient-to-r ${gradeInfo.textGradient} bg-clip-text text-transparent`}>
+                <WaveText text={gradeInfo.title} show={isHighScore} />
+                {!isHighScore && gradeInfo.title} {gradeInfo.emoji}
               </h1>
 
-              <div className="flex items-baseline gap-3 mb-4">
-                <span className={`text-5xl font-black bg-gradient-to-br ${gradeInfo.textGradient} bg-clip-text text-transparent`}>
-                  {finalScore.totalScore}
-                </span>
-                <span className="text-base text-gray-500">điểm</span>
+              <div className="flex items-baseline gap-3 mb-4 relative">
+                {/* Score with effects */}
+                <div className="relative">
+                  {isHighScore && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-24 h-24 rounded-full bg-yellow-400/20 animate-pulse-ring" />
+                    </div>
+                  )}
+                  {(() => {
+                    const scoreColor = getScoreColor(finalScore.totalScore);
+                    return (
+                      <span className={`text-7xl font-black ${scoreColor.text} ${scoreColor.glow} relative z-10 ${isHighScore ? 'animate-bounce-in' : ''}`}>
+                        <TVAnimatedScore target={finalScore.totalScore} duration={2500} withSound={true} />
+                      </span>
+                    );
+                  })()}
+                </div>
+                <span className="text-lg text-gray-400">điểm</span>
               </div>
 
               <div className="flex gap-4 text-sm mb-4">
-                <div className="bg-white/10 rounded-lg px-3 py-1.5">
+                <div className={`bg-white/10 rounded-lg px-4 py-2 backdrop-blur-sm border border-white/10 ${isMediumScore || isHighScore ? 'animate-fade-in' : ''}`} style={{ animationDelay: '0.3s' }}>
                   <span className="text-gray-400">🎵 Cao độ:</span>
-                  <span className="ml-1 font-semibold">{finalScore.pitchAccuracy}</span>
+                  <span className="ml-2 font-bold text-lg">{finalScore.pitchAccuracy}</span>
                 </div>
-                <div className="bg-white/10 rounded-lg px-3 py-1.5">
+                <div className={`bg-white/10 rounded-lg px-4 py-2 backdrop-blur-sm border border-white/10 ${isMediumScore || isHighScore ? 'animate-fade-in' : ''}`} style={{ animationDelay: '0.5s' }}>
                   <span className="text-gray-400">🥁 Nhịp:</span>
-                  <span className="ml-1 font-semibold">{finalScore.timing}</span>
+                  <span className="ml-2 font-bold text-lg">{finalScore.timing}</span>
                 </div>
               </div>
             </>
@@ -380,7 +855,7 @@ function TVSongResultScreen({
           <button
             onClick={onNext}
             autoFocus
-            className="px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-base font-medium transition-all focus:outline-none focus:ring-2 focus:ring-primary-400 focus:scale-105"
+            className={`px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl text-base font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-primary-400 focus:scale-105 shadow-lg ${isHighScore ? 'animate-pulse' : ''}`}
           >
             {hasNextSong ? 'Bài tiếp theo →' : 'Về trang chủ →'}
           </button>
@@ -729,7 +1204,6 @@ function TVAppContent() {
             scoringEnabled={!!mobileScore}
             scoreData={mobileScore}
             onError={handleYouTubeError}
-            autoSkipDelay={5000}
           />
         );
 
