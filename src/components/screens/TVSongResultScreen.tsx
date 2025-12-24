@@ -329,7 +329,7 @@ function EpicParticleExplosion({ show, color }: { show: boolean; color: string }
   return <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none z-30" />;
 }
 
-// ============ FIREWORK CANVAS - Real fireworks as background ============
+// ============ FIREWORK CANVAS - Beautiful fireworks as background ============
 function FireworkCanvas({ show, intensity = 'high' }: { show: boolean; intensity?: 'low' | 'medium' | 'high' }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
@@ -347,118 +347,76 @@ function FireworkCanvas({ show, intensity = 'high' }: { show: boolean; intensity
     interface Particle {
       x: number; y: number; vx: number; vy: number;
       life: number; color: string; size: number;
-      trail: Array<{x: number; y: number}>;
-      type: 'normal' | 'sparkle' | 'star';
+      type: 'normal' | 'sparkle';
     }
     
     interface Firework {
       x: number; y: number; targetY: number; vy: number;
       color: string; exploded: boolean;
       particles: Particle[];
-      type: 'burst' | 'ring' | 'heart' | 'spiral';
     }
     
     const fireworks: Firework[] = [];
     
     const colors = [
       '#FFD700', '#FF6B6B', '#4ECDC4', '#A855F7', '#F472B6', 
-      '#22D3EE', '#10B981', '#FFFFFF', '#FF4500', '#00FF7F',
-      '#FF1493', '#00BFFF', '#FFE4B5', '#7FFF00'
+      '#22D3EE', '#10B981', '#FF4500', '#00FF7F'
     ];
-    const maxFireworks = intensity === 'high' ? 15 : intensity === 'medium' ? 10 : 6;
-    const spawnRate = intensity === 'high' ? 15 : intensity === 'medium' ? 25 : 40;
+    const maxFireworks = intensity === 'high' ? 8 : intensity === 'medium' ? 5 : 3;
+    const spawnRate = intensity === 'high' ? 40 : intensity === 'medium' ? 60 : 90;
     
     const createFirework = () => {
       if (fireworks.length < maxFireworks) {
-        const types: Array<'burst' | 'ring' | 'heart' | 'spiral'> = ['burst', 'burst', 'ring', 'spiral'];
         fireworks.push({
-          x: Math.random() * canvas.width * 0.8 + canvas.width * 0.1,
+          x: Math.random() * canvas.width * 0.7 + canvas.width * 0.15,
           y: canvas.height + 10,
-          targetY: Math.random() * canvas.height * 0.45 + canvas.height * 0.08,
-          vy: -16 - Math.random() * 8,
+          targetY: Math.random() * canvas.height * 0.4 + canvas.height * 0.1,
+          vy: -12 - Math.random() * 5,
           color: colors[Math.floor(Math.random() * colors.length)],
           exploded: false,
           particles: [],
-          type: types[Math.floor(Math.random() * types.length)],
         });
       }
     };
     
     const createExplosion = (fw: Firework) => {
-      const particleCount = 120 + Math.floor(Math.random() * 60);
+      const particleCount = 80;
       const baseColor = fw.color;
       
-      if (fw.type === 'ring') {
-        // Double ring explosion
-        for (let ring = 0; ring < 2; ring++) {
-          for (let j = 0; j < 40; j++) {
-            const angle = (Math.PI * 2 * j) / 40;
-            const speed = 5 + ring * 4;
-            fw.particles.push({
-              x: fw.x, y: fw.y,
-              vx: Math.cos(angle) * speed,
-              vy: Math.sin(angle) * speed,
-              life: 1,
-              color: ring === 0 ? baseColor : '#FFFFFF',
-              size: 3 + Math.random() * 2,
-              trail: [],
-              type: 'normal',
-            });
-          }
-        }
-      } else if (fw.type === 'spiral') {
-        // Spiral explosion
-        for (let j = 0; j < particleCount; j++) {
-          const angle = (Math.PI * 2 * j) / 30 + j * 0.1;
-          const speed = 2 + (j % 30) * 0.3;
-          fw.particles.push({
-            x: fw.x, y: fw.y,
-            vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed,
-            life: 1,
-            color: j % 3 === 0 ? '#FFFFFF' : baseColor,
-            size: 2 + Math.random() * 3,
-            trail: [],
-            type: j % 5 === 0 ? 'sparkle' : 'normal',
-          });
-        }
-      } else {
-        // Standard burst with trails
-        for (let j = 0; j < particleCount; j++) {
-          const angle = (Math.PI * 2 * j) / particleCount + Math.random() * 0.3;
-          const speed = 4 + Math.random() * 10;
-          fw.particles.push({
-            x: fw.x, y: fw.y,
-            vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed,
-            life: 1,
-            color: Math.random() > 0.15 ? baseColor : '#FFFFFF',
-            size: 2 + Math.random() * 5,
-            trail: [],
-            type: Math.random() > 0.7 ? 'sparkle' : 'normal',
-          });
-        }
-        // Add center flash
-        for (let j = 0; j < 8; j++) {
-          const angle = (Math.PI * 2 * j) / 8;
-          fw.particles.push({
-            x: fw.x, y: fw.y,
-            vx: Math.cos(angle) * 2,
-            vy: Math.sin(angle) * 2,
-            life: 1,
-            color: '#FFFFFF',
-            size: 8,
-            trail: [],
-            type: 'star',
-          });
-        }
+      // Main burst
+      for (let j = 0; j < particleCount; j++) {
+        const angle = (Math.PI * 2 * j) / particleCount + Math.random() * 0.2;
+        const speed = 3 + Math.random() * 6;
+        fw.particles.push({
+          x: fw.x, y: fw.y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 1,
+          color: Math.random() > 0.2 ? baseColor : '#FFFFFF',
+          size: 2 + Math.random() * 3,
+          type: Math.random() > 0.8 ? 'sparkle' : 'normal',
+        });
+      }
+      
+      // Inner ring
+      for (let j = 0; j < 20; j++) {
+        const angle = (Math.PI * 2 * j) / 20;
+        fw.particles.push({
+          x: fw.x, y: fw.y,
+          vx: Math.cos(angle) * 2,
+          vy: Math.sin(angle) * 2,
+          life: 1,
+          color: '#FFFFFF',
+          size: 3,
+          type: 'sparkle',
+        });
       }
     };
     
     let frame = 0;
     const animate = () => {
       // Fade effect for trails
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       
       if (frame % spawnRate === 0) createFirework();
@@ -468,35 +426,23 @@ function FireworkCanvas({ show, intensity = 'high' }: { show: boolean; intensity
         
         if (!fw.exploded) {
           fw.y += fw.vy;
-          fw.vy += 0.28;
+          fw.vy += 0.2;
           
           // Draw rising rocket with glow
-          const gradient = ctx.createRadialGradient(fw.x, fw.y, 0, fw.x, fw.y, 15);
-          gradient.addColorStop(0, fw.color);
-          gradient.addColorStop(0.5, fw.color + '80');
-          gradient.addColorStop(1, 'transparent');
-          
           ctx.beginPath();
-          ctx.arc(fw.x, fw.y, 15, 0, Math.PI * 2);
-          ctx.fillStyle = gradient;
-          ctx.fill();
-          
-          ctx.beginPath();
-          ctx.arc(fw.x, fw.y, 4, 0, Math.PI * 2);
+          ctx.arc(fw.x, fw.y, 3, 0, Math.PI * 2);
           ctx.fillStyle = '#FFFFFF';
           ctx.shadowColor = fw.color;
-          ctx.shadowBlur = 20;
+          ctx.shadowBlur = 15;
           ctx.fill();
           
-          // Sparkling trail
-          for (let t = 0; t < 5; t++) {
-            const ty = fw.y + t * 8;
-            const tx = fw.x + (Math.random() - 0.5) * 4;
-            ctx.beginPath();
-            ctx.arc(tx, ty, 2 - t * 0.3, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(255, 255, 255, ${0.8 - t * 0.15})`;
-            ctx.fill();
-          }
+          // Simple trail
+          ctx.beginPath();
+          ctx.moveTo(fw.x, fw.y);
+          ctx.lineTo(fw.x, fw.y + 15);
+          ctx.strokeStyle = fw.color + '80';
+          ctx.lineWidth = 2;
+          ctx.stroke();
           
           if (fw.y <= fw.targetY || fw.vy >= 0) {
             fw.exploded = true;
@@ -505,71 +451,23 @@ function FireworkCanvas({ show, intensity = 'high' }: { show: boolean; intensity
         } else {
           let hasAlive = false;
           fw.particles.forEach((p) => {
-            // Store trail
-            if (p.trail.length < 8) {
-              p.trail.push({x: p.x, y: p.y});
-            } else {
-              p.trail.shift();
-              p.trail.push({x: p.x, y: p.y});
-            }
-            
             p.x += p.vx;
             p.y += p.vy;
-            p.vy += 0.1;
+            p.vy += 0.08;
             p.vx *= 0.98;
-            p.life -= 0.015;
+            p.life -= 0.018;
             
             if (p.life > 0) {
               hasAlive = true;
               
-              // Draw trail
-              if (p.trail.length > 1) {
-                ctx.beginPath();
-                ctx.moveTo(p.trail[0].x, p.trail[0].y);
-                for (let t = 1; t < p.trail.length; t++) {
-                  ctx.lineTo(p.trail[t].x, p.trail[t].y);
-                }
-                ctx.strokeStyle = p.color + Math.floor(p.life * 80).toString(16).padStart(2, '0');
-                ctx.lineWidth = p.size * p.life * 0.5;
-                ctx.stroke();
-              }
-              
-              // Draw particle
               ctx.beginPath();
-              if (p.type === 'star') {
-                // Draw star shape
-                const spikes = 4;
-                const outerRadius = p.size * p.life;
-                const innerRadius = outerRadius * 0.5;
-                for (let s = 0; s < spikes * 2; s++) {
-                  const radius = s % 2 === 0 ? outerRadius : innerRadius;
-                  const angle = (s * Math.PI) / spikes;
-                  const sx = p.x + Math.cos(angle) * radius;
-                  const sy = p.y + Math.sin(angle) * radius;
-                  if (s === 0) ctx.moveTo(sx, sy);
-                  else ctx.lineTo(sx, sy);
-                }
-                ctx.closePath();
-              } else {
-                ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
-              }
-              
+              ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
               ctx.fillStyle = p.color;
               ctx.globalAlpha = p.life * 0.9;
               ctx.shadowColor = p.color;
-              ctx.shadowBlur = p.type === 'sparkle' ? 20 : 12;
+              ctx.shadowBlur = p.type === 'sparkle' ? 15 : 8;
               ctx.fill();
               ctx.globalAlpha = 1;
-              
-              // Extra sparkle effect
-              if (p.type === 'sparkle' && Math.random() > 0.7) {
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, p.size * p.life * 2, 0, Math.PI * 2);
-                ctx.fillStyle = '#FFFFFF';
-                ctx.globalAlpha = p.life * 0.3;
-                ctx.fill();
-                ctx.globalAlpha = 1;
-              }
             }
           });
           
@@ -584,10 +482,9 @@ function FireworkCanvas({ show, intensity = 'high' }: { show: boolean; intensity
       animationRef.current = requestAnimationFrame(animate);
     };
     
-    // Start with multiple fireworks
-    for (let i = 0; i < 4; i++) {
-      setTimeout(createFirework, i * 200);
-    }
+    // Start with a couple fireworks
+    createFirework();
+    setTimeout(createFirework, 300);
     animate();
     
     return () => {
@@ -1046,10 +943,10 @@ function PulsingCircles({ color }: { color: string }) {
 
 // ============ SPARKLE FIELD - Twinkling stars ============
 function SparkleField({ intensity = 'normal' }: { intensity?: 'low' | 'normal' | 'high' }) {
-  const count = intensity === 'high' ? 60 : intensity === 'normal' ? 35 : 20;
+  const count = intensity === 'high' ? 30 : intensity === 'normal' ? 20 : 12;
   const stars = useMemo(() => [...Array(count)].map((_, i) => ({
     id: i, x: Math.random() * 100, y: Math.random() * 100,
-    size: 2 + Math.random() * 5, dur: 0.8 + Math.random() * 1.5, delay: Math.random() * 3,
+    size: 2 + Math.random() * 4, dur: 1 + Math.random() * 2, delay: Math.random() * 3,
   })), [count]);
 
   return (
@@ -1057,7 +954,7 @@ function SparkleField({ intensity = 'normal' }: { intensity?: 'low' | 'normal' |
       {stars.map(s => (
         <div key={s.id} className="absolute rounded-full bg-white animate-twinkle"
           style={{ left: `${s.x}%`, top: `${s.y}%`, width: `${s.size}px`, height: `${s.size}px`,
-            animationDuration: `${s.dur}s`, animationDelay: `${s.delay}s`, boxShadow: '0 0 10px 3px #fff' }} />
+            animationDuration: `${s.dur}s`, animationDelay: `${s.delay}s`, boxShadow: '0 0 8px 2px #fff' }} />
       ))}
     </div>
   );
@@ -1244,23 +1141,21 @@ function GoldenRain({ show }: { show: boolean }) {
     interface GoldParticle {
       x: number; y: number; vy: number; vx: number;
       size: number; rotation: number; rotationSpeed: number;
-      type: 'star' | 'sparkle' | 'coin';
       shimmer: number;
     }
     
     const particles: GoldParticle[] = [];
     
-    // Create golden particles
-    for (let i = 0; i < 80; i++) {
+    // Create golden particles - reduced count
+    for (let i = 0; i < 40; i++) {
       particles.push({
         x: Math.random() * canvas.width,
-        y: -50 - Math.random() * 500,
-        vy: 3 + Math.random() * 4,
-        vx: (Math.random() - 0.5) * 2,
-        size: 10 + Math.random() * 20,
+        y: -50 - Math.random() * 300,
+        vy: 2 + Math.random() * 3,
+        vx: (Math.random() - 0.5) * 1,
+        size: 8 + Math.random() * 12,
         rotation: Math.random() * Math.PI * 2,
-        rotationSpeed: (Math.random() - 0.5) * 0.1,
-        type: ['star', 'sparkle', 'coin'][Math.floor(Math.random() * 3)] as any,
+        rotationSpeed: (Math.random() - 0.5) * 0.08,
         shimmer: Math.random() * Math.PI * 2,
       });
     }
@@ -1271,13 +1166,13 @@ function GoldenRain({ show }: { show: boolean }) {
       
       particles.forEach(p => {
         p.y += p.vy;
-        p.x += p.vx + Math.sin(frame * 0.02 + p.shimmer) * 0.5;
+        p.x += p.vx + Math.sin(frame * 0.02 + p.shimmer) * 0.3;
         p.rotation += p.rotationSpeed;
-        p.shimmer += 0.1;
+        p.shimmer += 0.08;
         
         // Reset if off screen
         if (p.y > canvas.height + 50) {
-          p.y = -50;
+          p.y = -30;
           p.x = Math.random() * canvas.width;
         }
         
@@ -1285,42 +1180,22 @@ function GoldenRain({ show }: { show: boolean }) {
         ctx.translate(p.x, p.y);
         ctx.rotate(p.rotation);
         
-        const shimmerIntensity = 0.5 + Math.sin(p.shimmer) * 0.5;
-        ctx.globalAlpha = 0.8 * shimmerIntensity;
+        const shimmerIntensity = 0.6 + Math.sin(p.shimmer) * 0.4;
+        ctx.globalAlpha = shimmerIntensity;
         ctx.shadowColor = '#FFD700';
-        ctx.shadowBlur = 15;
+        ctx.shadowBlur = 10;
         
-        if (p.type === 'star') {
-          // Draw 4-point star
-          ctx.fillStyle = '#FFD700';
-          ctx.beginPath();
-          for (let i = 0; i < 8; i++) {
-            const r = i % 2 === 0 ? p.size : p.size / 3;
-            const angle = (i * Math.PI) / 4;
-            if (i === 0) ctx.moveTo(Math.cos(angle) * r, Math.sin(angle) * r);
-            else ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
-          }
-          ctx.closePath();
-          ctx.fill();
-        } else if (p.type === 'sparkle') {
-          // Draw sparkle
-          ctx.fillStyle = '#FFFFFF';
-          ctx.beginPath();
-          ctx.arc(0, 0, p.size / 3, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = '#FFD700';
-          ctx.fillRect(-p.size / 2, -1, p.size, 2);
-          ctx.fillRect(-1, -p.size / 2, 2, p.size);
-        } else {
-          // Draw coin
-          ctx.fillStyle = '#FFD700';
-          ctx.beginPath();
-          ctx.ellipse(0, 0, p.size / 2, p.size / 2 * Math.abs(Math.cos(p.rotation * 2)), 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = '#FFA500';
-          ctx.lineWidth = 2;
-          ctx.stroke();
+        // Draw 4-point star
+        ctx.fillStyle = '#FFD700';
+        ctx.beginPath();
+        for (let i = 0; i < 8; i++) {
+          const r = i % 2 === 0 ? p.size : p.size / 3;
+          const angle = (i * Math.PI) / 4;
+          if (i === 0) ctx.moveTo(Math.cos(angle) * r, Math.sin(angle) * r);
+          else ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
         }
+        ctx.closePath();
+        ctx.fill();
         
         ctx.restore();
       });
@@ -1597,36 +1472,23 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
       
       {grade && (
         <>
-          {/* Background effects - always on */}
+          {/* Background effects - subtle ambient */}
           <AmbientGlow color={grade.glowColor} />
-          <SparkleField intensity={isHigh ? 'high' : 'normal'} />
-          <RotatingRays color={grade.glowColor} />
-          <PulsingCircles color={grade.glowColor} />
+          <SparkleField intensity={isHigh ? 'normal' : 'low'} />
           
-          {/* Floating particles */}
-          <FloatingParticles particles={grade.particles} count={isHigh ? 25 : 15} />
-          
-          {/* Firework background - always running for high scores */}
+          {/* Firework background - main effect for high scores */}
           {isHigh && <FireworkCanvas show={true} intensity={isSRank ? 'high' : 'medium'} />}
           
-          {/* High score effects (80+) */}
-          {isHigh && <StageLights color={grade.glowColor} />}
-          {isHigh && <LaserBeams color={grade.glowColor} />}
+          {/* Neon border for high scores */}
           {isHigh && <NeonBorder color={grade.glowColor} isHigh={isHigh} />}
-          {isHigh && <ShootingStars show={true} />}
-          {isHigh && <ConfettiRain show={isRevealed} colors={['#FFD700', '#FF6B6B', '#4ECDC4', '#A855F7', '#F472B6', '#22D3EE']} />}
-          {isHigh && <ElectricArcs show={isRevealed} color={grade.glowColor} />}
           
-          {/* S Rank special effects (90+) */}
+          {/* S Rank special - golden rain and trophy */}
           {isSRank && <GoldenRain show={isRevealed} />}
-          {isSRank && <DiscoBallEffect show={isRevealed} color={grade.glowColor} />}
           {isSRank && <SpinningTrophy show={isRevealed} />}
           
-          {/* Score reveal effects - EPIC */}
+          {/* Score reveal effects */}
           <ShockwaveEffect show={isRevealed} color={grade.glowColor} />
           <MegaFlash show={isRevealed} color={grade.glowColor} />
-          <EpicParticleExplosion show={isRevealed} color={grade.glowColor} />
-          {isHigh && <MegaCelebration show={isRevealed} grade={grade} />}
         </>
       )}
 
@@ -1710,7 +1572,7 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
                   <div className={`mt-3 transition-all duration-700 delay-300 ${isRevealed ? 'opacity-100' : 'opacity-0'}`}>
                     <p className={`text-base text-white font-medium ${isRevealed && isSRank ? 'animate-rainbow' : ''}`}
                       style={{ textShadow: '0 2px 15px rgba(0,0,0,0.8)' }}>
-                      "{quote}"
+                      &ldquo;{quote}&rdquo;
                     </p>
                   </div>
                 </div>
