@@ -12,7 +12,8 @@ export interface SearchScreenProps {
   onSearch: (query: string) => Promise<Song[]>;
   recentSearches?: string[];
   onRecentSearchSelect?: (query: string) => void;
-  suggestions?: Song[]; // Đề xuất bài hát
+  onGetSuggestions?: (videoIds: string[], maxResults?: number) => Promise<Song[]>;
+  lastPlayedVideoId?: string; // Video vừa hát xong - dùng để lấy gợi ý
 }
 
 const KEYBOARD_LAYOUT = [
@@ -39,6 +40,23 @@ function MicIcon() {
   return (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+    </svg>
+  );
+}
+
+function KeyboardIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+    </svg>
+  );
+}
+
+function KeyboardOpenIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <rect x="2" y="6" width="20" height="12" rx="2" strokeWidth={2} />
+      <path strokeLinecap="round" strokeWidth={2} d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8" />
     </svg>
   );
 }
@@ -109,7 +127,8 @@ export function SearchScreen({
   onSearch,
   recentSearches = [],
   onRecentSearchSelect,
-  suggestions = [],
+  onGetSuggestions,
+  lastPlayedVideoId,
 }: SearchScreenProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Song[]>([]);
@@ -119,6 +138,35 @@ export function SearchScreen({
   const [voiceText, setVoiceText] = useState(''); // Text đang nghe
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
+  
+  // Suggestions state
+  const [suggestions, setSuggestions] = useState<Song[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  
+  // Keyboard sidebar state - hidden by default
+  const [showKeyboard, setShowKeyboard] = useState(false);
+
+  // Load suggestions when entering search screen
+  useEffect(() => {
+    if (!onGetSuggestions || hasSearched) return;
+    
+    setIsLoadingSuggestions(true);
+    
+    // If we have a last played video, get suggestions based on it
+    // Otherwise, get popular karaoke (empty array triggers search fallback)
+    const videoIds = lastPlayedVideoId ? [lastPlayedVideoId] : [];
+    
+    onGetSuggestions(videoIds, 12)
+      .then(results => {
+        // Filter out the last played video from suggestions
+        const filtered = lastPlayedVideoId 
+          ? results.filter(s => s.youtubeId !== lastPlayedVideoId)
+          : results;
+        setSuggestions(filtered);
+      })
+      .catch(() => setSuggestions([]))
+      .finally(() => setIsLoadingSuggestions(false));
+  }, [onGetSuggestions, lastPlayedVideoId, hasSearched]);
 
   const handleKeyPress = useCallback(async (key: string) => {
     if (key === '⌫') {
@@ -235,7 +283,6 @@ export function SearchScreen({
   }, []);
 
   const KEYBOARD_ROWS = KEYBOARD_LAYOUT.length;
-  const RESULTS_COL_START = 10; // Results start at col 10 (after keyboard cols 0-9)
 
   // Hiển thị đề xuất hoặc kết quả
   const displaySongs = hasSearched ? results : suggestions;
@@ -243,7 +290,7 @@ export function SearchScreen({
   return (
     <NavigationGrid className="h-screen bg-tv-bg p-3 overflow-hidden">
       <div className="w-full h-full flex flex-col">
-        {/* Header với nút Mic lớn */}
+        {/* Header với nút Mic và Keyboard */}
         <header className="flex items-center gap-3 mb-2 flex-shrink-0">
           <FocusableButton
             row={0}
@@ -259,19 +306,31 @@ export function SearchScreen({
           
           <h1 className="text-lg font-bold flex-1">Tìm kiếm</h1>
           
-          {/* Nút Mic - đơn giản với icon 1 màu */}
+          {/* Nút Mic */}
           <FocusableButton
             row={0}
             col={1}
             onSelect={isListening ? stopVoiceSearch : startVoiceSearch}
             variant={isListening ? "primary" : "secondary"}
             icon={<MicIcon />}
-            className={`!min-w-[160px] !min-h-[44px] !px-4 ${
+            className={`!min-h-[44px] !px-4 ${
               isListening ? '!bg-red-500 animate-pulse' : ''
             }`}
             autoFocus
           >
-            {isListening ? 'Đang nghe...' : 'Tìm bằng giọng nói'}
+            {isListening ? 'Đang nghe...' : 'Giọng nói'}
+          </FocusableButton>
+          
+          {/* Nút mở bàn phím */}
+          <FocusableButton
+            row={0}
+            col={2}
+            onSelect={() => setShowKeyboard(!showKeyboard)}
+            variant={showKeyboard ? "primary" : "secondary"}
+            icon={<KeyboardOpenIcon />}
+            className="!min-h-[44px] !px-4"
+          >
+            {showKeyboard ? 'Ẩn bàn phím' : 'Bàn phím'}
           </FocusableButton>
         </header>
         
@@ -294,94 +353,120 @@ export function SearchScreen({
           </div>
         )}
 
-        <div className="flex gap-2 flex-1 min-h-0 overflow-hidden">
-          {/* Left - Keyboard */}
-          <div className="w-[380px] flex-shrink-0 flex flex-col">
-            {/* Search input */}
-            <div className="bg-white/5 backdrop-blur rounded-lg p-1.5 mb-1.5">
-              <div className="flex items-center gap-1.5">
-                <svg className="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <div className="flex-1 min-h-[20px] flex items-center overflow-hidden">
-                  {query ? (
-                    <span className="text-xs truncate">{query}</span>
-                  ) : (
-                    <span className="text-xs text-gray-500">Nhập tên bài hát...</span>
-                  )}
-                  <span className="w-0.5 h-3 bg-primary-400 animate-pulse ml-0.5 flex-shrink-0" />
+        <div className="flex gap-2 flex-1 min-h-0 overflow-hidden relative">
+          {/* Left - Keyboard Sidebar (hidden by default) */}
+          <div className={`absolute left-0 top-0 bottom-0 z-20 transition-transform duration-300 ease-in-out ${
+            showKeyboard ? 'translate-x-0' : '-translate-x-full'
+          }`}>
+            <div className="w-[380px] h-full flex flex-col bg-tv-bg/95 backdrop-blur-lg border-r border-white/10 p-2">
+              {/* Search input */}
+              <div className="bg-white/5 backdrop-blur rounded-lg p-1.5 mb-1.5">
+                <div className="flex items-center gap-1.5">
+                  <svg className="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <div className="flex-1 min-h-[20px] flex items-center overflow-hidden">
+                    {query ? (
+                      <span className="text-xs truncate">{query}</span>
+                    ) : (
+                      <span className="text-xs text-gray-500">Nhập tên bài hát...</span>
+                    )}
+                    <span className="w-0.5 h-3 bg-primary-400 animate-pulse ml-0.5 flex-shrink-0" />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Keyboard */}
-            <OnScreenKeyboard onKeyPress={handleKeyPress} startRow={1} />
+              {/* Keyboard */}
+              <OnScreenKeyboard onKeyPress={handleKeyPress} startRow={1} />
 
-            {/* Recent searches + Popular keywords */}
-            {!hasSearched && (
-              <div className="mt-1.5 space-y-1.5">
-                {recentSearches.length > 0 && (
+              {/* Recent searches + Popular keywords */}
+              {!hasSearched && (
+                <div className="mt-1.5 space-y-1.5">
+                  {recentSearches.length > 0 && (
+                    <div>
+                      <p className="text-[10px] text-gray-400 mb-0.5">Gần đây</p>
+                      <div className="flex flex-wrap gap-0.5">
+                        {recentSearches.slice(0, 4).map((search, index) => (
+                          <FocusableButton
+                            key={`recent-${index}`}
+                            row={KEYBOARD_ROWS + 2}
+                            col={index}
+                            onSelect={() => handleRecentSearch(search)}
+                            variant="secondary"
+                            size="sm"
+                            className="!py-0.5 !px-1.5 !min-h-0 !min-w-0 !text-[10px]"
+                          >
+                            {search}
+                          </FocusableButton>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
                   <div>
-                    <p className="text-[10px] text-gray-400 mb-0.5">Gần đây</p>
+                    <p className="text-[10px] text-gray-400 mb-0.5">Phổ biến</p>
                     <div className="flex flex-wrap gap-0.5">
-                      {recentSearches.slice(0, 4).map((search, index) => (
+                      {POPULAR_KEYWORDS.map((keyword, index) => (
                         <FocusableButton
-                          key={`recent-${index}`}
-                          row={KEYBOARD_ROWS + 2}
+                          key={`popular-${index}`}
+                          row={KEYBOARD_ROWS + 3}
                           col={index}
-                          onSelect={() => handleRecentSearch(search)}
-                          variant="secondary"
+                          onSelect={() => doSearch(keyword)}
+                          variant="ghost"
                           size="sm"
-                          className="!py-0.5 !px-1.5 !min-h-0 !min-w-0 !text-[10px]"
+                          className="!py-0.5 !px-1.5 !min-h-0 !min-w-0 !text-[10px] !bg-primary-500/20 !text-primary-300"
                         >
-                          {search}
+                          {keyword}
                         </FocusableButton>
                       ))}
                     </div>
                   </div>
-                )}
-                
-                <div>
-                  <p className="text-[10px] text-gray-400 mb-0.5">Phổ biến</p>
-                  <div className="flex flex-wrap gap-0.5">
-                    {POPULAR_KEYWORDS.map((keyword, index) => (
-                      <FocusableButton
-                        key={`popular-${index}`}
-                        row={KEYBOARD_ROWS + 3}
-                        col={index}
-                        onSelect={() => doSearch(keyword)}
-                        variant="ghost"
-                        size="sm"
-                        className="!py-0.5 !px-1.5 !min-h-0 !min-w-0 !text-[10px] !bg-primary-500/20 !text-primary-300"
-                      >
-                        {keyword}
-                      </FocusableButton>
-                    ))}
-                  </div>
                 </div>
+              )}
+              
+              {/* Close button at bottom */}
+              <div className="mt-auto pt-2">
+                <FocusableButton
+                  row={KEYBOARD_ROWS + 4}
+                  col={0}
+                  onSelect={() => setShowKeyboard(false)}
+                  variant="secondary"
+                  size="sm"
+                  className="w-full !text-xs"
+                >
+                  Đóng bàn phím
+                </FocusableButton>
               </div>
-            )}
+            </div>
           </div>
+          
+          {/* Overlay when keyboard is open */}
+          {showKeyboard && (
+            <div 
+              className="absolute inset-0 bg-black/30 z-10"
+              onClick={() => setShowKeyboard(false)}
+            />
+          )}
 
-          {/* Right - Results / Suggestions */}
+          {/* Results / Suggestions - Full width */}
           <div className="flex-1 min-w-0 overflow-hidden">
             <div className="bg-white/5 backdrop-blur rounded-lg p-3 h-full flex flex-col overflow-hidden">
               <p className="text-[10px] text-gray-400 mb-2 flex-shrink-0">
-                {isSearching ? 'Đang tìm...' : hasSearched ? `Kết quả (${results.length})` : suggestions.length > 0 ? 'Đề xuất cho bạn' : 'Kết quả'}
+                {isSearching ? 'Đang tìm...' : hasSearched ? `Kết quả (${results.length})` : isLoadingSuggestions ? 'Đang tải gợi ý...' : suggestions.length > 0 ? 'Gợi ý cho bạn' : 'Kết quả'}
               </p>
 
-              {isSearching ? (
+              {isSearching || isLoadingSuggestions ? (
                 <div className="flex items-center justify-center flex-1">
                   <div className="w-5 h-5 border-2 border-primary-400 border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : displaySongs.length > 0 ? (
-                <div className="grid grid-cols-2 gap-3 overflow-y-auto hide-scrollbar flex-1 content-start p-2">
+                <div className="grid grid-cols-3 lg:grid-cols-4 gap-3 overflow-y-auto hide-scrollbar flex-1 content-start p-2">
                   {displaySongs.map((song, index) => (
                     <SongCard
                       key={song.youtubeId}
                       song={song}
-                      row={1 + Math.floor(index / 2)}
-                      col={RESULTS_COL_START + (index % 2)}
+                      row={1 + Math.floor(index / 4)}
+                      col={index % 4}
                       onSelect={() => onSongSelect(song)}
                     />
                   ))}

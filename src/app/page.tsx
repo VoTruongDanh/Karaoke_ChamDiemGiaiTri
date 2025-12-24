@@ -1079,6 +1079,8 @@ function TVAppContent() {
             }}
             onNext={() => setPreviewScore(null)}
             hasNextSong={false}
+            onSearch={() => { setPreviewScore(null); navigateTo('search'); }}
+            onHome={() => { setPreviewScore(null); navigateTo('home'); }}
           />
           {/* Preview controls overlay */}
           <div className="absolute top-4 left-4 bg-black/80 backdrop-blur-sm rounded-xl p-4 z-50">
@@ -1130,6 +1132,8 @@ function TVAppContent() {
             onBack={goBack}
             onSearch={handleSearch}
             recentSearches={recentSearches}
+            onGetSuggestions={songLibrary ? (videoIds, maxResults = 12) => songLibrary.getSuggestions(videoIds, maxResults) : undefined}
+            lastPlayedVideoId={completedSongs.length > 0 ? completedSongs[completedSongs.length - 1].queueItem.song.youtubeId : undefined}
           />
         );
 
@@ -1183,6 +1187,8 @@ function TVAppContent() {
             hasNextSong={queueStore.getNext() !== null}
             onGetSuggestions={songLibrary ? (videoIds, maxResults = 6) => songLibrary.getSuggestions(videoIds, maxResults) : undefined}
             onAddToQueue={handleSongSelect}
+            onSearch={() => { clearFinishedSong(); setResultData(null); navigateTo('search'); }}
+            onHome={() => { clearFinishedSong(); setResultData(null); navigateTo('home'); }}
           />
         );
 

@@ -17,6 +17,8 @@ interface UseSilentScoringProps {
   isPlaying: boolean;
   /** Callback to send score updates */
   onScoreUpdate?: (score: ScoreData) => void;
+  /** Song ID for tracking previous scores */
+  songId?: string;
 }
 
 interface UseSilentScoringReturn {
@@ -143,9 +145,78 @@ interface SingingSegment {
   stability: number;
 }
 
+// Score history storage key
+const SCORE_HISTORY_KEY = 'karaoke_score_history';
+const MIN_SCORE_CHANGE = 5; // Minimum score change required from previous score
+
+/**
+ * Get previous score for a song from localStorage
+ */
+function getPreviousScore(): number | null {
+  try {
+    const stored = localStorage.getItem(SCORE_HISTORY_KEY);
+    if (stored) {
+      const data = JSON.parse(stored);
+      return data.lastScore ?? null;
+    }
+  } catch {}
+  return null;
+}
+
+/**
+ * Save score to localStorage
+ */
+function saveScore(score: number): void {
+  try {
+    localStorage.setItem(SCORE_HISTORY_KEY, JSON.stringify({
+      lastScore: score,
+      timestamp: Date.now(),
+    }));
+  } catch {}
+}
+
+/**
+ * Apply score smoothing rule:
+ * - First time: use raw score
+ * - From 2nd time: 
+ *   - If difference >= 5: use raw score
+ *   - If difference < 5: adjust to previous ± 5
+ * 
+ * Example:
+ * - Previous: 65, Raw: 72 (diff=7 >= 5) → Result: 72
+ * - Previous: 65, Raw: 68 (diff=3 < 5) → Result: 70 (65+5)
+ * - Previous: 65, Raw: 62 (diff=-3 < 5) → Result: 60 (65-5)
+ */
+function applyScoreSmoothing(rawScore: number, previousScore: number | null): number {
+  // First time - use raw score directly
+  if (previousScore === null) {
+    return rawScore;
+  }
+  
+  const diff = rawScore - previousScore;
+  
+  // If difference >= MIN_SCORE_CHANGE, use raw score
+  if (Math.abs(diff) >= MIN_SCORE_CHANGE) {
+    return rawScore;
+  }
+  
+  // If difference < MIN_SCORE_CHANGE, adjust to previous ± MIN_SCORE_CHANGE
+  if (diff > 0) {
+    // Trying to go higher but not enough - bump to previous + 5
+    return Math.min(100, previousScore + MIN_SCORE_CHANGE);
+  } else if (diff < 0) {
+    // Trying to go lower but not enough - drop to previous - 5
+    return Math.max(0, previousScore - MIN_SCORE_CHANGE);
+  }
+  
+  // Exactly same score - keep it
+  return previousScore;
+}
+
 export function useSilentScoring({ 
   isPlaying, 
-  onScoreUpdate 
+  onScoreUpdate,
+  songId,
 }: UseSilentScoringProps): UseSilentScoringReturn {
   const [currentScore, setCurrentScore] = useState<ScoreData>({ 
     pitchAccuracy: 0, 
@@ -162,6 +233,10 @@ export function useSilentScoring({
   const isRecordingRef = useRef(false);
   const onScoreUpdateRef = useRef(onScoreUpdate);
   
+  // Previous score tracking
+  const previousScoreRef = useRef<number | null>(null);
+  const isFirstScoreRef = useRef(true);
+  
   // Scoring data - segment based
   const currentSegmentRef = useRef<number[]>([]); // Current singing segment pitches
   const segmentsRef = useRef<SingingSegment[]>([]); // Completed segments
@@ -177,6 +252,12 @@ export function useSilentScoring({
   useEffect(() => {
     onScoreUpdateRef.current = onScoreUpdate;
   });
+  
+  // Load previous score on mount
+  useEffect(() => {
+    previousScoreRef.current = getPreviousScore();
+    isFirstScoreRef.current = previousScoreRef.current === null;
+  }, [songId]);
 
   // Calculate score from segments only (ignores instrumental parts)
   const calculateSegmentScore = useCallback(() => {
@@ -229,7 +310,10 @@ export function useSilentScoring({
     
     // Total score - balanced formula
     // pitchAccuracy and timing both contribute equally
-    const totalScore = Math.round((pitchAccuracy + timing) / 2);
+    const rawTotalScore = Math.round((pitchAccuracy + timing) / 2);
+    
+    // Apply score smoothing based on previous score
+    const totalScore = applyScoreSmoothing(rawTotalScore, previousScoreRef.current);
     
     return { pitchAccuracy, timing, totalScore };
   }, []);
@@ -350,6 +434,13 @@ export function useSilentScoring({
     const finalScore = calculateSegmentScore();
     setCurrentScore(finalScore);
     onScoreUpdateRef.current?.(finalScore);
+    
+    // Save score for next time (only if there was actual singing)
+    if (finalScore.totalScore > 0) {
+      saveScore(finalScore.totalScore);
+      previousScoreRef.current = finalScore.totalScore;
+      isFirstScoreRef.current = false;
+    }
   }, [calculateSegmentScore]);
 
   // Auto start/stop based on isPlaying
