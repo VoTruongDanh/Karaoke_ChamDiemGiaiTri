@@ -397,8 +397,10 @@ export class ScoringService {
   /**
    * Calculate final score - REDESIGNED for better differentiation
    * 
-   * Problem: Scores always around 75-77 regardless of singing quality
-   * Solution: Focus on measurable differences and spread scores wider
+   * V2: Fixed issue where scores always clustered around 75-77
+   * - Use actual accuracy samples instead of derived metrics
+   * - Wider score distribution based on real performance differences
+   * - Better baseline handling to avoid division issues
    */
   private calculateFinalScore(): ScoreData {
     if (this.pitchSamples.length === 0) {
@@ -408,108 +410,146 @@ export class ScoringService {
     const validSamples = this.pitchSamples.filter(s => s.timestamp > this.calibrationTime);
     const voiceSamples = validSamples.filter(s => s.isVoice);
     
-    // No singing = very low score
+    // No singing = very low score with variation
     if (voiceSamples.length < 15) {
+      const base = 15 + Math.random() * 20;
       return { 
-        pitchAccuracy: Math.round(10 + Math.random() * 15), 
-        timing: Math.round(5 + Math.random() * 15), 
-        totalScore: Math.round(8 + Math.random() * 12)
+        pitchAccuracy: Math.round(base + Math.random() * 10), 
+        timing: Math.round(base - 5 + Math.random() * 10), 
+        totalScore: Math.round(base)
       };
     }
 
-    // === 1. PRESENCE SCORE (how much did they sing?) ===
-    const presenceRatio = voiceSamples.length / Math.max(1, validSamples.length);
-    // More singing = higher score, scaled aggressively
-    const presenceScore = Math.min(100, presenceRatio * 130);
-
-    // === 2. VOLUME/ENTHUSIASM SCORE ===
-    const volumes = voiceSamples.map(s => s.volume);
-    const avgVolume = volumes.reduce((a, b) => a + b, 0) / volumes.length;
-    const volumeRatio = avgVolume / Math.max(0.01, this.baselineVolume);
+    // === 1. USE ACTUAL ACCURACY SCORES FROM SAMPLES ===
+    // This is the most direct measure of singing quality
+    const accuracyScores = voiceSamples.map(s => s.accuracy);
+    const avgAccuracy = accuracyScores.reduce((a, b) => a + b, 0) / accuracyScores.length;
     
-    // Louder singing = more enthusiastic = higher score
-    let volumeScore: number;
-    if (volumeRatio >= 5) volumeScore = 95;
-    else if (volumeRatio >= 4) volumeScore = 85;
-    else if (volumeRatio >= 3) volumeScore = 72;
-    else if (volumeRatio >= 2.5) volumeScore = 60;
-    else if (volumeRatio >= 2) volumeScore = 48;
-    else if (volumeRatio >= 1.5) volumeScore = 35;
-    else volumeScore = 20;
+    // Distribution of accuracy levels
+    const perfectCount = accuracyScores.filter(a => a >= 85).length;
+    const goodCount = accuracyScores.filter(a => a >= 60 && a < 85).length;
+    const okCount = accuracyScores.filter(a => a >= 35 && a < 60).length;
+    const missCount = accuracyScores.filter(a => a < 35).length;
+    
+    const totalFrames = voiceSamples.length;
+    const perfectRatio = perfectCount / totalFrames;
+    const goodRatio = goodCount / totalFrames;
+    const okRatio = okCount / totalFrames;
+    const missRatio = missCount / totalFrames;
 
-    // === 3. CONFIDENCE SCORE (clear voice detection) ===
-    const confidences = voiceSamples.map(s => s.confidence);
-    const avgConfidence = confidences.reduce((a, b) => a + b, 0) / confidences.length;
-    // Higher confidence = clearer singing
-    const confidenceScore = Math.min(100, avgConfidence * 140);
+    // === 2. PRESENCE SCORE (singing duration) ===
+    const presenceRatio = voiceSamples.length / Math.max(1, validSamples.length);
+    // Require at least 30% presence for decent score
+    let presenceScore: number;
+    if (presenceRatio >= 0.6) presenceScore = 100;
+    else if (presenceRatio >= 0.45) presenceScore = 80;
+    else if (presenceRatio >= 0.30) presenceScore = 60;
+    else if (presenceRatio >= 0.15) presenceScore = 40;
+    else presenceScore = 20;
 
-    // === 4. PITCH STABILITY SCORE ===
+    // === 3. PITCH STABILITY (consistency) ===
     const pitches = voiceSamples
       .filter(s => s.detectedPitch !== null)
       .map(s => s.detectedPitch as number);
     
-    let stabilityScore = 50;
+    let stabilityScore = 40; // Lower default
     if (pitches.length >= 10) {
-      // Calculate how stable the pitch is over time
       let stableFrames = 0;
+      let totalChecks = 0;
+      
       for (let i = 3; i < pitches.length; i++) {
         const recent = pitches.slice(i - 3, i + 1);
         const avg = recent.reduce((a, b) => a + b, 0) / recent.length;
         const maxDev = Math.max(...recent.map(p => Math.abs(1200 * Math.log2(p / avg))));
         
-        // Stable if within 50 cents
-        if (maxDev < 50) stableFrames++;
+        totalChecks++;
+        if (maxDev < 30) stableFrames += 1.0;      // Very stable
+        else if (maxDev < 50) stableFrames += 0.7; // Stable
+        else if (maxDev < 80) stableFrames += 0.4; // Somewhat stable
+        // else: unstable, no points
       }
-      stabilityScore = (stableFrames / (pitches.length - 3)) * 100;
+      stabilityScore = totalChecks > 0 ? (stableFrames / totalChecks) * 100 : 40;
     }
 
-    // === 5. GAP PENALTY ===
+    // === 4. GAP PENALTY (long pauses) ===
     let gapPenalty = 0;
     let currentGap = 0;
+    let longGaps = 0;
     validSamples.forEach(s => {
       if (!s.isVoice) {
         currentGap++;
-        if (currentGap > 15) gapPenalty += 2;
+        if (currentGap === 20) longGaps++; // Count each long gap once
       } else {
         currentGap = 0;
       }
     });
-    gapPenalty = Math.min(25, gapPenalty);
+    gapPenalty = Math.min(30, longGaps * 5);
 
-    // === COMBINE WITH WIDE SPREAD ===
-    const pitchAccuracy = Math.round(stabilityScore * 0.6 + confidenceScore * 0.4);
-    const timing = Math.round(presenceScore * 0.8 + (100 - gapPenalty * 2) * 0.2);
+    // === 5. CALCULATE COMPONENT SCORES ===
     
-    // Raw score with different weights
+    // Pitch accuracy: based on actual accuracy samples + stability
+    const pitchAccuracy = Math.round(
+      avgAccuracy * 0.5 +           // Direct accuracy measurement
+      stabilityScore * 0.3 +        // Pitch consistency
+      (perfectRatio * 100) * 0.2    // Bonus for perfect frames
+    );
+    
+    // Timing: based on presence and consistency
+    const timing = Math.round(
+      presenceScore * 0.6 +                    // How much they sang
+      (1 - missRatio) * 100 * 0.25 +          // Not missing notes
+      Math.max(0, 100 - gapPenalty * 2) * 0.15 // No long pauses
+    );
+
+    // === 6. FINAL SCORE WITH WIDER DISTRIBUTION ===
+    // Weight different aspects to create variety
+    const qualityScore = (
+      perfectRatio * 40 +    // Perfect frames worth most
+      goodRatio * 25 +       // Good frames
+      okRatio * 10           // OK frames worth less
+    ) * 100;
+    
     const rawScore = (
-      volumeScore * 0.30 +      // Enthusiasm matters most
-      stabilityScore * 0.25 +   // Pitch control
-      presenceScore * 0.25 +    // Actually singing
-      confidenceScore * 0.20    // Clear voice
+      qualityScore * 0.35 +      // Quality of singing (most important)
+      avgAccuracy * 0.25 +       // Average accuracy
+      stabilityScore * 0.20 +    // Pitch stability
+      presenceScore * 0.20       // Singing duration
     ) - gapPenalty;
 
-    // === SPREAD THE SCORES WIDER ===
-    // Map raw 40-80 range to 30-95 range
+    // === SPREAD SCORES ACROSS FULL RANGE ===
+    // Different singers should get noticeably different scores
     let finalScore: number;
-    if (rawScore >= 80) {
-      finalScore = 90 + (rawScore - 80) * 0.5; // 80-100 -> 90-100
-    } else if (rawScore >= 65) {
-      finalScore = 70 + (rawScore - 65) * 1.33; // 65-80 -> 70-90
-    } else if (rawScore >= 50) {
-      finalScore = 45 + (rawScore - 50) * 1.67; // 50-65 -> 45-70
-    } else if (rawScore >= 35) {
-      finalScore = 25 + (rawScore - 35) * 1.33; // 35-50 -> 25-45
+    
+    if (rawScore >= 85) {
+      // Excellent: 88-100
+      finalScore = 88 + (rawScore - 85) * 0.8;
+    } else if (rawScore >= 70) {
+      // Great: 75-88
+      finalScore = 75 + (rawScore - 70) * 0.87;
+    } else if (rawScore >= 55) {
+      // Good: 60-75
+      finalScore = 60 + (rawScore - 55) * 1.0;
+    } else if (rawScore >= 40) {
+      // Average: 45-60
+      finalScore = 45 + (rawScore - 40) * 1.0;
+    } else if (rawScore >= 25) {
+      // Below average: 30-45
+      finalScore = 30 + (rawScore - 25) * 1.0;
     } else {
-      finalScore = rawScore * 0.71; // 0-35 -> 0-25
+      // Poor: 10-30
+      finalScore = 10 + rawScore * 0.8;
     }
     
-    // Random variation ±3
-    finalScore += (Math.random() - 0.5) * 6;
+    // Add meaningful variation based on performance characteristics
+    // Better singers get tighter variation, worse singers get more
+    const variationRange = rawScore >= 70 ? 4 : rawScore >= 50 ? 6 : 8;
+    finalScore += (Math.random() - 0.5) * variationRange;
 
+    // Ensure scores are bounded
     return {
-      pitchAccuracy: Math.max(0, Math.min(100, pitchAccuracy)),
-      timing: Math.max(0, Math.min(100, timing)),
-      totalScore: Math.max(0, Math.min(100, Math.round(finalScore))),
+      pitchAccuracy: Math.max(5, Math.min(100, pitchAccuracy)),
+      timing: Math.max(5, Math.min(100, timing)),
+      totalScore: Math.max(10, Math.min(100, Math.round(finalScore))),
     };
   }
 
