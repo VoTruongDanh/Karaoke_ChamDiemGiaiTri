@@ -240,7 +240,6 @@ function CinematicScoreReveal({ target, onComplete, glowColor }: {
       await new Promise(r => setTimeout(r, 400));
       if (cancelled) return;
       setPhase('counting');
-      playSound('whoosh');
       
       // Fast count to 60%
       const fastTarget = Math.floor(target * 0.6);
