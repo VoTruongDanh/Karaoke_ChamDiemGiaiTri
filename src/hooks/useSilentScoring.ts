@@ -599,9 +599,21 @@ export function useSilentScoring({
 
       analyze();
       console.log('[Silent Scoring] Mic started successfully');
-    } catch (err) {
-      console.error('[Silent Scoring] Mic error:', err);
-      setError('Không thể truy cập microphone');
+    } catch (err: any) {
+      const errorMessage = err?.message || err?.name || 'Unknown error';
+      console.error('[Silent Scoring] Mic error:', errorMessage, err);
+      
+      // Show specific error message
+      if (errorMessage.includes('Permission') || errorMessage.includes('NotAllowed')) {
+        setError('Chưa cấp quyền mic');
+      } else if (errorMessage.includes('NotFound') || errorMessage.includes('DevicesNotFound')) {
+        setError('Không tìm thấy mic');
+      } else if (errorMessage.includes('NotReadable') || errorMessage.includes('TrackStartError')) {
+        setError('Mic đang được sử dụng');
+      } else {
+        setError(`Lỗi mic: ${errorMessage.substring(0, 30)}`);
+      }
+      
       setIsRecording(false);
       
       // Try to reconnect if playing
@@ -651,13 +663,20 @@ export function useSilentScoring({
       clearTimeout(reconnectTimerRef.current);
     }
     
-    // Always keep trying while playing - no max attempts
     reconnectAttemptsRef.current++;
-    console.log(`[Silent Scoring] Scheduling reconnect attempt ${reconnectAttemptsRef.current}`);
-    setError(`Đang kết nối lại mic...`);
     
-    // Exponential backoff: 2s, 4s, 8s, max 10s
-    const delay = Math.min(RECONNECT_DELAY * Math.pow(1.5, reconnectAttemptsRef.current - 1), 10000);
+    // Stop trying after 3 attempts - mic likely not available (WebView, permissions, etc.)
+    if (reconnectAttemptsRef.current > 3) {
+      console.log('[Silent Scoring] Max reconnect attempts reached, mic not available');
+      setError(null); // Clear error message - don't spam user
+      return;
+    }
+    
+    console.log(`[Silent Scoring] Scheduling reconnect attempt ${reconnectAttemptsRef.current}`);
+    setError(`Đang kết nối mic... (${reconnectAttemptsRef.current}/3)`);
+    
+    // Exponential backoff: 2s, 4s, 8s
+    const delay = Math.min(RECONNECT_DELAY * Math.pow(2, reconnectAttemptsRef.current - 1), 8000);
     
     reconnectTimerRef.current = setTimeout(() => {
       if (isPlaying && !isRecordingRef.current) {
