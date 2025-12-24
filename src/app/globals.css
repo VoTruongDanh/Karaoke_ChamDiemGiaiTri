@@ -2406,3 +2406,162 @@
 .animate-score-celebrate {
   animation: scoreCelebrate 1s ease-out;
 }
+
+
+/* ========== CINEMATIC SCORE REVEAL V2 ========== */
+
+/* Light beam animations */
+@keyframes lightBeamVertical {
+  0% {
+    transform: translate(-50%, -50%) scaleY(0);
+    opacity: 0;
+  }
+  50% {
+    transform: translate(-50%, -50%) scaleY(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scaleY(0);
+    opacity: 0;
+  }
+}
+
+@keyframes lightBeamHorizontal {
+  0% {
+    transform: translate(-50%, -50%) scaleX(0);
+    opacity: 0;
+  }
+  50% {
+    transform: translate(-50%, -50%) scaleX(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scaleX(0);
+    opacity: 0;
+  }
+}
+
+.animate-light-beam-vertical {
+  animation: lightBeamVertical 0.6s ease-out forwards;
+}
+
+.animate-light-beam-horizontal {
+  animation: lightBeamHorizontal 0.6s ease-out forwards;
+  animation-delay: 0.1s;
+}
+
+/* Glow animations */
+@keyframes expandGlow {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.5);
+    opacity: 0.6;
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 0.8;
+  }
+}
+
+.animate-expand-glow {
+  animation: expandGlow 0.5s ease-out forwards;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+/* Digit animations */
+@keyframes digitImpact {
+  0% {
+    transform: scale(1) translateY(0);
+  }
+  30% {
+    transform: scale(1.3) translateY(-15px);
+  }
+  50% {
+    transform: scale(1.1) translateY(-5px);
+  }
+  70% {
+    transform: scale(1.15) translateY(-8px);
+  }
+  100% {
+    transform: scale(1.1) translateY(-5px);
+  }
+}
+
+@keyframes digitGlow {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.3);
+  }
+}
+
+.animate-digit-impact {
+  animation: digitImpact 0.5s ease-out forwards;
+}
+
+.animate-digit-glow {
+  animation: digitGlow 1.5s ease-in-out infinite;
+}
+
+/* Flash burst */
+@keyframes flashBurst {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2);
+    opacity: 0;
+  }
+}
+
+.animate-flash-burst {
+  animation: flashBurst 0.4s ease-out forwards;
+}
+
+/* Orbit sparkle */
+@keyframes orbitSparkle {
+  0% {
+    transform: rotate(var(--orbit-angle, 0deg)) translateX(var(--orbit-radius, 60px)) rotate(calc(-1 * var(--orbit-angle, 0deg)));
+  }
+  100% {
+    transform: rotate(calc(var(--orbit-angle, 0deg) + 360deg)) translateX(var(--orbit-radius, 60px)) rotate(calc(-1 * (var(--orbit-angle, 0deg) + 360deg)));
+  }
+}
+
+.animate-orbit-sparkle {
+  animation: orbitSparkle var(--orbit-duration, 3s) linear infinite;
+}
+
+/* Twinkle */
+@keyframes twinkleEffect {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+.animate-twinkle {
+  animation: twinkleEffect 0.8s ease-in-out infinite;
+}

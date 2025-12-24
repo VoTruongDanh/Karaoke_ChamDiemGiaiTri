@@ -150,17 +150,19 @@ function CinematicScoreReveal({ target, onComplete, glowColor }: {
   glowColor?: string;
   isHighScore?: boolean;
 }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [displayValue, setDisplayValue] = useState(0);
-  const [phase, setPhase] = useState<'intro' | 'buildup' | 'counting' | 'impact' | 'celebrate'>('intro');
+  const [phase, setPhase] = useState<'hidden' | 'lightBeam' | 'counting' | 'impact' | 'glow'>('hidden');
   const audioRef = useRef<AudioContext | null>(null);
   const onCompleteRef = useRef(onComplete);
   const hasCompletedRef = useRef(false);
+  const animationFrameRef = useRef<number>(0);
   
-  // Keep callback ref updated but don't trigger re-render
   onCompleteRef.current = onComplete;
 
   const color = glowColor || '#FFD700';
   const isHigh = target >= 80;
+  const isSRank = target >= 90;
 
   // Initialize audio
   useEffect(() => {
@@ -169,150 +171,367 @@ function CinematicScoreReveal({ target, onComplete, glowColor }: {
     } catch {}
     return () => { 
       audioRef.current?.close().catch(() => {}); 
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
   }, []);
 
   // Sound effects
-  const playSound = useCallback((type: 'whoosh' | 'tick' | 'boom' | 'fanfare') => {
+  const playSound = useCallback((type: 'tick' | 'boom' | 'fanfare' | 'shimmer') => {
     if (!audioRef.current || audioRef.current.state === 'closed') return;
     const ctx = audioRef.current;
     try {
-      if (type === 'whoosh') {
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.type = 'sawtooth';
-        o.frequency.setValueAtTime(100, ctx.currentTime);
-        o.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.3);
-        g.gain.setValueAtTime(0.2, ctx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-        o.connect(g); g.connect(ctx.destination);
-        o.start(); o.stop(ctx.currentTime + 0.35);
-      } else if (type === 'tick') {
+      if (type === 'tick') {
         const o = ctx.createOscillator();
         const g = ctx.createGain();
         o.type = 'sine';
-        o.frequency.value = 1000 + Math.random() * 500;
-        g.gain.setValueAtTime(0.1, ctx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+        o.frequency.value = 800 + Math.random() * 600;
+        g.gain.setValueAtTime(0.08, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
         o.connect(g); g.connect(ctx.destination);
-        o.start(); o.stop(ctx.currentTime + 0.05);
+        o.start(); o.stop(ctx.currentTime + 0.04);
       } else if (type === 'boom') {
+        // Epic impact
         const o = ctx.createOscillator();
         const g = ctx.createGain();
         o.type = 'sine';
-        o.frequency.setValueAtTime(150, ctx.currentTime);
-        o.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 0.5);
-        g.gain.setValueAtTime(0.6, ctx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+        o.frequency.setValueAtTime(180, ctx.currentTime);
+        o.frequency.exponentialRampToValueAtTime(25, ctx.currentTime + 0.6);
+        g.gain.setValueAtTime(0.7, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.7);
         o.connect(g); g.connect(ctx.destination);
-        o.start(); o.stop(ctx.currentTime + 0.6);
+        o.start(); o.stop(ctx.currentTime + 0.7);
       } else if (type === 'fanfare') {
-        const notes = isHigh ? [523, 659, 784, 1047, 1319] : [523, 659, 784];
+        const notes = isSRank ? [523, 659, 784, 1047, 1319, 1568] : isHigh ? [523, 659, 784, 1047] : [523, 659, 784];
         notes.forEach((f, i) => {
           const o = ctx.createOscillator();
           const g = ctx.createGain();
-          o.type = 'sine'; o.frequency.value = f;
-          g.gain.setValueAtTime(0.25, ctx.currentTime + i * 0.1);
-          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.1 + 0.6);
+          o.type = 'sine'; 
+          o.frequency.value = f;
+          g.gain.setValueAtTime(0.2, ctx.currentTime + i * 0.08);
+          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.08 + 0.5);
           o.connect(g); g.connect(ctx.destination);
-          o.start(ctx.currentTime + i * 0.1);
-          o.stop(ctx.currentTime + i * 0.1 + 0.6);
+          o.start(ctx.currentTime + i * 0.08);
+          o.stop(ctx.currentTime + i * 0.08 + 0.5);
         });
+      } else if (type === 'shimmer') {
+        // Magical shimmer sound
+        for (let i = 0; i < 5; i++) {
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.type = 'sine';
+          o.frequency.value = 2000 + i * 500 + Math.random() * 200;
+          g.gain.setValueAtTime(0.03, ctx.currentTime + i * 0.05);
+          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.05 + 0.2);
+          o.connect(g); g.connect(ctx.destination);
+          o.start(ctx.currentTime + i * 0.05);
+          o.stop(ctx.currentTime + i * 0.05 + 0.2);
+        }
       }
     } catch {}
-  }, [isHigh]);
+  }, [isHigh, isSRank]);
 
-  // Main animation - only run once on mount, ignore all re-renders
+  // Canvas particle effects
   useEffect(() => {
-    // Skip if already completed
+    const canvas = canvasRef.current;
+    if (!canvas || (phase !== 'impact' && phase !== 'glow')) return;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * 2;
+    canvas.height = rect.height * 2;
+    ctx.scale(2, 2);
+    
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    
+    interface Particle {
+      x: number; y: number; vx: number; vy: number;
+      size: number; color: string; life: number; maxLife: number;
+      type: 'spark' | 'glow' | 'ring' | 'star';
+    }
+    
+    const particles: Particle[] = [];
+    const colors = [color, '#FFD700', '#FFFFFF', '#FF6B6B', '#4ECDC4', '#A855F7'];
+    
+    // Create explosion particles
+    if (phase === 'impact') {
+      // Sparks
+      for (let i = 0; i < 40; i++) {
+        const angle = (Math.PI * 2 * i) / 40 + Math.random() * 0.3;
+        const speed = 6 + Math.random() * 10;
+        particles.push({
+          x: centerX, y: centerY,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          size: 2 + Math.random() * 4,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          life: 1, maxLife: 60 + Math.random() * 30,
+          type: 'spark',
+        });
+      }
+      
+      // Glowing orbs
+      for (let i = 0; i < 15; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 2 + Math.random() * 4;
+        particles.push({
+          x: centerX, y: centerY,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 2,
+          size: 8 + Math.random() * 12,
+          color: colors[Math.floor(Math.random() * 3)],
+          life: 1, maxLife: 80 + Math.random() * 40,
+          type: 'glow',
+        });
+      }
+      
+      // Expanding rings
+      for (let i = 0; i < 3; i++) {
+        particles.push({
+          x: centerX, y: centerY,
+          vx: 0, vy: 0,
+          size: 20 + i * 30,
+          color: i === 0 ? '#FFFFFF' : color,
+          life: 1, maxLife: 50 + i * 10,
+          type: 'ring',
+        });
+      }
+      
+      // Stars for high scores
+      if (isHigh) {
+        for (let i = 0; i < 8; i++) {
+          const angle = (Math.PI * 2 * i) / 8;
+          const speed = 3 + Math.random() * 3;
+          particles.push({
+            x: centerX, y: centerY,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 1,
+            size: 10 + Math.random() * 8,
+            color: '#FFD700',
+            life: 1, maxLife: 100,
+            type: 'star',
+          });
+        }
+      }
+    }
+    
+    let frame = 0;
+    const animate = () => {
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      
+      let hasAlive = false;
+      particles.forEach(p => {
+        p.life = Math.max(0, 1 - frame / p.maxLife);
+        if (p.life <= 0) return;
+        hasAlive = true;
+        
+        if (p.type === 'ring') {
+          p.size += 5;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = 4 * p.life;
+          ctx.globalAlpha = p.life * 0.7;
+          ctx.stroke();
+        } else {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.15;
+          p.vx *= 0.98;
+          
+          ctx.globalAlpha = p.life;
+          
+          if (p.type === 'spark') {
+            // Spark with trail
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p.x - p.vx * 4, p.y - p.vy * 4);
+            ctx.strokeStyle = p.color;
+            ctx.lineWidth = p.size * p.life;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+          } else if (p.type === 'glow') {
+            // Glowing orb
+            const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * p.life);
+            gradient.addColorStop(0, '#FFFFFF');
+            gradient.addColorStop(0.3, p.color);
+            gradient.addColorStop(1, 'transparent');
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size * p.life * 1.5, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (p.type === 'star') {
+            // 4-point star
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(frame * 0.05);
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 15;
+            ctx.beginPath();
+            const size = p.size * p.life;
+            for (let i = 0; i < 8; i++) {
+              const r = i % 2 === 0 ? size : size / 3;
+              const angle = (i * Math.PI) / 4;
+              if (i === 0) ctx.moveTo(Math.cos(angle) * r, Math.sin(angle) * r);
+              else ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+      });
+      
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
+      frame++;
+      
+      if (frame < 120 && hasAlive) {
+        animationFrameRef.current = requestAnimationFrame(animate);
+      }
+    };
+    
+    animate();
+  }, [phase, color, isHigh]);
+
+  // Main animation sequence
+  useEffect(() => {
     if (hasCompletedRef.current) return;
     
     let cancelled = false;
     
-    // Start animation
     const runAnimation = async () => {
-      // Buildup
-      await new Promise(r => setTimeout(r, 100));
+      // Light beam intro
+      await new Promise(r => setTimeout(r, 200));
       if (cancelled) return;
-      setPhase('buildup');
+      setPhase('lightBeam');
+      playSound('shimmer');
       
-      // Counting
-      await new Promise(r => setTimeout(r, 400));
+      // Start counting
+      await new Promise(r => setTimeout(r, 600));
       if (cancelled) return;
       setPhase('counting');
       
-      // Fast count to 60%
-      const fastTarget = Math.floor(target * 0.6);
-      for (let val = 0; val <= fastTarget; val += Math.ceil(target / 15)) {
+      // Fast count to 50%
+      const fastTarget = Math.floor(target * 0.5);
+      for (let val = 0; val <= fastTarget; val += Math.ceil(target / 12)) {
         if (cancelled) return;
         setDisplayValue(Math.min(val, fastTarget));
-        await new Promise(r => setTimeout(r, 40));
+        await new Promise(r => setTimeout(r, 50));
       }
       
-      // Slow count remaining
-      for (let val = fastTarget; val <= target; val++) {
+      // Medium count to 80%
+      const medTarget = Math.floor(target * 0.8);
+      for (let val = fastTarget; val <= medTarget; val += Math.ceil(target / 20)) {
+        if (cancelled) return;
+        setDisplayValue(Math.min(val, medTarget));
+        playSound('tick');
+        await new Promise(r => setTimeout(r, 80));
+      }
+      
+      // Slow dramatic count remaining
+      for (let val = medTarget; val <= target; val++) {
         if (cancelled) return;
         setDisplayValue(val);
         playSound('tick');
-        await new Promise(r => setTimeout(r, 100));
+        await new Promise(r => setTimeout(r, 120));
       }
       
       // Impact
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise(r => setTimeout(r, 300));
       if (cancelled) return;
       setPhase('impact');
       playSound('boom');
       
-      // Celebrate
-      await new Promise(r => setTimeout(r, 400));
+      // Glow & celebrate
+      await new Promise(r => setTimeout(r, 500));
       if (cancelled) return;
       hasCompletedRef.current = true;
-      setPhase('celebrate');
+      setPhase('glow');
       playSound('fanfare');
       onCompleteRef.current?.();
     };
     
     runAnimation();
     
-    return () => {
-      cancelled = true;
-    };
-  }, []); // Empty deps - run only once on mount
+    return () => { cancelled = true; };
+  }, [target, playSound]);
 
   const digits = displayValue.toString().split('');
-  const isImpact = phase === 'impact' || phase === 'celebrate';
+  const isImpact = phase === 'impact';
+  const isGlow = phase === 'glow';
+  const isVisible = phase !== 'hidden';
 
   return (
     <div className="relative inline-block">
-      {/* Buildup glow */}
-      {phase === 'buildup' && (
+      {/* Particle canvas */}
+      <canvas 
+        ref={canvasRef}
+        className="absolute -inset-20 pointer-events-none z-30"
+        style={{ width: 'calc(100% + 160px)', height: 'calc(100% + 160px)' }}
+      />
+      
+      {/* Light beam effect */}
+      {phase === 'lightBeam' && (
+        <>
+          <div 
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-40 -z-10 animate-light-beam-vertical"
+            style={{ 
+              background: `linear-gradient(to bottom, transparent, ${color}, transparent)`,
+              boxShadow: `0 0 30px 10px ${color}`,
+            }}
+          />
+          <div 
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-1 -z-10 animate-light-beam-horizontal"
+            style={{ 
+              background: `linear-gradient(to right, transparent, ${color}, transparent)`,
+              boxShadow: `0 0 30px 10px ${color}`,
+            }}
+          />
+        </>
+      )}
+      
+      {/* Background glow */}
+      {(isImpact || isGlow) && (
         <div 
-          className="absolute inset-0 animate-pulse rounded-full blur-3xl opacity-50 -z-10"
-          style={{ backgroundColor: color, transform: 'scale(3)' }}
+          className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full -z-10 ${isGlow ? 'animate-pulse-glow' : 'animate-expand-glow'}`}
+          style={{ 
+            width: 200, height: 200,
+            background: `radial-gradient(circle, ${color}40 0%, transparent 70%)`,
+            boxShadow: `0 0 60px 30px ${color}30`,
+          }}
         />
       )}
       
       {/* Score number */}
       <div 
-        className={`relative z-10 flex items-baseline justify-center transition-all duration-200
-          ${phase === 'intro' ? 'opacity-0 scale-50' : ''}
-          ${phase === 'buildup' ? 'opacity-60 scale-90' : ''}
+        className={`relative z-10 flex items-baseline justify-center transition-all
+          ${phase === 'hidden' ? 'opacity-0 scale-0' : ''}
+          ${phase === 'lightBeam' ? 'opacity-0 scale-50' : ''}
           ${phase === 'counting' ? 'opacity-100 scale-100' : ''}
-          ${isImpact ? 'opacity-100 scale-110' : ''}
+          ${isImpact ? 'opacity-100 scale-125 duration-200' : ''}
+          ${isGlow ? 'opacity-100 scale-110 duration-500' : ''}
         `}
       >
-        {digits.map((digit, i) => (
+        {isVisible && digits.map((digit, i) => (
           <span
             key={i}
-            className={`inline-block font-black tabular-nums ${isImpact ? 'animate-score-impact' : ''}`}
+            className={`inline-block font-black tabular-nums transition-transform
+              ${isImpact ? 'animate-digit-impact' : ''}
+              ${isGlow ? 'animate-digit-glow' : ''}
+            `}
             style={{
-              fontSize: isImpact ? '100px' : '90px',
+              fontSize: isImpact || isGlow ? '110px' : '90px',
               color: '#FFFFFF',
-              textShadow: isImpact 
-                ? `0 0 20px ${color}, 0 0 40px ${color}, 0 0 80px ${color}, 0 0 120px ${color}, 0 8px 0 rgba(0,0,0,0.4)`
-                : `0 0 10px ${color}, 0 4px 0 rgba(0,0,0,0.3)`,
-              animationDelay: isImpact ? `${i * 0.05}s` : '0s',
-              letterSpacing: '0.05em',
+              textShadow: isImpact || isGlow
+                ? `0 0 20px ${color}, 0 0 40px ${color}, 0 0 60px ${color}, 0 0 100px ${color}, 0 0 150px ${color}, 0 6px 0 rgba(0,0,0,0.5)`
+                : `0 0 10px ${color}, 0 4px 0 rgba(0,0,0,0.4)`,
+              animationDelay: `${i * 0.05}s`,
+              letterSpacing: '0.02em',
+              WebkitTextStroke: isGlow ? `1px ${color}` : 'none',
             }}
           >
             {digit}
@@ -320,30 +539,38 @@ function CinematicScoreReveal({ target, onComplete, glowColor }: {
         ))}
       </div>
       
-      {/* Impact flash */}
-      {phase === 'impact' && (
+      {/* Flash overlay */}
+      {isImpact && (
         <div 
-          className="absolute inset-0 bg-white rounded-full animate-flash-out -z-10 pointer-events-none"
-          style={{ transform: 'scale(5)' }}
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full animate-flash-burst pointer-events-none z-20"
+          style={{ 
+            width: 300, height: 300,
+            background: 'radial-gradient(circle, white 0%, transparent 70%)',
+          }}
         />
       )}
       
-      {/* Celebration sparkles */}
-      {phase === 'celebrate' && isHigh && (
-        <div className="absolute inset-0 pointer-events-none z-20 overflow-visible">
-          {[...Array(12)].map((_, i) => (
+      {/* Sparkle ring for high scores */}
+      {isGlow && isHigh && (
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20">
+          {[...Array(isSRank ? 16 : 10)].map((_, i) => (
             <div
               key={i}
-              className="absolute left-1/2 top-1/2 animate-sparkle-burst"
+              className="absolute animate-orbit-sparkle"
               style={{
-                '--angle': `${i * 30}deg`,
-                '--distance': `${80 + Math.random() * 40}px`,
-                animationDelay: `${i * 0.03}s`,
+                '--orbit-angle': `${(360 / (isSRank ? 16 : 10)) * i}deg`,
+                '--orbit-radius': `${70 + (i % 3) * 15}px`,
+                '--orbit-duration': `${3 + (i % 2)}s`,
+                animationDelay: `${i * 0.1}s`,
               } as React.CSSProperties}
             >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill={color}>
-                <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z" />
-              </svg>
+              <div 
+                className="w-2 h-2 rounded-full animate-twinkle"
+                style={{ 
+                  backgroundColor: i % 3 === 0 ? '#FFD700' : i % 3 === 1 ? color : '#FFFFFF',
+                  boxShadow: `0 0 8px 2px ${i % 3 === 0 ? '#FFD700' : color}`,
+                }}
+              />
             </div>
           ))}
         </div>
