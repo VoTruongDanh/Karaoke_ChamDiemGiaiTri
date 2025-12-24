@@ -383,12 +383,12 @@ function CinematicScoreReveal({ target, onComplete, glowColor }: {
     let cancelled = false;
     
     const runAnimation = async () => {
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise(r => setTimeout(r, 300));
       if (cancelled) return;
       setPhase('intro');
       playSound('shimmer');
       
-      await new Promise(r => setTimeout(r, 700));
+      await new Promise(r => setTimeout(r, 1000));
       if (cancelled) return;
       setPhase('counting');
       
@@ -396,7 +396,7 @@ function CinematicScoreReveal({ target, onComplete, glowColor }: {
       for (let val = 0; val <= fastTarget; val += Math.ceil(target / 12)) {
         if (cancelled) return;
         setDisplayValue(Math.min(val, fastTarget));
-        await new Promise(r => setTimeout(r, 50));
+        await new Promise(r => setTimeout(r, 70));
       }
       
       const medTarget = Math.floor(target * 0.8);
@@ -404,22 +404,22 @@ function CinematicScoreReveal({ target, onComplete, glowColor }: {
         if (cancelled) return;
         setDisplayValue(Math.min(val, medTarget));
         playSound('tick');
-        await new Promise(r => setTimeout(r, 80));
+        await new Promise(r => setTimeout(r, 100));
       }
       
       for (let val = medTarget; val <= target; val++) {
         if (cancelled) return;
         setDisplayValue(val);
         playSound('tick');
-        await new Promise(r => setTimeout(r, 120));
+        await new Promise(r => setTimeout(r, 180));
       }
       
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 400));
       if (cancelled) return;
       setPhase('impact');
       playSound('boom');
       
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 600));
       if (cancelled) return;
       hasCompletedRef.current = true;
       setPhase('glow');
