@@ -612,7 +612,7 @@ export function ControllerScreen({
             {/* Debug: Show suggestion count */}
             {recentlyAddedSongs.length > 0 && ytSuggestions.length === 0 && !isLoadingSuggestions && (
               <p className="text-xs text-slate-400 text-center py-2">
-                Đang tìm gợi ý cho "{recentlyAddedSongs[0]?.title?.slice(0, 20)}..."
+                Đang tìm gợi ý cho &ldquo;{recentlyAddedSongs[0]?.title?.slice(0, 20)}...&rdquo;
               </p>
             )}
 

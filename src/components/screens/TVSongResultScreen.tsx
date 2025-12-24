@@ -78,9 +78,10 @@ function getRandomQuote(grade: GradeInfo): string {
 
 
 // ============ ANIMATED SCORE WITH DRAMATIC EFFECT ============
-function AnimatedScoreDramatic({ target, onComplete }: { target: number; onComplete?: () => void }) {
+function AnimatedScoreDramatic({ target, onComplete, glowColor }: { target: number; onComplete?: () => void; glowColor?: string }) {
   const [current, setCurrent] = useState(0);
   const [phase, setPhase] = useState<'wait' | 'fast' | 'slow' | 'done'>('wait');
+  const [showDigitEffect, setShowDigitEffect] = useState(false);
   const audioRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
@@ -149,6 +150,7 @@ function AnimatedScoreDramatic({ target, onComplete }: { target: number; onCompl
         if (val >= target) {
           clearInterval(interval);
           setPhase('done');
+          setShowDigitEffect(true);
           playFanfare();
           onComplete?.();
         }
@@ -157,7 +159,61 @@ function AnimatedScoreDramatic({ target, onComplete }: { target: number; onCompl
     }
   }, [phase, target, onComplete]);
 
-  return <>{current}</>;
+  const digits = current.toString().split('');
+  const isDone = phase === 'done';
+
+  return (
+    <span className="relative inline-flex">
+      {digits.map((digit, i) => (
+        <span
+          key={i}
+          className={`inline-block transition-all ${isDone ? 'animate-digit-pop' : ''}`}
+          style={{
+            animationDelay: isDone ? `${i * 0.1}s` : '0s',
+          }}
+        >
+          {digit}
+        </span>
+      ))}
+      {/* Particle burst on complete */}
+      {showDigitEffect && <ScoreParticleBurst color={glowColor || '#FFD700'} />}
+    </span>
+  );
+}
+
+// ============ SCORE PARTICLE BURST - Particles exploding from score ============
+function ScoreParticleBurst({ color }: { color: string }) {
+  const particles = useMemo(() => {
+    const colors = [color, '#FFD700', '#FFFFFF', '#FF6B6B', '#4ECDC4'];
+    return [...Array(24)].map((_, i) => ({
+      id: i,
+      angle: (i * 15) * (Math.PI / 180),
+      distance: 60 + Math.random() * 80,
+      size: 4 + Math.random() * 6,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      delay: Math.random() * 0.2,
+    }));
+  }, [color]);
+
+  return (
+    <div className="absolute inset-0 pointer-events-none">
+      {particles.map(p => (
+        <div
+          key={p.id}
+          className="absolute left-1/2 top-1/2 rounded-full animate-score-particle-burst"
+          style={{
+            width: p.size,
+            height: p.size,
+            backgroundColor: p.color,
+            boxShadow: `0 0 10px ${p.color}, 0 0 20px ${p.color}`,
+            '--burst-x': `${Math.cos(p.angle) * p.distance}px`,
+            '--burst-y': `${Math.sin(p.angle) * p.distance}px`,
+            animationDelay: `${p.delay}s`,
+          } as React.CSSProperties}
+        />
+      ))}
+    </div>
+  );
 }
 
 
@@ -494,6 +550,190 @@ function FireworkCanvas({ show, intensity = 'high' }: { show: boolean; intensity
 
   if (!show) return null;
   return <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none" style={{ zIndex: 5 }} />;
+}
+
+// ============ SPOTLIGHT BEAMS - Beautiful stage spotlights ============
+function SpotlightBeams({ color }: { color: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animationRef = useRef<number | null>(null);
+  
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    
+    const beams = [
+      { x: canvas.width * 0.15, phase: 0, speed: 0.015, color: color },
+      { x: canvas.width * 0.35, phase: Math.PI * 0.5, speed: 0.02, color: '#FFD700' },
+      { x: canvas.width * 0.65, phase: Math.PI, speed: 0.018, color: color },
+      { x: canvas.width * 0.85, phase: Math.PI * 1.5, speed: 0.022, color: '#FF6B6B' },
+    ];
+    
+    let frame = 0;
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      beams.forEach(beam => {
+        const swing = Math.sin(frame * beam.speed + beam.phase) * 0.4;
+        const angle = Math.PI / 2 + swing;
+        
+        // Create gradient for beam
+        const gradient = ctx.createLinearGradient(
+          beam.x, 0,
+          beam.x + Math.cos(angle) * canvas.height,
+          Math.sin(angle) * canvas.height
+        );
+        gradient.addColorStop(0, beam.color + 'AA');
+        gradient.addColorStop(0.3, beam.color + '40');
+        gradient.addColorStop(1, 'transparent');
+        
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        
+        // Draw cone
+        ctx.beginPath();
+        ctx.moveTo(beam.x - 15, 0);
+        ctx.lineTo(beam.x + 15, 0);
+        const endX = beam.x + Math.cos(angle) * canvas.height * 1.2;
+        const endY = Math.sin(angle) * canvas.height * 1.2;
+        ctx.lineTo(endX + 150, endY);
+        ctx.lineTo(endX - 150, endY);
+        ctx.closePath();
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        
+        // Light source glow
+        ctx.beginPath();
+        ctx.arc(beam.x, 5, 12, 0, Math.PI * 2);
+        ctx.fillStyle = beam.color;
+        ctx.shadowColor = beam.color;
+        ctx.shadowBlur = 25;
+        ctx.globalAlpha = 0.9;
+        ctx.fill();
+        
+        ctx.restore();
+      });
+      
+      frame++;
+      animationRef.current = requestAnimationFrame(animate);
+    };
+    
+    animate();
+    
+    return () => {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    };
+  }, [color]);
+
+  return <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none" style={{ zIndex: 2 }} />;
+}
+
+// ============ GLOWING ORBS - Floating light orbs ============
+function GlowingOrbs({ color, count = 8 }: { color: string; count?: number }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animationRef = useRef<number | null>(null);
+  
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    
+    const colors = [color, '#FFD700', '#FF6B6B', '#4ECDC4', '#A855F7'];
+    
+    const orbs = Array.from({ length: count }, () => ({
+      x: Math.random() * canvas.width,
+      y: canvas.height + 50 + Math.random() * 100,
+      vx: (Math.random() - 0.5) * 0.8,
+      vy: -1 - Math.random() * 1.5,
+      size: 15 + Math.random() * 25,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      pulse: Math.random() * Math.PI * 2,
+      pulseSpeed: 0.03 + Math.random() * 0.02,
+    }));
+    
+    let frame = 0;
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      orbs.forEach(orb => {
+        orb.x += orb.vx + Math.sin(frame * 0.02 + orb.pulse) * 0.5;
+        orb.y += orb.vy;
+        orb.pulse += orb.pulseSpeed;
+        
+        // Reset if off screen
+        if (orb.y < -100) {
+          orb.y = canvas.height + 50;
+          orb.x = Math.random() * canvas.width;
+        }
+        
+        const pulseSize = orb.size * (0.8 + Math.sin(orb.pulse) * 0.2);
+        
+        // Outer glow
+        const gradient = ctx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, pulseSize * 2);
+        gradient.addColorStop(0, orb.color + '60');
+        gradient.addColorStop(0.5, orb.color + '20');
+        gradient.addColorStop(1, 'transparent');
+        
+        ctx.beginPath();
+        ctx.arc(orb.x, orb.y, pulseSize * 2, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        
+        // Inner bright core
+        ctx.beginPath();
+        ctx.arc(orb.x, orb.y, pulseSize * 0.4, 0, Math.PI * 2);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.shadowColor = orb.color;
+        ctx.shadowBlur = 20;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      });
+      
+      frame++;
+      animationRef.current = requestAnimationFrame(animate);
+    };
+    
+    animate();
+    
+    return () => {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    };
+  }, [color, count]);
+
+  return <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none" style={{ zIndex: 3 }} />;
+}
+
+// ============ SCORE PULSE RINGS - Pulsing rings around score area ============
+function ScorePulseRings({ show, color }: { show: boolean; color: string }) {
+  if (!show) return null;
+  
+  return (
+    <div className="absolute right-[20%] top-1/2 -translate-y-1/2 pointer-events-none">
+      {[0, 1, 2].map(i => (
+        <div
+          key={i}
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full animate-score-pulse-ring"
+          style={{
+            width: '200px',
+            height: '200px',
+            border: `3px solid ${color}`,
+            boxShadow: `0 0 20px ${color}, inset 0 0 20px ${color}40`,
+            animationDelay: `${i * 0.4}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
 }
 
 // ============ MEGA CELEBRATION - Ultimate effect for high scores ============
@@ -1476,6 +1716,12 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
           <AmbientGlow color={grade.glowColor} />
           <SparkleField intensity={isHigh ? 'normal' : 'low'} />
           
+          {/* Spotlight beams for high scores */}
+          {isHigh && <SpotlightBeams color={grade.glowColor} />}
+          
+          {/* Glowing orbs floating up */}
+          {isHigh && <GlowingOrbs color={grade.glowColor} count={isSRank ? 10 : 6} />}
+          
           {/* Firework background - main effect for high scores */}
           {isHigh && <FireworkCanvas show={true} intensity={isSRank ? 'high' : 'medium'} />}
           
@@ -1487,6 +1733,7 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
           {isSRank && <SpinningTrophy show={isRevealed} />}
           
           {/* Score reveal effects */}
+          <ScorePulseRings show={isRevealed && isHigh} color={grade.glowColor} />
           <ShockwaveEffect show={isRevealed} color={grade.glowColor} />
           <MegaFlash show={isRevealed} color={grade.glowColor} />
         </>
@@ -1554,7 +1801,7 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
                         fontFamily: 'system-ui, -apple-system, sans-serif',
                         fontWeight: 900,
                       }}>
-                      <AnimatedScoreDramatic target={finalScore.totalScore} onComplete={() => { setPhase('revealed'); fireConfetti(); }} />
+                      <AnimatedScoreDramatic target={finalScore.totalScore} glowColor={grade.glowColor} onComplete={() => { setPhase('revealed'); fireConfetti(); }} />
                     </span>
                     <span className="text-2xl text-white font-bold" style={{ textShadow: '0 3px 15px rgba(0,0,0,0.8)' }}>điểm</span>
                   </div>
