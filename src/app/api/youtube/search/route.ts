@@ -11,6 +11,8 @@ const PIPED_INSTANCES = [
   'https://pipedapi.adminforge.de', 
   'https://watchapi.whatever.social',
   'https://pipedapi.syncpundit.io',
+  'https://api.piped.yt',
+  'https://pipedapi.in.projectsegfau.lt',
 ];
 
 interface PipedVideo {
@@ -23,12 +25,14 @@ interface PipedVideo {
 
 // Race all instances in parallel - return first successful result
 async function searchPipedParallel(query: string): Promise<any[]> {
+  console.log('[Search API] Trying Piped instances for:', query);
+  
   const promises = PIPED_INSTANCES.map(async (instance) => {
     try {
       const url = `${instance}/search?q=${encodeURIComponent(query)}&filter=videos`;
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
       
       const response = await fetch(url, {
         signal: controller.signal,
@@ -42,6 +46,7 @@ async function searchPipedParallel(query: string): Promise<any[]> {
       const data = await response.json();
       
       if (data.items && data.items.length > 0) {
+        console.log('[Search API] Success from:', instance, '- got', data.items.length, 'results');
         return data.items.map((video: PipedVideo) => {
           const videoId = video.url?.replace('/watch?v=', '') || '';
           return {
@@ -54,48 +59,62 @@ async function searchPipedParallel(query: string): Promise<any[]> {
         });
       }
       throw new Error('No results');
-    } catch {
-      throw new Error(`${instance} failed`);
+    } catch (err: any) {
+      // Silent fail for individual instances
+      throw new Error(`${instance} failed: ${err.message}`);
     }
   });
 
   // Return first successful result
   try {
     return await Promise.any(promises);
-  } catch {
+  } catch (err) {
+    console.log('[Search API] All Piped instances failed');
     return [];
   }
 }
 
 // Fallback: scrape YouTube directly (basic)
 async function searchYouTubeDirect(query: string): Promise<any[]> {
+  console.log('[Search API] Trying direct YouTube scrape for:', query);
+  
   try {
     const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
     
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
     
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept-Language': 'en-US,en;q=0.9',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       },
     });
     
     clearTimeout(timeoutId);
     
-    if (!response.ok) return [];
+    if (!response.ok) {
+      console.log('[Search API] YouTube returned:', response.status);
+      return [];
+    }
     
     const html = await response.text();
+    console.log('[Search API] Got HTML, length:', html.length);
     
     // Extract ytInitialData JSON
     const match = html.match(/var ytInitialData = ({.+?});<\/script>/);
-    if (!match) return [];
+    if (!match) {
+      console.log('[Search API] No ytInitialData found in HTML');
+      return [];
+    }
     
     const data = JSON.parse(match[1]);
     const contents = data?.contents?.twoColumnSearchResultsRenderer?.primaryContents
       ?.sectionListRenderer?.contents?.[0]?.itemSectionRenderer?.contents || [];
+    
+    console.log('[Search API] Found', contents.length, 'content items');
     
     const videos: any[] = [];
     for (const item of contents) {
@@ -122,8 +141,10 @@ async function searchYouTubeDirect(query: string): Promise<any[]> {
       });
     }
     
+    console.log('[Search API] Extracted', videos.length, 'videos from YouTube');
     return videos.slice(0, 20);
-  } catch {
+  } catch (err: any) {
+    console.log('[Search API] YouTube scrape error:', err.message);
     return [];
   }
 }
@@ -131,6 +152,8 @@ async function searchYouTubeDirect(query: string): Promise<any[]> {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('q') || '';
+  
+  console.log('[Search API] Request:', query);
   
   if (!query.trim()) {
     return NextResponse.json({ songs: [] });
@@ -144,8 +167,11 @@ export async function GET(request: NextRequest) {
   
   // Fallback to direct scrape only if Piped failed
   if (songs.length === 0) {
+    console.log('[Search API] Piped failed, trying direct scrape...');
     songs = await searchYouTubeDirect(karaokeQuery);
   }
+  
+  console.log('[Search API] Final result:', songs.length, 'songs');
   
   // Prioritize karaoke videos
   const karaokeKeywords = ['karaoke', 'beat', 'instrumental', 'lyrics'];

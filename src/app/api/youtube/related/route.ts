@@ -31,7 +31,7 @@ async function scrapeYouTube(videoId: string): Promise<RelatedVideo[]> {
     console.log('[Related] Scraping YouTube for:', videoId);
     
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
     
     const response = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
       signal: controller.signal,
@@ -43,9 +43,13 @@ async function scrapeYouTube(videoId: string): Promise<RelatedVideo[]> {
     });
     clearTimeout(timeoutId);
     
-    if (!response.ok) return [];
+    if (!response.ok) {
+      console.log('[Related] YouTube returned:', response.status);
+      return [];
+    }
     
     const html = await response.text();
+    console.log('[Related] Got HTML, length:', html.length);
     
     // Find ytInitialData
     const match = html.match(/var\s+ytInitialData\s*=\s*(\{[\s\S]+?\});\s*<\/script>/);
