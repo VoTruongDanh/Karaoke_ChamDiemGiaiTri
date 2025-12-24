@@ -237,17 +237,17 @@ function CinematicScoreReveal({ target, onComplete, glowColor }: {
       setPhase('buildup');
       
       // Counting
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 400));
       if (cancelled) return;
       setPhase('counting');
       playSound('whoosh');
       
-      // Fast count to 70%
-      const fastTarget = Math.floor(target * 0.7);
-      for (let val = 0; val <= fastTarget; val += Math.ceil(target / 10)) {
+      // Fast count to 60%
+      const fastTarget = Math.floor(target * 0.6);
+      for (let val = 0; val <= fastTarget; val += Math.ceil(target / 15)) {
         if (cancelled) return;
         setDisplayValue(Math.min(val, fastTarget));
-        await new Promise(r => setTimeout(r, 25));
+        await new Promise(r => setTimeout(r, 40));
       }
       
       // Slow count remaining
@@ -255,17 +255,17 @@ function CinematicScoreReveal({ target, onComplete, glowColor }: {
         if (cancelled) return;
         setDisplayValue(val);
         playSound('tick');
-        await new Promise(r => setTimeout(r, 60));
+        await new Promise(r => setTimeout(r, 100));
       }
       
       // Impact
-      await new Promise(r => setTimeout(r, 150));
+      await new Promise(r => setTimeout(r, 200));
       if (cancelled) return;
       setPhase('impact');
       playSound('boom');
       
       // Celebrate
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 400));
       if (cancelled) return;
       hasCompletedRef.current = true;
       setPhase('celebrate');
