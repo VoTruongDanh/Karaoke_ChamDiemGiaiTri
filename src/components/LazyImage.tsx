@@ -57,12 +57,33 @@ export function LazyImage({
   const [isLoaded, setIsLoaded] = useState(false);
   const [isInView, setIsInView] = useState(priority);
   const [hasError, setHasError] = useState(false);
+  const [imgSrc, setImgSrc] = useState(src);
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Reset state when src changes
+  useEffect(() => {
+    setImgSrc(src);
+    setIsLoaded(false);
+    setHasError(false);
+  }, [src]);
+
   // Set up intersection observer for lazy loading
   useEffect(() => {
-    if (priority || isInView) return;
+    if (priority) {
+      setIsInView(true);
+      return;
+    }
+
+    // Check if already in view on mount
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const isVisible = rect.top < window.innerHeight + 100 && rect.bottom > -100;
+      if (isVisible) {
+        setIsInView(true);
+        return;
+      }
+    }
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -74,7 +95,7 @@ export function LazyImage({
         });
       },
       {
-        rootMargin: '100px', // Start loading 100px before entering viewport
+        rootMargin: '200px', // Start loading 200px before entering viewport
         threshold: 0,
       }
     );
@@ -84,7 +105,7 @@ export function LazyImage({
     }
 
     return () => observer.disconnect();
-  }, [priority, isInView]);
+  }, [priority]);
 
   // Handle image load
   const handleLoad = () => {
@@ -132,7 +153,7 @@ export function LazyImage({
       {isInView && !hasError && (
         <img
           ref={imgRef}
-          src={src}
+          src={imgSrc}
           alt={alt}
           className={`
             w-full h-full object-cover

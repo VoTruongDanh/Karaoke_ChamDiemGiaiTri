@@ -221,6 +221,38 @@ export function ControllerScreen({
     return songs;
   }, [queue, currentSong]);
 
+  // Track if initial popular suggestions have been loaded
+  const initialLoadDoneRef = useRef(false);
+
+  // Load initial popular karaoke suggestions when no songs in queue
+  useEffect(() => {
+    if (!onGetSuggestions) return;
+    
+    // If we have songs, skip initial load
+    if (queueSongs.length > 0 || recentlyAddedSongs.length > 0) return;
+    
+    // Skip if already loaded
+    if (initialLoadDoneRef.current) return;
+    
+    console.log('[Controller] Loading initial popular karaoke suggestions');
+    initialLoadDoneRef.current = true;
+    setIsLoadingSuggestions(true);
+    
+    // Pass empty array to trigger search fallback for popular karaoke
+    onGetSuggestions([])
+      .then(suggestions => {
+        console.log('[Controller] Got initial suggestions:', suggestions.length);
+        setYtSuggestions(suggestions.slice(0, 6));
+        suggestionsLoadedRef.current = true;
+      })
+      .catch((err) => {
+        console.error('[Controller] Initial suggestions error:', err);
+        // Reset flag to allow retry
+        initialLoadDoneRef.current = false;
+      })
+      .finally(() => setIsLoadingSuggestions(false));
+  }, [onGetSuggestions, queueSongs.length, recentlyAddedSongs.length]);
+
   // Load YouTube suggestions when songs are added OR when joining with existing queue
   useEffect(() => {
     if (!onGetSuggestions) return;
@@ -645,7 +677,7 @@ export function ControllerScreen({
               </div>
             )}
 
-            {!currentSong && waitingCount === 0 && (
+            {!currentSong && waitingCount === 0 && ytSuggestions.length === 0 && !isLoadingSuggestions && (
               <div className="text-center py-8">
                 <span className="text-4xl mb-3 block">♪</span>
                 <p className="text-slate-500">Tìm và thêm bài hát để bắt đầu</p>

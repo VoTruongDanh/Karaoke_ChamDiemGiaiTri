@@ -131,7 +131,7 @@ export function HomeScreen({
   // Load suggestions based on last played or current song
   // If no video, search for "karaoke 2025"
   useEffect(() => {
-    console.log('[Home] useEffect - onGetSuggestions:', !!onGetSuggestions, 'primaryVideoId:', primaryVideoId, 'initialLoadDone:', initialLoadDone.current);
+    console.log('[Home] useEffect - onGetSuggestions:', !!onGetSuggestions, 'primaryVideoId:', primaryVideoId, 'suggestions:', suggestions.length);
     
     if (!onGetSuggestions) {
       console.log('[Home] No onGetSuggestions callback');
@@ -140,8 +140,9 @@ export function HomeScreen({
     
     // If no video yet, fetch popular karaoke (pass empty array to trigger search)
     if (!primaryVideoId) {
-      if (initialLoadDone.current && suggestions.length > 0) {
-        console.log('[Home] Already loaded initial suggestions');
+      // Skip if already loading or already have suggestions
+      if (initialLoadDone.current) {
+        console.log('[Home] Initial load already done');
         return;
       }
       
@@ -158,13 +159,12 @@ export function HomeScreen({
         .catch((err) => {
           console.error('[Home] Failed to get popular karaoke:', err);
           setSuggestions([]);
+          // Reset flag so it can retry
+          initialLoadDone.current = false;
         })
         .finally(() => setIsLoadingSuggestions(false));
       return;
     }
-    
-    // Reset initial load flag when we have a video
-    initialLoadDone.current = false;
     
     // Skip if we already fetched for this video
     if (primaryVideoId === lastFetchedVideoIdRef.current && suggestions.length > 0) {
@@ -198,7 +198,7 @@ export function HomeScreen({
       })
       .catch(() => setSuggestions([]))
       .finally(() => setIsLoadingSuggestions(false));
-  }, [primaryVideoId, queueItems, onGetSuggestions]);
+  }, [primaryVideoId, onGetSuggestions]); // Remove queueItems dependency to prevent re-fetch loop
 
   // Load more suggestions when scrolling
   const loadMoreSuggestions = useCallback(async () => {
