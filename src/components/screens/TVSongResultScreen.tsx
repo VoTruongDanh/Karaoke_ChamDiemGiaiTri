@@ -143,7 +143,19 @@ function getRandomQuote(grade: GradeInfo): string {
 }
 
 
-// ============ CINEMATIC SCORE REVEAL - Ultra High-end visual effect ============
+// Effect types for random selection
+type ScoreEffectType = 'lightBeam' | 'vortex' | 'shatter' | 'matrix' | 'explosion' | 'wave';
+
+// Get random effect type
+function getRandomEffect(): ScoreEffectType {
+  const effects: ScoreEffectType[] = ['lightBeam', 'vortex', 'shatter', 'matrix', 'explosion', 'wave'];
+  return effects[Math.floor(Math.random() * effects.length)];
+}
+
+// Neutral color for counting phase (before reveal)
+const NEUTRAL_COLOR = '#FFFFFF';
+
+// ============ CINEMATIC SCORE REVEAL - Multiple High-end Effects ============
 function CinematicScoreReveal({ target, onComplete, glowColor }: { 
   target: number; 
   onComplete?: () => void; 
@@ -152,7 +164,8 @@ function CinematicScoreReveal({ target, onComplete, glowColor }: {
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [displayValue, setDisplayValue] = useState(0);
-  const [phase, setPhase] = useState<'hidden' | 'lightBeam' | 'counting' | 'impact' | 'glow'>('hidden');
+  const [phase, setPhase] = useState<'hidden' | 'intro' | 'counting' | 'impact' | 'glow'>('hidden');
+  const [effectType] = useState<ScoreEffectType>(() => getRandomEffect());
   const audioRef = useRef<AudioContext | null>(null);
   const onCompleteRef = useRef(onComplete);
   const hasCompletedRef = useRef(false);
@@ -160,7 +173,11 @@ function CinematicScoreReveal({ target, onComplete, glowColor }: {
   
   onCompleteRef.current = onComplete;
 
-  const color = glowColor || '#FFD700';
+  // Use neutral color during counting, reveal actual color on impact/glow
+  const finalColor = glowColor || '#FFD700';
+  const isRevealed = phase === 'impact' || phase === 'glow';
+  const color = isRevealed ? finalColor : NEUTRAL_COLOR;
+  
   const isHigh = target >= 80;
   const isSRank = target >= 90;
 
@@ -230,10 +247,10 @@ function CinematicScoreReveal({ target, onComplete, glowColor }: {
     } catch {}
   }, [isHigh, isSRank]);
 
-  // Canvas particle effects
+  // Canvas particle effects - different for each effect type
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || (phase !== 'impact' && phase !== 'glow')) return;
+    if (!canvas || (phase !== 'intro' && phase !== 'impact' && phase !== 'glow')) return;
     
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -246,73 +263,62 @@ function CinematicScoreReveal({ target, onComplete, glowColor }: {
     const centerX = rect.width / 2;
     const centerY = rect.height / 2;
     
+    // Use neutral colors for intro, final colors for impact
+    const introColors = ['#FFFFFF', '#E0E0E0', '#C0C0C0', '#A0A0A0'];
+    const impactColors = [finalColor, finalColor, '#FFFFFF', finalColor];
+    const colors = phase === 'intro' ? introColors : impactColors;
+    
     interface Particle {
       x: number; y: number; vx: number; vy: number;
       size: number; color: string; life: number; maxLife: number;
-      type: 'spark' | 'glow' | 'ring' | 'star';
+      type: string; rotation?: number; delay?: number;
     }
     
     const particles: Particle[] = [];
-    const colors = [color, '#FFD700', '#FFFFFF', '#FF6B6B', '#4ECDC4', '#A855F7'];
     
-    // Create explosion particles
+    // Create particles based on effect type
+    if (phase === 'intro') {
+      if (effectType === 'vortex') {
+        for (let i = 0; i < 60; i++) {
+          const angle = (i / 60) * Math.PI * 6;
+          const dist = 150 - (i / 60) * 140;
+          particles.push({ x: centerX + Math.cos(angle) * dist, y: centerY + Math.sin(angle) * dist, vx: 0, vy: 0, size: 3 + Math.random() * 3, color: colors[i % colors.length], life: 1, maxLife: 60, type: 'vortex', rotation: angle, delay: i * 0.5 });
+        }
+      } else if (effectType === 'matrix') {
+        for (let i = 0; i < 30; i++) {
+          particles.push({ x: centerX - 100 + Math.random() * 200, y: -20 - Math.random() * 100, vx: 0, vy: 3 + Math.random() * 4, size: 12 + Math.random() * 8, color: color, life: 1, maxLife: 80, type: 'matrix', delay: Math.random() * 30 });
+        }
+      } else if (effectType === 'shatter') {
+        for (let i = 0; i < 25; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          particles.push({ x: centerX, y: centerY, vx: Math.cos(angle) * (2 + Math.random() * 6), vy: Math.sin(angle) * (2 + Math.random() * 6), size: 15 + Math.random() * 20, color: colors[Math.floor(Math.random() * 3)], life: 1, maxLife: 50, type: 'shatter', rotation: Math.random() * Math.PI * 2 });
+        }
+      } else if (effectType === 'wave') {
+        for (let i = 0; i < 5; i++) {
+          particles.push({ x: centerX, y: centerY, vx: 0, vy: 0, size: 10, color: i % 2 === 0 ? color : '#FFFFFF', life: 1, maxLife: 60, type: 'wave', delay: i * 8 });
+        }
+      }
+    }
+    
     if (phase === 'impact') {
-      // Sparks
-      for (let i = 0; i < 40; i++) {
-        const angle = (Math.PI * 2 * i) / 40 + Math.random() * 0.3;
-        const speed = 6 + Math.random() * 10;
-        particles.push({
-          x: centerX, y: centerY,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          size: 2 + Math.random() * 4,
-          color: colors[Math.floor(Math.random() * colors.length)],
-          life: 1, maxLife: 60 + Math.random() * 30,
-          type: 'spark',
-        });
+      for (let i = 0; i < 50; i++) {
+        const angle = (Math.PI * 2 * i) / 50 + Math.random() * 0.3;
+        const speed = 5 + Math.random() * 12;
+        particles.push({ x: centerX, y: centerY, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, size: 2 + Math.random() * 5, color: colors[Math.floor(Math.random() * colors.length)], life: 1, maxLife: 70 + Math.random() * 30, type: 'spark' });
       }
-      
-      // Glowing orbs
-      for (let i = 0; i < 15; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 2 + Math.random() * 4;
-        particles.push({
-          x: centerX, y: centerY,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed - 2,
-          size: 8 + Math.random() * 12,
-          color: colors[Math.floor(Math.random() * 3)],
-          life: 1, maxLife: 80 + Math.random() * 40,
-          type: 'glow',
-        });
+      if (effectType === 'explosion') {
+        for (let i = 0; i < 30; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          particles.push({ x: centerX, y: centerY, vx: Math.cos(angle) * (3 + Math.random() * 5), vy: Math.sin(angle) * (3 + Math.random() * 5) - 3, size: 15 + Math.random() * 20, color: ['#FF4500', '#FF6B00', '#FFD700', '#FFFFFF'][Math.floor(Math.random() * 4)], life: 1, maxLife: 60, type: 'fire' });
+        }
       }
-      
-      // Expanding rings
       for (let i = 0; i < 3; i++) {
-        particles.push({
-          x: centerX, y: centerY,
-          vx: 0, vy: 0,
-          size: 20 + i * 30,
-          color: i === 0 ? '#FFFFFF' : color,
-          life: 1, maxLife: 50 + i * 10,
-          type: 'ring',
-        });
+        particles.push({ x: centerX, y: centerY, vx: 0, vy: 0, size: 20 + i * 25, color: i === 0 ? '#FFFFFF' : color, life: 1, maxLife: 45 + i * 10, type: 'ring' });
       }
-      
-      // Stars for high scores
       if (isHigh) {
-        for (let i = 0; i < 8; i++) {
-          const angle = (Math.PI * 2 * i) / 8;
-          const speed = 3 + Math.random() * 3;
-          particles.push({
-            x: centerX, y: centerY,
-            vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed - 1,
-            size: 10 + Math.random() * 8,
-            color: '#FFD700',
-            life: 1, maxLife: 100,
-            type: 'star',
-          });
+        for (let i = 0; i < 10; i++) {
+          const angle = (Math.PI * 2 * i) / 10;
+          particles.push({ x: centerX, y: centerY, vx: Math.cos(angle) * (3 + Math.random() * 3), vy: Math.sin(angle) * (3 + Math.random() * 3) - 2, size: 12 + Math.random() * 10, color: finalColor, life: 1, maxLife: 90, type: 'star', rotation: 0 });
         }
       }
     }
@@ -320,102 +326,72 @@ function CinematicScoreReveal({ target, onComplete, glowColor }: {
     let frame = 0;
     const animate = () => {
       ctx.clearRect(0, 0, rect.width, rect.height);
-      
       let hasAlive = false;
+      
       particles.forEach(p => {
-        p.life = Math.max(0, 1 - frame / p.maxLife);
+        const effectiveFrame = frame - (p.delay || 0);
+        if (effectiveFrame < 0) { hasAlive = true; return; }
+        p.life = Math.max(0, 1 - effectiveFrame / p.maxLife);
         if (p.life <= 0) return;
         hasAlive = true;
+        ctx.globalAlpha = p.life;
         
-        if (p.type === 'ring') {
-          p.size += 5;
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-          ctx.strokeStyle = p.color;
-          ctx.lineWidth = 4 * p.life;
-          ctx.globalAlpha = p.life * 0.7;
-          ctx.stroke();
-        } else {
-          p.x += p.vx;
+        if (p.type === 'vortex') {
+          const progress = effectiveFrame / p.maxLife;
+          p.x = centerX + Math.cos((p.rotation || 0) + progress * Math.PI * 4) * ((1 - progress) * 150);
+          p.y = centerY + Math.sin((p.rotation || 0) + progress * Math.PI * 4) * ((1 - progress) * 150);
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + p.life * 0.5), 0, Math.PI * 2);
+          ctx.fillStyle = p.color; ctx.shadowColor = p.color; ctx.shadowBlur = 10; ctx.fill();
+        } else if (p.type === 'matrix') {
           p.y += p.vy;
-          p.vy += 0.15;
-          p.vx *= 0.98;
-          
-          ctx.globalAlpha = p.life;
-          
-          if (p.type === 'spark') {
-            // Spark with trail
-            ctx.beginPath();
-            ctx.moveTo(p.x, p.y);
-            ctx.lineTo(p.x - p.vx * 4, p.y - p.vy * 4);
-            ctx.strokeStyle = p.color;
-            ctx.lineWidth = p.size * p.life;
-            ctx.lineCap = 'round';
-            ctx.stroke();
-          } else if (p.type === 'glow') {
-            // Glowing orb
-            const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * p.life);
-            gradient.addColorStop(0, '#FFFFFF');
-            gradient.addColorStop(0.3, p.color);
-            gradient.addColorStop(1, 'transparent');
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.size * p.life * 1.5, 0, Math.PI * 2);
-            ctx.fill();
-          } else if (p.type === 'star') {
-            // 4-point star
-            ctx.save();
-            ctx.translate(p.x, p.y);
-            ctx.rotate(frame * 0.05);
-            ctx.fillStyle = p.color;
-            ctx.shadowColor = p.color;
-            ctx.shadowBlur = 15;
-            ctx.beginPath();
-            const size = p.size * p.life;
-            for (let i = 0; i < 8; i++) {
-              const r = i % 2 === 0 ? size : size / 3;
-              const angle = (i * Math.PI) / 4;
-              if (i === 0) ctx.moveTo(Math.cos(angle) * r, Math.sin(angle) * r);
-              else ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
-            }
-            ctx.closePath();
-            ctx.fill();
-            ctx.restore();
-          }
+          ctx.font = `${p.size}px monospace`; ctx.fillStyle = p.color; ctx.shadowColor = p.color; ctx.shadowBlur = 15;
+          ctx.fillText(String.fromCharCode(0x30A0 + Math.random() * 96), p.x, p.y);
+        } else if (p.type === 'shatter') {
+          p.x += p.vx; p.y += p.vy; p.vy += 0.3; p.rotation = (p.rotation || 0) + 0.1;
+          ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rotation); ctx.fillStyle = p.color; ctx.globalAlpha = p.life * 0.8;
+          ctx.beginPath(); ctx.moveTo(0, -p.size / 2); ctx.lineTo(p.size / 3, p.size / 2); ctx.lineTo(-p.size / 3, p.size / 2); ctx.closePath(); ctx.fill(); ctx.restore();
+        } else if (p.type === 'wave') {
+          p.size += 4; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.strokeStyle = p.color; ctx.lineWidth = 3 * p.life; ctx.stroke();
+        } else if (p.type === 'ring') {
+          p.size += 5; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.strokeStyle = p.color; ctx.lineWidth = 4 * p.life; ctx.globalAlpha = p.life * 0.7; ctx.stroke();
+        } else if (p.type === 'spark') {
+          p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.vx *= 0.98;
+          ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * 4, p.y - p.vy * 4); ctx.strokeStyle = p.color; ctx.lineWidth = p.size * p.life; ctx.lineCap = 'round'; ctx.stroke();
+        } else if (p.type === 'fire') {
+          p.x += p.vx; p.y += p.vy; p.vy += 0.1; p.vx *= 0.97; p.size *= 0.98;
+          const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+          gradient.addColorStop(0, '#FFFFFF'); gradient.addColorStop(0.3, p.color); gradient.addColorStop(1, 'transparent');
+          ctx.fillStyle = gradient; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+        } else if (p.type === 'star') {
+          p.x += p.vx; p.y += p.vy; p.vy += 0.1; p.rotation = (p.rotation || 0) + 0.05;
+          ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rotation); ctx.fillStyle = p.color; ctx.shadowColor = p.color; ctx.shadowBlur = 15;
+          ctx.beginPath(); const size = p.size * p.life;
+          for (let i = 0; i < 8; i++) { const r = i % 2 === 0 ? size : size / 3; const angle = (i * Math.PI) / 4; if (i === 0) ctx.moveTo(Math.cos(angle) * r, Math.sin(angle) * r); else ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r); }
+          ctx.closePath(); ctx.fill(); ctx.restore();
         }
       });
       
-      ctx.globalAlpha = 1;
-      ctx.shadowBlur = 0;
-      frame++;
-      
-      if (frame < 120 && hasAlive) {
-        animationFrameRef.current = requestAnimationFrame(animate);
-      }
+      ctx.globalAlpha = 1; ctx.shadowBlur = 0; frame++;
+      if (frame < 150 && hasAlive) animationFrameRef.current = requestAnimationFrame(animate);
     };
-    
     animate();
-  }, [phase, color, isHigh]);
+  }, [phase, color, finalColor, isHigh, effectType]);
 
   // Main animation sequence
   useEffect(() => {
     if (hasCompletedRef.current) return;
-    
     let cancelled = false;
     
     const runAnimation = async () => {
-      // Light beam intro
       await new Promise(r => setTimeout(r, 200));
       if (cancelled) return;
-      setPhase('lightBeam');
+      setPhase('intro');
       playSound('shimmer');
       
-      // Start counting
-      await new Promise(r => setTimeout(r, 600));
+      await new Promise(r => setTimeout(r, 700));
       if (cancelled) return;
       setPhase('counting');
       
-      // Fast count to 50%
       const fastTarget = Math.floor(target * 0.5);
       for (let val = 0; val <= fastTarget; val += Math.ceil(target / 12)) {
         if (cancelled) return;
@@ -423,7 +399,6 @@ function CinematicScoreReveal({ target, onComplete, glowColor }: {
         await new Promise(r => setTimeout(r, 50));
       }
       
-      // Medium count to 80%
       const medTarget = Math.floor(target * 0.8);
       for (let val = fastTarget; val <= medTarget; val += Math.ceil(target / 20)) {
         if (cancelled) return;
@@ -432,7 +407,6 @@ function CinematicScoreReveal({ target, onComplete, glowColor }: {
         await new Promise(r => setTimeout(r, 80));
       }
       
-      // Slow dramatic count remaining
       for (let val = medTarget; val <= target; val++) {
         if (cancelled) return;
         setDisplayValue(val);
@@ -440,13 +414,11 @@ function CinematicScoreReveal({ target, onComplete, glowColor }: {
         await new Promise(r => setTimeout(r, 120));
       }
       
-      // Impact
       await new Promise(r => setTimeout(r, 300));
       if (cancelled) return;
       setPhase('impact');
       playSound('boom');
       
-      // Glow & celebrate
       await new Promise(r => setTimeout(r, 500));
       if (cancelled) return;
       hasCompletedRef.current = true;
@@ -456,7 +428,6 @@ function CinematicScoreReveal({ target, onComplete, glowColor }: {
     };
     
     runAnimation();
-    
     return () => { cancelled = true; };
   }, [target, playSound]);
 
@@ -467,110 +438,71 @@ function CinematicScoreReveal({ target, onComplete, glowColor }: {
 
   return (
     <div className="relative inline-block">
-      {/* Particle canvas */}
-      <canvas 
-        ref={canvasRef}
-        className="absolute -inset-20 pointer-events-none z-30"
-        style={{ width: 'calc(100% + 160px)', height: 'calc(100% + 160px)' }}
-      />
+      <canvas ref={canvasRef} className="absolute -inset-20 pointer-events-none z-30"
+        style={{ width: 'calc(100% + 160px)', height: 'calc(100% + 160px)' }} />
       
-      {/* Light beam effect */}
-      {phase === 'lightBeam' && (
+      {/* Effect-specific intro visuals */}
+      {phase === 'intro' && effectType === 'lightBeam' && (
         <>
-          <div 
-            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-40 -z-10 animate-light-beam-vertical"
-            style={{ 
-              background: `linear-gradient(to bottom, transparent, ${color}, transparent)`,
-              boxShadow: `0 0 30px 10px ${color}`,
-            }}
-          />
-          <div 
-            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-1 -z-10 animate-light-beam-horizontal"
-            style={{ 
-              background: `linear-gradient(to right, transparent, ${color}, transparent)`,
-              boxShadow: `0 0 30px 10px ${color}`,
-            }}
-          />
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-40 -z-10 animate-light-beam-vertical"
+            style={{ background: `linear-gradient(to bottom, transparent, ${color}, transparent)`, boxShadow: `0 0 30px 10px ${color}` }} />
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-1 -z-10 animate-light-beam-horizontal"
+            style={{ background: `linear-gradient(to right, transparent, ${color}, transparent)`, boxShadow: `0 0 30px 10px ${color}` }} />
         </>
       )}
-      
-      {/* Background glow */}
-      {(isImpact || isGlow) && (
-        <div 
-          className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full -z-10 ${isGlow ? 'animate-pulse-glow' : 'animate-expand-glow'}`}
-          style={{ 
-            width: 200, height: 200,
-            background: `radial-gradient(circle, ${color}40 0%, transparent 70%)`,
-            boxShadow: `0 0 60px 30px ${color}30`,
-          }}
-        />
+      {phase === 'intro' && effectType === 'vortex' && (
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 -z-10 animate-spin rounded-full"
+          style={{ background: `conic-gradient(from 0deg, transparent, ${color}, transparent, ${color}, transparent)`, filter: 'blur(8px)' }} />
+      )}
+      {phase === 'intro' && effectType === 'wave' && (
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 -z-10 animate-ping"
+          style={{ backgroundColor: color, borderRadius: '50%', boxShadow: `0 0 40px 20px ${color}` }} />
+      )}
+      {phase === 'intro' && effectType === 'explosion' && (
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 -z-10 animate-pulse"
+          style={{ background: `radial-gradient(circle, ${color} 0%, transparent 70%)`, filter: 'blur(10px)' }} />
       )}
       
-      {/* Score number */}
-      <div 
-        className={`relative z-10 flex items-baseline justify-center transition-all
-          ${phase === 'hidden' ? 'opacity-0 scale-0' : ''}
-          ${phase === 'lightBeam' ? 'opacity-0 scale-50' : ''}
-          ${phase === 'counting' ? 'opacity-100 scale-100' : ''}
-          ${isImpact ? 'opacity-100 scale-125 duration-200' : ''}
-          ${isGlow ? 'opacity-100 scale-110 duration-500' : ''}
-        `}
-      >
+      {(isImpact || isGlow) && (
+        <div className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full -z-10 ${isGlow ? 'animate-pulse-glow' : 'animate-expand-glow'}`}
+          style={{ width: 200, height: 200, background: `radial-gradient(circle, ${color}40 0%, transparent 70%)`, boxShadow: `0 0 60px 30px ${color}30` }} />
+      )}
+      
+      <div className={`relative z-10 flex items-baseline justify-center transition-all
+        ${phase === 'hidden' ? 'opacity-0 scale-0' : ''}
+        ${phase === 'intro' ? 'opacity-0 scale-50' : ''}
+        ${phase === 'counting' ? 'opacity-100 scale-100' : ''}
+        ${isImpact ? 'opacity-100 scale-125 duration-200' : ''}
+        ${isGlow ? 'opacity-100 scale-110 duration-500' : ''}`}>
         {isVisible && digits.map((digit, i) => (
-          <span
-            key={i}
-            className={`inline-block font-black tabular-nums transition-transform
-              ${isImpact ? 'animate-digit-impact' : ''}
-              ${isGlow ? 'animate-digit-glow' : ''}
-            `}
+          <span key={i}
+            className={`inline-block font-black tabular-nums transition-transform ${isImpact ? 'animate-digit-impact' : ''} ${isGlow ? 'animate-digit-glow' : ''}`}
             style={{
               fontSize: isImpact || isGlow ? '110px' : '90px',
               color: '#FFFFFF',
               textShadow: isImpact || isGlow
-                ? `0 0 20px ${color}, 0 0 40px ${color}, 0 0 60px ${color}, 0 0 100px ${color}, 0 0 150px ${color}, 0 6px 0 rgba(0,0,0,0.5)`
+                ? `0 0 20px ${color}, 0 0 40px ${color}, 0 0 60px ${color}, 0 0 100px ${color}, 0 6px 0 rgba(0,0,0,0.5)`
                 : `0 0 10px ${color}, 0 4px 0 rgba(0,0,0,0.4)`,
               animationDelay: `${i * 0.05}s`,
               letterSpacing: '0.02em',
-              WebkitTextStroke: isGlow ? `1px ${color}` : 'none',
-            }}
-          >
+            }}>
             {digit}
           </span>
         ))}
       </div>
       
-      {/* Flash overlay */}
       {isImpact && (
-        <div 
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full animate-flash-burst pointer-events-none z-20"
-          style={{ 
-            width: 300, height: 300,
-            background: 'radial-gradient(circle, white 0%, transparent 70%)',
-          }}
-        />
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full animate-flash-burst pointer-events-none z-20"
+          style={{ width: 300, height: 300, background: 'radial-gradient(circle, white 0%, transparent 70%)' }} />
       )}
       
-      {/* Sparkle ring for high scores */}
       {isGlow && isHigh && (
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20">
           {[...Array(isSRank ? 16 : 10)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute animate-orbit-sparkle"
-              style={{
-                '--orbit-angle': `${(360 / (isSRank ? 16 : 10)) * i}deg`,
-                '--orbit-radius': `${70 + (i % 3) * 15}px`,
-                '--orbit-duration': `${3 + (i % 2)}s`,
-                animationDelay: `${i * 0.1}s`,
-              } as React.CSSProperties}
-            >
-              <div 
-                className="w-2 h-2 rounded-full animate-twinkle"
-                style={{ 
-                  backgroundColor: i % 3 === 0 ? '#FFD700' : i % 3 === 1 ? color : '#FFFFFF',
-                  boxShadow: `0 0 8px 2px ${i % 3 === 0 ? '#FFD700' : color}`,
-                }}
-              />
+            <div key={i} className="absolute animate-orbit-sparkle"
+              style={{ '--orbit-angle': `${(360 / (isSRank ? 16 : 10)) * i}deg`, '--orbit-radius': `${70 + (i % 3) * 15}px`, '--orbit-duration': `${3 + (i % 2)}s`, animationDelay: `${i * 0.1}s` } as React.CSSProperties}>
+              <div className="w-2 h-2 rounded-full animate-twinkle"
+                style={{ backgroundColor: i % 3 === 0 ? finalColor : i % 3 === 1 ? finalColor : '#FFFFFF', boxShadow: `0 0 8px 2px ${finalColor}` }} />
             </div>
           ))}
         </div>
@@ -2139,38 +2071,43 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
   }, [onNext, suggestions.length, showSuggestions]);
 
   const isRevealed = phase === 'revealed';
+  
+  // Neutral color for suspense - only show grade color after reveal
+  const NEUTRAL_GLOW = '#94a3b8'; // slate-400
+  const currentGlowColor = isRevealed ? (grade?.glowColor || NEUTRAL_GLOW) : NEUTRAL_GLOW;
+  const currentGradient = isRevealed ? (grade?.gradient || 'from-slate-400 to-slate-500') : 'from-slate-400 to-slate-500';
 
   return (
-    <NavigationGrid className={`h-screen w-screen relative overflow-hidden bg-gradient-to-br ${grade?.bgGradient || 'from-slate-900 to-slate-800'}`}>
+    <NavigationGrid className="h-screen w-screen relative overflow-hidden bg-black">
       {/* Confetti canvas */}
       <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-50" style={{ width: '100vw', height: '100vh' }} />
       
       {grade && (
         <>
           {/* Background effects - subtle ambient */}
-          <AmbientGlow color={grade.glowColor} />
+          <AmbientGlow color={currentGlowColor} />
           <SparkleField intensity={isHigh ? 'normal' : 'low'} />
           
-          {/* Spotlight beams for high scores */}
-          {isHigh && <SpotlightBeams color={grade.glowColor} />}
+          {/* Spotlight beams for high scores - only after reveal */}
+          {isHigh && isRevealed && <SpotlightBeams color={currentGlowColor} />}
           
-          {/* Glowing orbs floating up */}
-          {isHigh && <GlowingOrbs color={grade.glowColor} count={isSRank ? 10 : 6} />}
+          {/* Glowing orbs floating up - only after reveal */}
+          {isHigh && isRevealed && <GlowingOrbs color={currentGlowColor} count={isSRank ? 10 : 6} />}
           
-          {/* Firework background - main effect for high scores */}
-          {isHigh && <FireworkCanvas show={true} intensity={isSRank ? 'high' : 'medium'} />}
+          {/* Firework background - main effect for high scores - only after reveal */}
+          {isHigh && isRevealed && <FireworkCanvas show={true} intensity={isSRank ? 'high' : 'medium'} />}
           
-          {/* Neon border for high scores */}
-          {isHigh && <NeonBorder color={grade.glowColor} isHigh={isHigh} />}
+          {/* Neon border for high scores - only after reveal */}
+          {isHigh && isRevealed && <NeonBorder color={currentGlowColor} isHigh={isHigh} />}
           
           {/* S Rank special - golden rain and trophy */}
           {isSRank && <GoldenRain show={isRevealed} />}
           {isSRank && <SpinningTrophy show={isRevealed} />}
           
           {/* Score reveal effects */}
-          <ScorePulseRings show={isRevealed && isHigh} color={grade.glowColor} />
-          <ShockwaveEffect show={isRevealed} color={grade.glowColor} />
-          <MegaFlash show={isRevealed} color={grade.glowColor} />
+          <ScorePulseRings show={isRevealed && isHigh} color={currentGlowColor} />
+          <ShockwaveEffect show={isRevealed} color={currentGlowColor} />
+          <MegaFlash show={isRevealed} color={currentGlowColor} />
         </>
       )}
 
@@ -2181,18 +2118,18 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
           {/* Thumbnail with glow */}
           <div className="flex-shrink-0 relative">
             {grade && (
-              <div className="absolute inset-0 rounded-2xl blur-[50px] opacity-60 animate-pulse-slow"
-                style={{ backgroundColor: grade.glowColor, transform: 'scale(1.2)' }} />
+              <div className={`absolute inset-0 rounded-2xl blur-[50px] opacity-60 animate-pulse-slow transition-colors duration-1000`}
+                style={{ backgroundColor: currentGlowColor, transform: 'scale(1.2)' }} />
             )}
-            <div className={`relative p-1.5 rounded-2xl bg-gradient-to-br ${grade?.gradient || 'from-purple-500 to-pink-500'} shadow-2xl`}
-              style={{ boxShadow: grade ? `0 0 50px ${grade.glowColor}` : undefined }}>
+            <div className={`relative p-1.5 rounded-2xl bg-gradient-to-br ${currentGradient} shadow-2xl transition-all duration-1000`}
+              style={{ boxShadow: `0 0 50px ${currentGlowColor}` }}>
               <img src={song.song.thumbnail} alt="" className="w-72 h-40 rounded-xl object-cover" />
               {/* Grade badge */}
               {grade && (
-                <div className={`absolute -bottom-4 -right-4 w-16 h-16 rounded-full bg-gradient-to-br ${grade.gradient} 
-                  flex items-center justify-center shadow-2xl border-4 border-black z-20
+                <div className={`absolute -bottom-4 -right-4 w-16 h-16 rounded-full bg-gradient-to-br ${currentGradient} 
+                  flex items-center justify-center shadow-2xl border-4 border-black z-20 transition-all duration-1000
                   ${isRevealed && isHigh ? 'animate-bounce' : ''}`}
-                  style={{ boxShadow: `0 0 30px ${grade.glowColor}, 0 0 60px ${grade.glowColor}50` }}>
+                  style={{ boxShadow: `0 0 30px ${currentGlowColor}, 0 0 60px ${currentGlowColor}50` }}>
                   <span className="text-2xl font-black text-white drop-shadow-lg">{grade.grade}</span>
                 </div>
               )}
@@ -2210,8 +2147,8 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
             {finalScore && grade ? (
               <>
                 {/* Title with emoji */}
-                <h1 className={`text-xl font-black mb-3 bg-gradient-to-r ${grade.gradient} bg-clip-text text-transparent flex items-center gap-2 drop-shadow-lg`}
-                  style={{ filter: `drop-shadow(0 0 15px ${grade.glowColor})` }}>
+                <h1 className={`text-xl font-black mb-3 bg-gradient-to-r ${currentGradient} bg-clip-text text-transparent flex items-center gap-2 drop-shadow-lg transition-all duration-1000`}
+                  style={{ filter: `drop-shadow(0 0 15px ${currentGlowColor})` }}>
                   <span className={`text-2xl ${isRevealed && isHigh ? 'animate-bounce' : ''}`}>{grade.emoji}</span>
                   <span>{grade.title}</span>
                 </h1>
@@ -2226,10 +2163,10 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
                         fontSize: isSRank ? '90px' : '80px',
                         color: '#FFFFFF',
                         textShadow: `
-                          0 0 15px ${grade.glowColor},
-                          0 0 30px ${grade.glowColor},
-                          0 0 60px ${grade.glowColor},
-                          0 0 100px ${grade.glowColor},
+                          0 0 15px ${currentGlowColor},
+                          0 0 30px ${currentGlowColor},
+                          0 0 60px ${currentGlowColor},
+                          0 0 100px ${currentGlowColor},
                           0 5px 0 rgba(0,0,0,0.5)
                         `,
                         lineHeight: 1,
@@ -2240,7 +2177,7 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
                       <AnimatedScoreDramatic 
                         key={`score-${finalScore.totalScore}`}
                         target={finalScore.totalScore} 
-                        glowColor={grade.glowColor} 
+                        glowColor={currentGlowColor} 
                         onComplete={() => { setPhase('revealed'); fireConfetti(); }} 
                       />
                     </span>
@@ -2249,9 +2186,9 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
                   
                   {/* Grade badge */}
                   <div className={`mt-4 transition-all duration-500 ${isRevealed ? 'opacity-100 animate-zoom-in-bounce' : 'opacity-0'}`}>
-                    <span className={`inline-flex items-center gap-2 px-5 py-2 rounded-full bg-gradient-to-r ${grade.gradient} 
-                      text-white font-black shadow-2xl text-base border-2 border-white/30 ${isRevealed && isHigh ? 'animate-electric-pulse' : ''}`}
-                      style={{ boxShadow: `0 0 30px ${grade.glowColor}, 0 0 60px ${grade.glowColor}50` }}>
+                    <span className={`inline-flex items-center gap-2 px-5 py-2 rounded-full bg-gradient-to-r ${currentGradient} 
+                      text-white font-black shadow-2xl text-base border-2 border-white/30 transition-all duration-1000 ${isRevealed && isHigh ? 'animate-electric-pulse' : ''}`}
+                      style={{ boxShadow: `0 0 30px ${currentGlowColor}, 0 0 60px ${currentGlowColor}50` }}>
                       <span className="text-xl">{grade.emoji}</span> Hạng {grade.grade}
                     </span>
                   </div>
@@ -2280,7 +2217,7 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
 
             {/* Next button */}
             <FocusableButton row={0} col={0} onSelect={onNext} autoFocus variant="primary"
-              className={`!px-6 !py-3 !text-base !font-bold !rounded-xl ${isHigh ? `!bg-gradient-to-r ${grade?.gradient}` : ''}`}>
+              className={`!px-6 !py-3 !text-base !font-bold !rounded-xl transition-all duration-1000 ${isHigh && isRevealed ? `!bg-gradient-to-r ${currentGradient}` : ''}`}>
               {hasNextSong ? 'Bài tiếp theo →' : 'Về trang chủ →'}
             </FocusableButton>
           </div>
