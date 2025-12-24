@@ -728,14 +728,6 @@ function WaveText({ text, show }: { text: string; show: boolean }) {
   );
 }
 
-async function mockSearch(query: string): Promise<Song[]> {
-  await new Promise(resolve => setTimeout(resolve, 500));
-  return [
-    { youtubeId: 'dQw4w9WgXcQ', title: `${query} - Karaoke`, thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg', channelName: 'Karaoke Channel', duration: 213 },
-    { youtubeId: 'kJQP7kiw5Fk', title: `${query} - Beat`, thumbnail: 'https://i.ytimg.com/vi/kJQP7kiw5Fk/hqdefault.jpg', channelName: 'Music Karaoke', duration: 245 },
-  ];
-}
-
 function TVAppContent() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -753,11 +745,9 @@ function TVAppContent() {
   
   const { addToast } = useToast();
   
-  const songLibrary = useMemo<SongLibrary | null>(() => {
-    if (YOUTUBE_API_KEY && YOUTUBE_API_KEY !== 'YOUR_YOUTUBE_API_KEY_HERE') {
-      return createSongLibrary(YOUTUBE_API_KEY);
-    }
-    return null;
+  const songLibrary = useMemo<SongLibrary>(() => {
+    // Always create songLibrary - will use API proxy if no YouTube API key
+    return createSongLibrary(YOUTUBE_API_KEY || undefined);
   }, []);
   
   const {
@@ -925,15 +915,13 @@ function TVAppContent() {
   const handleSearch = useCallback(async (query: string): Promise<Song[]> => {
     setRecentSearches(prev => [query, ...prev.filter(s => s !== query)].slice(0, 10));
     
-    if (songLibrary) {
-      try {
-        const result = await songLibrary.search(query);
-        return result.songs;
-      } catch {
-        return mockSearch(query);
-      }
+    try {
+      const result = await songLibrary.search(query);
+      return result.songs;
+    } catch (err) {
+      console.error('[TV] Search error:', err);
+      return [];
     }
-    return mockSearch(query);
   }, [songLibrary]);
 
   const handleSongEnd = useCallback((score?: ScoreData) => {
