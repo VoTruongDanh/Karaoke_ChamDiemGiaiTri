@@ -28,7 +28,18 @@ function getScoreGrade(score: number): GradeInfo {
     bgGradient: 'from-black via-amber-950/50 to-black',
     textColor: 'text-yellow-300', glowColor: '#fbbf24',
     particles: ['⭐', '✨', '🌟', '💫', '👑', '🏆'],
-    quotes: ['Giọng ca vàng đây rồi!', 'Quá đỉnh! Đi thi The Voice được rồi!', 'Siêu sao âm nhạc là đây!', 'Huyền thoại! Mic cháy luôn!', 'Perfect! Không còn gì để chê!']
+    quotes: [
+      'Giọng ca vàng đây rồi! 🎤✨',
+      'Quá đỉnh! Đi thi The Voice được rồi! 🏆',
+      'Siêu sao âm nhạc là đây! ⭐',
+      'Huyền thoại! Mic cháy luôn! 🔥',
+      'Perfect! Không còn gì để chê! 💯',
+      'Ông/Bà hoàng karaoke đây rồi! 👑',
+      'Hàng xóm đang gọi điện khen đấy! 📞',
+      'Cháy hết mình luôn! Quá xịn! 🔥',
+      'Giọng hát thiên thần! 😇',
+      'Đỉnh của chóp! Không ai địch nổi! 🏔️',
+    ]
   };
   if (score >= 80) return {
     grade: 'A', title: 'TUYỆT VỜI!', emoji: '🌟',
@@ -36,7 +47,18 @@ function getScoreGrade(score: number): GradeInfo {
     bgGradient: 'from-black via-emerald-950/50 to-black',
     textColor: 'text-emerald-300', glowColor: '#34d399',
     particles: ['🎉', '✨', '🎊', '💚'],
-    quotes: ['Hay quá trời! Hát nữa đi!', 'Giọng ngọt như mía lùi!', 'Tuyệt vời! Cả xóm phải nghe!', 'Pro singer đây rồi!', 'Quá mượt! Nghe phê quá!']
+    quotes: [
+      'Hay quá trời! Hát nữa đi! 🎵',
+      'Giọng ngọt như mía lùi! 🍬',
+      'Tuyệt vời! Cả xóm phải nghe! 🏠',
+      'Pro singer đây rồi! 🎤',
+      'Quá mượt! Nghe phê quá! 😎',
+      'Chất lượng cao cấp đây! ✨',
+      'Hát như ca sĩ chuyên nghiệp! 🌟',
+      'Xuất sắc! Thêm bài nữa thôi! 🎶',
+      'Giọng ca đỉnh cao! 🔝',
+      'Nghe mà muốn hát theo luôn! 🎧',
+    ]
   };
   if (score >= 70) return {
     grade: 'B', title: 'RẤT TỐT!', emoji: '✨',
@@ -44,7 +66,18 @@ function getScoreGrade(score: number): GradeInfo {
     bgGradient: 'from-black via-sky-950/50 to-black',
     textColor: 'text-cyan-300', glowColor: '#22d3ee',
     particles: ['💎', '✨', '💙'],
-    quotes: ['Ngon lành! Tiếp tục phát huy!', 'Hát hay đấy! Thêm bài nữa nào!', 'Ổn áp! Cứ thế mà tiến!', 'Được lắm! Có tiềm năng đó!', 'Nice! Hát thêm vài bài nữa!']
+    quotes: [
+      'Ngon lành! Tiếp tục phát huy! 💪',
+      'Hát hay đấy! Thêm bài nữa nào! 🎵',
+      'Ổn áp! Cứ thế mà tiến! 🚀',
+      'Được lắm! Có tiềm năng đó! ⭐',
+      'Nice! Hát thêm vài bài nữa! 🎤',
+      'Khá lắm! Sắp lên hạng A rồi! 📈',
+      'Giọng ổn định ghê! 👍',
+      'Cứ đà này là pro thôi! 💯',
+      'Hát vậy là ngon rồi đó! 😊',
+      'Tiến bộ rõ rệt luôn! 🌟',
+    ]
   };
   if (score >= 60) return {
     grade: 'C', title: 'KHÁ TỐT', emoji: '👍',
@@ -52,7 +85,18 @@ function getScoreGrade(score: number): GradeInfo {
     bgGradient: 'from-black via-indigo-950/50 to-black',
     textColor: 'text-blue-300', glowColor: '#60a5fa',
     particles: ['💜', '✨'],
-    quotes: ['Tạm ổn! Luyện thêm tí nữa!', 'Được rồi! Cố thêm chút nữa!', 'OK đó! Bài sau sẽ hay hơn!', 'Cũng được! Đừng bỏ cuộc!', 'Không tệ! Tiếp tục cố gắng!']
+    quotes: [
+      'Tạm ổn! Luyện thêm tí nữa! 💪',
+      'Được rồi! Cố thêm chút nữa! 🎯',
+      'OK đó! Bài sau sẽ hay hơn! 📈',
+      'Cũng được! Đừng bỏ cuộc! 🔥',
+      'Không tệ! Tiếp tục cố gắng! ✊',
+      'Ráng thêm xíu là lên B! 🚀',
+      'Hát vui là chính mà! 😄',
+      'Cứ thoải mái hát tiếp! 🎵',
+      'Đang tiến bộ đó! 👏',
+      'Bài sau chắc chắn hay hơn! 🌟',
+    ]
   };
   if (score >= 50) return {
     grade: 'D', title: 'CỐ GẮNG THÊM', emoji: '💪',
@@ -60,7 +104,18 @@ function getScoreGrade(score: number): GradeInfo {
     bgGradient: 'from-black via-orange-950/50 to-black',
     textColor: 'text-orange-300', glowColor: '#fb923c',
     particles: ['🔥', '💪'],
-    quotes: ['Cố lên! Ai cũng từng như vậy!', 'Đừng nản! Hát nhiều sẽ hay!', 'Thử bài khác xem sao!', 'Luyện tập sẽ tiến bộ thôi!', 'Chill thôi! Vui là chính!']
+    quotes: [
+      'Cố lên! Ai cũng từng như vậy! 💪',
+      'Đừng nản! Hát nhiều sẽ hay! 🎤',
+      'Thử bài khác xem sao! 🎵',
+      'Luyện tập sẽ tiến bộ thôi! 📈',
+      'Chill thôi! Vui là chính! 😎',
+      'Hát karaoke mà, relax! 🍻',
+      'Bài này khó, thử bài dễ hơn! 🎶',
+      'Không sao! Hát cho vui mà! 😄',
+      'Cứ hát đi, sẽ hay thôi! 🌟',
+      'Đừng lo! Ai mới hát cũng vậy! 🤗',
+    ]
   };
   return {
     grade: 'F', title: 'THỬ LẠI NHÉ', emoji: '🎤',
@@ -68,7 +123,18 @@ function getScoreGrade(score: number): GradeInfo {
     bgGradient: 'from-black via-rose-950/50 to-black',
     textColor: 'text-rose-300', glowColor: '#fb7185',
     particles: ['❤️', '🎤'],
-    quotes: ['Không sao! Vui là được!', 'Thử bài dễ hơn nha!', 'Hát karaoke mà, chill thôi!', 'Lần sau sẽ tốt hơn!', 'Đừng lo! Ai cũng có lúc vậy!']
+    quotes: [
+      'Không sao! Vui là được! 😊',
+      'Thử bài dễ hơn nha! 🎵',
+      'Hát karaoke mà, chill thôi! 🍻',
+      'Lần sau sẽ tốt hơn! 💪',
+      'Đừng lo! Ai cũng có lúc vậy! 🤗',
+      'Mic có vấn đề hay sao á? 🎤😅',
+      'Bài này khó quá! Đổi bài đi! 🔄',
+      'Hát cho vui thôi mà! 😄',
+      'Cứ tự tin hát tiếp! ✊',
+      'Quan trọng là vui vẻ! 🎉',
+    ]
   };
 }
 
@@ -77,107 +143,256 @@ function getRandomQuote(grade: GradeInfo): string {
 }
 
 
-// ============ ANIMATED SCORE WITH DRAMATIC EFFECT ============
-function AnimatedScoreDramatic({ target, onComplete, glowColor }: { target: number; onComplete?: () => void; glowColor?: string }) {
-  const [current, setCurrent] = useState(0);
-  const [phase, setPhase] = useState<'wait' | 'fast' | 'slow' | 'done'>('wait');
-  const [showDigitEffect, setShowDigitEffect] = useState(false);
+// ============ CINEMATIC SCORE REVEAL - High-end visual effect ============
+function CinematicScoreReveal({ target, onComplete, glowColor, isHighScore }: { 
+  target: number; 
+  onComplete?: () => void; 
+  glowColor?: string;
+  isHighScore?: boolean;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const displayValueRef = useRef(0);
+  const [, forceUpdate] = useState(0); // Force re-render
+  const phaseRef = useRef<'buildup' | 'counting' | 'reveal' | 'celebrate'>('buildup');
+  const showNumberRef = useRef(false);
   const audioRef = useRef<AudioContext | null>(null);
+  const hasCompletedRef = useRef(false);
 
+  const color = glowColor || '#FFD700';
+
+  // Initialize audio once
   useEffect(() => {
-    try { audioRef.current = new (window.AudioContext || (window as any).webkitAudioContext)(); } catch {}
-    
-    const t1 = setTimeout(() => setPhase('fast'), 500);
-    return () => { clearTimeout(t1); audioRef.current?.close().catch(() => {}); };
+    if (!audioRef.current) {
+      try { 
+        audioRef.current = new (window.AudioContext || (window as any).webkitAudioContext)(); 
+      } catch {}
+    }
+    return () => { 
+      audioRef.current?.close().catch(() => {}); 
+      audioRef.current = null;
+    };
   }, []);
 
-  useEffect(() => {
-    if (phase === 'wait') return;
-    
-    const playTick = (freq: number, vol: number) => {
-      if (!audioRef.current) return;
-      try {
-        const ctx = audioRef.current;
+  // Sound effects
+  const playSound = useCallback((type: 'tick' | 'whoosh' | 'impact' | 'fanfare') => {
+    if (!audioRef.current) return;
+    const ctx = audioRef.current;
+    try {
+      if (type === 'tick') {
         const o = ctx.createOscillator();
         const g = ctx.createGain();
         o.type = 'sine';
-        o.frequency.value = freq;
-        g.gain.setValueAtTime(vol, ctx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+        o.frequency.value = 800 + Math.random() * 400;
+        g.gain.setValueAtTime(0.08, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03);
         o.connect(g); g.connect(ctx.destination);
-        o.start(); o.stop(ctx.currentTime + 0.05);
-      } catch {}
-    };
-
-    const playFanfare = () => {
-      if (!audioRef.current) return;
-      const ctx = audioRef.current;
-      const notes = [523, 659, 784, 1047];
-      notes.forEach((f, i) => {
+        o.start(); o.stop(ctx.currentTime + 0.03);
+      } else if (type === 'whoosh') {
         const o = ctx.createOscillator();
         const g = ctx.createGain();
-        o.type = 'sine'; o.frequency.value = f;
-        g.gain.setValueAtTime(0.2, ctx.currentTime + i * 0.1);
-        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.1 + 0.5);
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(200, ctx.currentTime);
+        o.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.15);
+        g.gain.setValueAtTime(0.15, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
         o.connect(g); g.connect(ctx.destination);
-        o.start(ctx.currentTime + i * 0.1);
-        o.stop(ctx.currentTime + i * 0.1 + 0.5);
-      });
-    };
+        o.start(); o.stop(ctx.currentTime + 0.2);
+      } else if (type === 'impact') {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(120, ctx.currentTime);
+        o.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.4);
+        g.gain.setValueAtTime(0.5, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(); o.stop(ctx.currentTime + 0.4);
+      } else if (type === 'fanfare') {
+        [523, 659, 784, 1047].forEach((f, i) => {
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.type = 'sine'; o.frequency.value = f;
+          g.gain.setValueAtTime(0.2, ctx.currentTime + i * 0.12);
+          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.5);
+          o.connect(g); g.connect(ctx.destination);
+          o.start(ctx.currentTime + i * 0.12);
+          o.stop(ctx.currentTime + i * 0.12 + 0.5);
+        });
+      }
+    } catch {}
+  }, []);
 
-    if (phase === 'fast') {
-      const fastTarget = Math.floor(target * 0.8);
+  // Main animation sequence - runs once on mount
+  useEffect(() => {
+    if (hasCompletedRef.current) return;
+    
+    let cancelled = false;
+    let fastInterval: ReturnType<typeof setInterval> | null = null;
+    let slowInterval: ReturnType<typeof setInterval> | null = null;
+    
+    const update = () => forceUpdate(n => n + 1);
+    
+    // Phase 1: Buildup (0.5s)
+    const t1 = setTimeout(() => {
+      if (cancelled) return;
+      phaseRef.current = 'counting';
+      playSound('whoosh');
+      update();
+    }, 500);
+
+    // Phase 2: Fast counting
+    const t2 = setTimeout(() => {
+      if (cancelled) return;
+      showNumberRef.current = true;
       let val = 0;
-      const interval = setInterval(() => {
-        val += Math.ceil(target / 20);
+      const fastTarget = Math.floor(target * 0.75);
+      
+      fastInterval = setInterval(() => {
+        if (cancelled) {
+          if (fastInterval) clearInterval(fastInterval);
+          return;
+        }
+        val += Math.ceil(target / 15);
         if (val >= fastTarget) {
           val = fastTarget;
-          clearInterval(interval);
-          setPhase('slow');
+          if (fastInterval) clearInterval(fastInterval);
+          
+          // Phase 3: Slow dramatic counting
+          let slowVal = fastTarget;
+          slowInterval = setInterval(() => {
+            if (cancelled) {
+              if (slowInterval) clearInterval(slowInterval);
+              return;
+            }
+            slowVal += 1;
+            displayValueRef.current = slowVal;
+            playSound('tick');
+            update();
+            
+            if (slowVal >= target) {
+              if (slowInterval) clearInterval(slowInterval);
+              phaseRef.current = 'reveal';
+              playSound('impact');
+              update();
+              
+              setTimeout(() => {
+                if (cancelled || hasCompletedRef.current) return;
+                hasCompletedRef.current = true;
+                phaseRef.current = 'celebrate';
+                playSound('fanfare');
+                update();
+                onComplete?.();
+              }, 300);
+            }
+          }, 100);
         }
-        setCurrent(val);
-        playTick(400 + (val / target) * 400, 0.05);
-      }, 50);
-      return () => clearInterval(interval);
-    }
+        displayValueRef.current = val;
+        update();
+      }, 40);
+    }, 600);
 
-    if (phase === 'slow') {
-      let val = Math.floor(target * 0.8);
-      const interval = setInterval(() => {
-        val += 1;
-        setCurrent(val);
-        playTick(600 + (val / target) * 500, 0.08);
-        if (val >= target) {
-          clearInterval(interval);
-          setPhase('done');
-          setShowDigitEffect(true);
-          playFanfare();
-          onComplete?.();
-        }
-      }, 120);
-      return () => clearInterval(interval);
-    }
-  }, [phase, target, onComplete]);
+    return () => {
+      cancelled = true;
+      clearTimeout(t1);
+      clearTimeout(t2);
+      if (fastInterval) clearInterval(fastInterval);
+      if (slowInterval) clearInterval(slowInterval);
+    };
+  }, []); // Empty deps - run once on mount
 
-  const digits = current.toString().split('');
-  const isDone = phase === 'done';
+  const displayValue = displayValueRef.current;
+  const phase = phaseRef.current;
+  const showNumber = showNumberRef.current;
+
+  const digits = displayValue.toString().split('');
+  const isRevealed = phase === 'reveal' || phase === 'celebrate';
 
   return (
-    <span className="relative inline-flex">
-      {digits.map((digit, i) => (
-        <span
+    <div ref={containerRef} className="relative">
+      {/* Score number */}
+      <div 
+        className={`relative z-10 flex items-baseline gap-1 ${isRevealed ? 'animate-cinematic-reveal' : ''}`}
+        style={{
+          filter: isRevealed ? `drop-shadow(0 0 30px ${color}) drop-shadow(0 0 60px ${color})` : undefined,
+        }}
+      >
+        {showNumber && digits.map((digit, i) => (
+          <span
+            key={`${i}-${digit}`}
+            className={`inline-block font-black transition-all ${
+              isRevealed ? 'animate-digit-cinematic' : 'animate-digit-counting'
+            }`}
+            style={{
+              animationDelay: isRevealed ? `${i * 0.05}s` : '0s',
+              color: '#FFFFFF',
+              textShadow: isRevealed 
+                ? `0 0 20px ${color}, 0 0 40px ${color}, 0 0 60px ${color}, 0 0 80px ${color}`
+                : `0 0 10px ${color}`,
+            }}
+          >
+            {digit}
+          </span>
+        ))}
+      </div>
+      
+      {/* Celebration particles */}
+      {phase === 'celebrate' && isHighScore && (
+        <div className="absolute inset-0 pointer-events-none">
+          {[...Array(20)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute left-1/2 top-1/2 animate-celebration-particle"
+              style={{
+                '--angle': `${(i * 18)}deg`,
+                '--distance': `${80 + Math.random() * 60}px`,
+                '--delay': `${Math.random() * 0.3}s`,
+              } as React.CSSProperties}
+            >
+              <div 
+                className="w-3 h-3 rounded-full"
+                style={{ 
+                  backgroundColor: ['#FFD700', '#FF6B6B', '#4ECDC4', '#A855F7', '#FFFFFF'][i % 5],
+                  boxShadow: `0 0 10px currentColor`,
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Legacy component wrapper for compatibility
+function AnimatedScoreDramatic({ target, onComplete, glowColor }: { target: number; onComplete?: () => void; glowColor?: string }) {
+  return (
+    <CinematicScoreReveal 
+      target={target} 
+      onComplete={onComplete} 
+      glowColor={glowColor}
+      isHighScore={target >= 80}
+    />
+  );
+}
+
+// ============ SCORE IMPACT RING - Ring expanding on score reveal ============
+function ScoreImpactRing({ color }: { color: string }) {
+  return (
+    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+      {[0, 1, 2].map(i => (
+        <div
           key={i}
-          className={`inline-block transition-all ${isDone ? 'animate-digit-pop' : ''}`}
+          className="absolute rounded-full animate-score-impact-ring"
           style={{
-            animationDelay: isDone ? `${i * 0.1}s` : '0s',
+            width: '100%',
+            height: '100%',
+            border: `3px solid ${color}`,
+            boxShadow: `0 0 20px ${color}`,
+            animationDelay: `${i * 0.1}s`,
           }}
-        >
-          {digit}
-        </span>
+        />
       ))}
-      {/* Particle burst on complete */}
-      {showDigitEffect && <ScoreParticleBurst color={glowColor || '#FFD700'} />}
-    </span>
+    </div>
   );
 }
 
@@ -1641,10 +1856,17 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
   }, [onAddToQueue]);
 
   // Fire confetti celebration
+  const confettiInstanceRef = useRef<confetti.CreateTypes | null>(null);
+  
   const fireConfetti = useCallback(() => {
     if (!canvasRef.current || confettiDone.current) return;
     confettiDone.current = true;
-    const c = confetti.create(canvasRef.current, { resize: true, useWorker: true });
+    
+    // Create confetti instance only once, without useWorker to avoid canvas transfer issues
+    if (!confettiInstanceRef.current) {
+      confettiInstanceRef.current = confetti.create(canvasRef.current, { resize: true, useWorker: false });
+    }
+    const c = confettiInstanceRef.current;
 
     if (isHigh) {
       // Epic celebration for high scores
@@ -1671,15 +1893,12 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
     }
   }, [isHigh, isSRank, finalScore]);
 
-  // Resize canvas
+  // Setup canvas size once on mount (no resize listener to avoid offscreen canvas issues)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas) {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
-      const handleResize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
-      window.addEventListener('resize', handleResize);
-      return () => window.removeEventListener('resize', handleResize);
     }
   }, []);
 
@@ -1788,7 +2007,7 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
                   <div className={`flex items-baseline gap-3 ${isRevealed && isSRank ? 'animate-victory-dance' : ''}`}>
                     <span className={`font-black ${isRevealed ? 'animate-score-celebrate' : ''}`}
                       style={{ 
-                        fontSize: isSRank ? '100px' : '85px',
+                        fontSize: isSRank ? '90px' : '80px',
                         color: '#FFFFFF',
                         textShadow: `
                           0 0 15px ${grade.glowColor},
@@ -1798,6 +2017,7 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
                           0 5px 0 rgba(0,0,0,0.5)
                         `,
                         lineHeight: 1,
+                        letterSpacing: '0.05em',
                         fontFamily: 'system-ui, -apple-system, sans-serif',
                         fontWeight: 900,
                       }}>

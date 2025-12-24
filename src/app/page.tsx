@@ -1003,8 +1003,13 @@ function TVAppContent() {
   // Show result screen when song finishes
   useEffect(() => {
     if (finishedSong) {
-      // Store result data locally
-      setResultData({ song: finishedSong.song, finalScore: finishedSong.finalScore });
+      // Only set if not already showing this song's result
+      setResultData(prev => {
+        if (prev?.song.id === finishedSong.song.id) {
+          return prev; // Don't update if same song
+        }
+        return { song: finishedSong.song, finalScore: finishedSong.finalScore };
+      });
       setCurrentScreen('result');
     }
   }, [finishedSong]);
@@ -1171,6 +1176,7 @@ function TVAppContent() {
         }
         return (
           <TVSongResultScreen
+            key={resultData.song.id}
             song={resultData.song}
             finalScore={resultData.finalScore}
             onNext={handleNextFromResult}
