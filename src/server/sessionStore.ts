@@ -35,6 +35,9 @@ export class SessionStore {
   
   /** Map of session code to session ID for quick lookup */
   private codeToSession: Map<string, string> = new Map();
+  
+  /** Map of session ID to primary scorer socket ID (only one mobile can score) */
+  private primaryScorer: Map<string, string> = new Map();
 
   /**
    * Create a new karaoke session
@@ -292,6 +295,12 @@ export class SessionStore {
       session.mobileConnections.splice(mobileIndex, 1);
     }
     this.socketToSession.delete(socketId);
+    
+    // Clear primary scorer if this mobile was the scorer
+    if (this.primaryScorer.get(sessionId) === socketId) {
+      this.primaryScorer.delete(sessionId);
+      console.log(`Primary scorer disconnected for session ${sessionId}`);
+    }
 
     return { session, isTv: false, userId: socketId };
   }
@@ -306,8 +315,9 @@ export class SessionStore {
       this.socketToSession.delete(socketId);
     });
 
-    // Remove session
+    // Remove session and primary scorer
     this.codeToSession.delete(session.code);
+    this.primaryScorer.delete(session.id);
     this.sessions.delete(session.id);
   }
 
@@ -327,4 +337,45 @@ export class SessionStore {
 
     return [session.tvSocketId, ...session.mobileConnections];
   }
-}
+  
+  /**
+   * Set primary scorer for a session (first mobile to send score)
+   * @param sessionId - The session ID
+   * @param socketId - The mobile socket ID
+   * @returns True if set successfully (first scorer), false if already set
+   */
+  setPrimaryScorer(sessionId: string, socketId: string): boolean {
+    // If no primary scorer yet, set this one
+    if (!this.primaryScorer.has(sessionId)) {
+      this.primaryScorer.set(sessionId, socketId);
+      console.log(`Primary scorer set for session ${sessionId}: ${socketId}`);
+      return true;
+    }
+    // Already has a primary scorer
+    return this.primaryScorer.get(sessionId) === socketId;
+  }
+  
+  /**
+   * Check if a socket is the primary scorer for a session
+   */
+  isPrimaryScorer(sessionId: string, socketId: string): boolean {
+    const primary = this.primaryScorer.get(sessionId);
+    // If no primary set yet, allow (will be set on first score)
+    if (!primary) return true;
+    return primary === socketId;
+  }
+  
+  /**
+   * Get primary scorer for a session
+   */
+  getPrimaryScorer(sessionId: string): string | null {
+    return this.primaryScorer.get(sessionId) || null;
+  }
+  
+  /**
+   * Clear primary scorer (when song ends or scorer disconnects)
+   */
+  clearPrimaryScorer(sessionId: string): void {
+    this.primaryScorer.delete(sessionId);
+    console.log(`Primary scorer cleared for session ${sessionId}`);
+  }

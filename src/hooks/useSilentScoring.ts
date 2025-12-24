@@ -28,6 +28,8 @@ interface UseSilentScoringReturn {
   isRecording: boolean;
   /** Any error message */
   error: string | null;
+  /** Manually reconnect mic */
+  reconnectMic: () => void;
 }
 
 /**
@@ -247,6 +249,20 @@ export function useSilentScoring({
   // Constants
   const SILENCE_THRESHOLD = 15; // Frames of silence to end a segment (~250ms)
   const MIN_SEGMENT_LENGTH = 10; // Minimum frames for valid segment (~166ms)
+  
+  // Reconnect tracking
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const RECONNECT_DELAY = 2000; // 2 seconds base delay
+  
+  // Track if mic stream is still active
+  const checkMicActiveRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Wake lock to prevent screen sleep and keep mic active
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  
+  // Keep-alive audio to prevent browser from suspending
+  const keepAliveAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Keep callback ref updated
   useEffect(() => {
@@ -258,6 +274,62 @@ export function useSilentScoring({
     previousScoreRef.current = getPreviousScore();
     isFirstScoreRef.current = previousScoreRef.current === null;
   }, [songId]);
+  
+  // Request wake lock to keep screen on and prevent mic suspension
+  const requestWakeLock = useCallback(async () => {
+    try {
+      if ('wakeLock' in navigator && !wakeLockRef.current) {
+        wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+        console.log('[Silent Scoring] Wake lock acquired');
+        
+        wakeLockRef.current?.addEventListener('release', () => {
+          console.log('[Silent Scoring] Wake lock released');
+          wakeLockRef.current = null;
+          // Try to re-acquire when visibility changes back
+        });
+      }
+    } catch (err) {
+      console.log('[Silent Scoring] Wake lock not available:', err);
+    }
+  }, []);
+  
+  // Release wake lock
+  const releaseWakeLock = useCallback(async () => {
+    if (wakeLockRef.current) {
+      try {
+        await wakeLockRef.current.release();
+        wakeLockRef.current = null;
+        console.log('[Silent Scoring] Wake lock released manually');
+      } catch {}
+    }
+  }, []);
+  
+  // Create silent audio to keep audio context alive
+  const startKeepAlive = useCallback(() => {
+    if (keepAliveAudioRef.current) return;
+    
+    try {
+      // Create a silent audio element that loops
+      // This helps keep the audio context active on some browsers
+      const audio = new Audio();
+      // Silent WAV data URL (very short silent audio)
+      audio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+      audio.loop = true;
+      audio.volume = 0.01; // Nearly silent
+      audio.play().catch(() => {});
+      keepAliveAudioRef.current = audio;
+      console.log('[Silent Scoring] Keep-alive audio started');
+    } catch {}
+  }, []);
+  
+  // Stop keep-alive audio
+  const stopKeepAlive = useCallback(() => {
+    if (keepAliveAudioRef.current) {
+      keepAliveAudioRef.current.pause();
+      keepAliveAudioRef.current = null;
+      console.log('[Silent Scoring] Keep-alive audio stopped');
+    }
+  }, []);
 
   // Calculate score from segments only (ignores instrumental parts)
   const calculateSegmentScore = useCallback(() => {
@@ -323,16 +395,43 @@ export function useSilentScoring({
     if (isRecordingRef.current) return;
 
     try {
+      // Request mic with settings to keep it active
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
+          // Keep mic active - prevent auto-suspend
+          channelCount: 1,
+          sampleRate: 44100,
         }
       });
       streamRef.current = stream;
+      
+      // Monitor track state to detect disconnection
+      const audioTrack = stream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.onended = () => {
+          console.log('[Silent Scoring] Audio track ended - will attempt reconnect');
+          if (isRecordingRef.current) {
+            handleMicDisconnect();
+          }
+        };
+        audioTrack.onmute = () => {
+          console.log('[Silent Scoring] Audio track muted');
+        };
+        audioTrack.onunmute = () => {
+          console.log('[Silent Scoring] Audio track unmuted');
+        };
+      }
 
       audioContextRef.current = new AudioContext();
+      
+      // Resume audio context if suspended (mobile browsers)
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume();
+      }
+      
       analyserRef.current = audioContextRef.current.createAnalyser();
       analyserRef.current.fftSize = 4096;
 
@@ -342,6 +441,13 @@ export function useSilentScoring({
       isRecordingRef.current = true;
       setIsRecording(true);
       setError(null);
+      reconnectAttemptsRef.current = 0; // Reset reconnect attempts on success
+      
+      // Request wake lock to keep screen on
+      requestWakeLock();
+      
+      // Start keep-alive audio
+      startKeepAlive();
       
       // Reset scoring data
       currentSegmentRef.current = [];
@@ -355,6 +461,23 @@ export function useSilentScoring({
       const sampleRate = audioContextRef.current.sampleRate;
       const bufferLength = analyser.fftSize;
       const dataArray = new Float32Array(bufferLength);
+      
+      // Periodic check to ensure mic is still active
+      checkMicActiveRef.current = setInterval(() => {
+        if (!isRecordingRef.current) return;
+        
+        const track = streamRef.current?.getAudioTracks()[0];
+        if (!track || track.readyState === 'ended' || !track.enabled) {
+          console.log('[Silent Scoring] Mic check failed - reconnecting');
+          handleMicDisconnect();
+        }
+        
+        // Also check audio context state
+        if (audioContextRef.current?.state === 'suspended') {
+          console.log('[Silent Scoring] Audio context suspended - resuming');
+          audioContextRef.current.resume().catch(() => {});
+        }
+      }, 3000); // Check every 3 seconds
 
       const analyze = () => {
         if (!isRecordingRef.current) return;
@@ -403,17 +526,105 @@ export function useSilentScoring({
       };
 
       analyze();
+      console.log('[Silent Scoring] Mic started successfully');
     } catch (err) {
       console.error('[Silent Scoring] Mic error:', err);
       setError('Không thể truy cập microphone');
       setIsRecording(false);
+      
+      // Try to reconnect if playing
+      if (isPlaying) {
+        scheduleReconnect();
+      }
     }
-  }, [calculateSegmentScore]);
+  }, [calculateSegmentScore, isPlaying]);
+  
+  // Handle mic disconnection
+  const handleMicDisconnect = useCallback(() => {
+    console.log('[Silent Scoring] Handling mic disconnect');
+    
+    // Clean up current resources
+    if (checkMicActiveRef.current) {
+      clearInterval(checkMicActiveRef.current);
+      checkMicActiveRef.current = null;
+    }
+    
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
+    
+    isRecordingRef.current = false;
+    setIsRecording(false);
+    
+    // Schedule reconnect if still playing
+    if (isPlaying) {
+      scheduleReconnect();
+    }
+  }, [isPlaying]);
+  
+  // Schedule reconnect attempt
+  const scheduleReconnect = useCallback(() => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+    }
+    
+    // Always keep trying while playing - no max attempts
+    reconnectAttemptsRef.current++;
+    console.log(`[Silent Scoring] Scheduling reconnect attempt ${reconnectAttemptsRef.current}`);
+    setError(`Đang kết nối lại mic...`);
+    
+    // Exponential backoff: 2s, 4s, 8s, max 10s
+    const delay = Math.min(RECONNECT_DELAY * Math.pow(1.5, reconnectAttemptsRef.current - 1), 10000);
+    
+    reconnectTimerRef.current = setTimeout(() => {
+      if (isPlaying && !isRecordingRef.current) {
+        startRecording();
+      }
+    }, delay);
+  }, [isPlaying, startRecording]);
+  
+  // Manual reconnect function
+  const reconnectMic = useCallback(() => {
+    console.log('[Silent Scoring] Manual reconnect requested');
+    reconnectAttemptsRef.current = 0; // Reset attempts
+    setError(null);
+    
+    // Stop current recording if any
+    if (isRecordingRef.current) {
+      handleMicDisconnect();
+    }
+    
+    // Start fresh
+    if (isPlaying) {
+      startRecording();
+    }
+  }, [isPlaying, startRecording, handleMicDisconnect]);
 
   // Stop recording
   const stopRecording = useCallback(() => {
     isRecordingRef.current = false;
     setIsRecording(false);
+    
+    // Clear timers
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+    if (checkMicActiveRef.current) {
+      clearInterval(checkMicActiveRef.current);
+      checkMicActiveRef.current = null;
+    }
 
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
@@ -426,9 +637,13 @@ export function useSilentScoring({
     }
 
     if (audioContextRef.current) {
-      audioContextRef.current.close();
+      audioContextRef.current.close().catch(() => {});
       audioContextRef.current = null;
     }
+    
+    // Release wake lock and stop keep-alive
+    releaseWakeLock();
+    stopKeepAlive();
 
     // Calculate and send final score
     const finalScore = calculateSegmentScore();
@@ -441,7 +656,7 @@ export function useSilentScoring({
       previousScoreRef.current = finalScore.totalScore;
       isFirstScoreRef.current = false;
     }
-  }, [calculateSegmentScore]);
+  }, [calculateSegmentScore, releaseWakeLock, stopKeepAlive]);
 
   // Auto start/stop based on isPlaying
   useEffect(() => {
@@ -451,18 +666,55 @@ export function useSilentScoring({
       stopRecording();
     }
   }, [isPlaying, startRecording, stopRecording]);
+  
+  // Handle visibility change - re-acquire wake lock and reconnect mic when screen turns back on
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isPlaying) {
+        console.log('[Silent Scoring] Page visible again, checking mic...');
+        // Re-acquire wake lock
+        requestWakeLock();
+        
+        // Check if mic is still active, reconnect if not
+        const track = streamRef.current?.getAudioTracks()[0];
+        if (!track || track.readyState === 'ended' || !track.enabled) {
+          console.log('[Silent Scoring] Mic lost while hidden, reconnecting...');
+          if (!isRecordingRef.current) {
+            startRecording();
+          }
+        }
+        
+        // Resume audio context if suspended
+        if (audioContextRef.current?.state === 'suspended') {
+          audioContextRef.current.resume().catch(() => {});
+        }
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isPlaying, requestWakeLock, startRecording]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+      }
+      if (checkMicActiveRef.current) {
+        clearInterval(checkMicActiveRef.current);
+      }
+      releaseWakeLock();
+      stopKeepAlive();
       stopRecording();
     };
-  }, [stopRecording]);
+  }, [stopRecording, releaseWakeLock, stopKeepAlive]);
 
   return {
     currentScore,
     isRecording,
     error,
+    reconnectMic,
   };
 }
 

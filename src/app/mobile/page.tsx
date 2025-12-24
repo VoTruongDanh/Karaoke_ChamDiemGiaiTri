@@ -64,8 +64,8 @@ function MobileAppContent() {
     disconnect,
   } = useMobileSocket();
 
-  // Silent scoring - background recording
-  useSilentScoring({
+  // Silent scoring - background recording with auto-reconnect
+  const { isRecording: isMicActive, error: micError } = useSilentScoring({
     isPlaying: !!currentSong,
     onScoreUpdate: sendScore,
   });
@@ -256,6 +256,24 @@ function MobileAppContent() {
           <span>Đang kết nối lại...</span>
         </div>
       )}
+      
+      {/* Mic status indicator - show when playing */}
+      {currentSong && isJoined && currentScreen === 'controller' && (
+        <div className="fixed top-0 left-0 right-0 z-40">
+          {micError ? (
+            <div className="flex items-center justify-center gap-2 px-3 py-1.5 bg-yellow-500 text-white text-xs">
+              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <span>🎤 {micError}</span>
+            </div>
+          ) : isMicActive ? (
+            <div className="flex items-center justify-center gap-2 px-3 py-1.5 bg-green-500/90 text-white text-xs">
+              <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+              <span>🎤 Mic đang hoạt động</span>
+            </div>
+          ) : null}
+        </div>
+      )}
+      
       {renderScreen()}
     </main>
   );

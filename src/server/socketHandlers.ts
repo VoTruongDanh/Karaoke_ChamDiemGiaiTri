@@ -114,6 +114,9 @@ export function setupSocketHandlers(io: TypedServer, sessionStore: SessionStore)
       sessionStore.updateQueue(session.id, updatedQueue);
       sessionStore.setCurrentSong(session.id, null);
       
+      // Clear primary scorer for next song (allow different mobile to score)
+      sessionStore.clearPrimaryScorer(session.id);
+      
       // Broadcast updated queue
       io.to(session.id).emit('queue:updated', updatedQueue);
       
@@ -244,6 +247,43 @@ export function setupSocketHandlers(io: TypedServer, sessionStore: SessionStore)
       // Send skip command to TV
       io.to(session.id).emit('playback:command', 'skip');
       console.log(`Playback skip requested for session: ${session.code}`);
+    });
+
+    /**
+     * Mobile sends real-time score update
+     * Only the first mobile to send score becomes the primary scorer
+     */
+    socket.on('score:update', (score: ScoreData) => {
+      const session = sessionStore.getSessionBySocket(socket.id);
+      if (!session) return;
+
+      // Check if this mobile can score (first one or already primary)
+      if (!sessionStore.isPrimaryScorer(session.id, socket.id)) {
+        // Not the primary scorer - ignore silently
+        return;
+      }
+      
+      // Set as primary scorer if not already set
+      sessionStore.setPrimaryScorer(session.id, socket.id);
+
+      // Forward score to TV
+      io.to(session.id).emit('score:updated', score);
+    });
+
+    /**
+     * Mobile sends real-time feedback
+     */
+    socket.on('score:feedback', (feedback: any) => {
+      const session = sessionStore.getSessionBySocket(socket.id);
+      if (!session) return;
+
+      // Only primary scorer can send feedback
+      if (!sessionStore.isPrimaryScorer(session.id, socket.id)) {
+        return;
+      }
+
+      // Forward feedback to TV
+      io.to(session.id).emit('score:feedback', feedback);
     });
 
     // ==========================================
