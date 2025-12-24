@@ -21,9 +21,12 @@ export class InvidiousService {
   /**
    * Search for videos via local API proxy
    */
-  async search(query: string, pageToken?: string): Promise<SearchResult> {
+  async search(query: string, continuation?: string): Promise<SearchResult> {
     try {
-      const url = `/api/youtube/search?q=${encodeURIComponent(query)}`;
+      let url = `/api/youtube/search?q=${encodeURIComponent(query)}`;
+      if (continuation) {
+        url += `&continuation=${encodeURIComponent(continuation)}`;
+      }
       console.log('[Search] Fetching:', url);
       
       const response = await fetch(url);
@@ -42,11 +45,11 @@ export class InvidiousService {
         duration: video.duration || 0,
       }));
 
-      console.log('[Search] Got', songs.length, 'results');
+      console.log('[Search] Got', songs.length, 'results, continuation:', !!data.continuation);
 
       return {
         songs,
-        nextPageToken: undefined, // Pagination not supported yet
+        nextPageToken: data.continuation || undefined,
       };
     } catch (error) {
       console.error('[Search] Failed:', error);

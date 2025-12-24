@@ -314,6 +314,11 @@ export function PlayingScreen({
   const progressRef = useRef<HTMLDivElement>(null);
   const timeUpdateRef = useRef<NodeJS.Timeout | null>(null);
   const seekTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Button refs for focus management
+  const backButtonRef = useRef<HTMLButtonElement>(null);
+  const skipButtonRef = useRef<HTMLButtonElement>(null);
+  const playButtonRef = useRef<HTMLButtonElement>(null);
 
   // Row 0: back (col 0), skip (col 1)
   // Row 1: rewind (col 0), play (col 1), forward (col 2)
@@ -376,6 +381,21 @@ export function PlayingScreen({
     resetHideTimer();
     return () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); };
   }, [resetHideTimer]);
+
+  // Sync DOM focus with focusedButton state
+  useEffect(() => {
+    if (!showControls) return;
+    
+    const buttonId = focusedRow === 0 
+      ? (focusedCol === 0 ? 'back' : 'skip')
+      : focusedRow === 1 
+        ? (focusedCol === 1 ? 'play' : null)
+        : null;
+    
+    if (buttonId === 'back') backButtonRef.current?.focus();
+    else if (buttonId === 'skip') skipButtonRef.current?.focus();
+    else if (buttonId === 'play') playButtonRef.current?.focus();
+  }, [showControls, focusedRow, focusedCol]);
 
   // Toggle play/pause
   const togglePlayPause = useCallback(() => {
@@ -689,10 +709,12 @@ export function PlayingScreen({
       {/* Controls overlay - auto hide */}
       <div className={`absolute inset-0 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         {/* Top bar */}
-        <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/70 to-transparent flex items-center justify-between">
+        <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/70 to-transparent flex items-center justify-between pointer-events-none">
           <button
+            ref={backButtonRef}
+            tabIndex={0}
             onClick={onBack}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all pointer-events-auto ${
               focusedButton === 'back' ? 'bg-[#f5f5f5]/60 ring-2 ring-[#f5f5f5] scale-105' : 'bg-[#f5f5f5]/40 hover:bg-[#f5f5f5]/50'
             }`}
           >
@@ -702,8 +724,10 @@ export function PlayingScreen({
 
           {onSkip && (
             <button
+              ref={skipButtonRef}
+              tabIndex={0}
               onClick={onSkip}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all pointer-events-auto ${
                 focusedButton === 'skip' ? 'bg-[#f5f5f5]/60 ring-2 ring-[#f5f5f5] scale-105' : 'bg-[#f5f5f5]/40 hover:bg-[#f5f5f5]/50'
               }`}
             >
@@ -714,8 +738,9 @@ export function PlayingScreen({
         </div>
 
         {/* Center controls - rewind, play/pause, forward */}
-        <div className="absolute inset-0 flex items-center justify-center gap-8">
+        <div className="absolute inset-0 flex items-center justify-center gap-8 pointer-events-none">
           <button
+            tabIndex={0}
             onClick={() => {
               const player = playerRef.current;
               if (player) {
@@ -727,14 +752,16 @@ export function PlayingScreen({
                 } catch {}
               }
             }}
-            className={getButtonClass('rewind')}
+            className={`${getButtonClass('rewind')} pointer-events-auto`}
           >
             <RewindIcon />
           </button>
           
           <button
+            ref={playButtonRef}
+            tabIndex={0}
             onClick={togglePlayPause}
-            className={`p-4 rounded-full transition-all ${
+            className={`p-4 rounded-full transition-all pointer-events-auto ${
               focusedButton === 'play' ? 'bg-[#f5f5f5]/60 ring-2 ring-[#f5f5f5] scale-110' : 'bg-[#f5f5f5]/40 hover:bg-[#f5f5f5]/50'
             }`}
           >
@@ -742,6 +769,7 @@ export function PlayingScreen({
           </button>
           
           <button
+            tabIndex={0}
             onClick={() => {
               const player = playerRef.current;
               if (player) {
@@ -753,20 +781,20 @@ export function PlayingScreen({
                 } catch {}
               }
             }}
-            className={getButtonClass('forward')}
+            className={`${getButtonClass('forward')} pointer-events-auto`}
           >
             <ForwardIcon />
           </button>
         </div>
 
         {/* Bottom song info + progress bar */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent">
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent pointer-events-none">
           {/* Progress bar */}
           <div className="px-4 pt-4">
             <div 
               ref={progressRef}
               onClick={handleProgressClick}
-              className={`relative h-2 bg-white/20 rounded-full cursor-pointer transition-all ${
+              className={`relative h-2 bg-white/20 rounded-full cursor-pointer transition-all pointer-events-auto ${
                 focusedRow === 2 ? 'ring-2 ring-primary-400 h-3' : ''
               }`}
             >

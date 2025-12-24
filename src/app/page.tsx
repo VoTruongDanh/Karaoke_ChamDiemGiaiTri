@@ -912,15 +912,20 @@ function TVAppContent() {
     queueStore.add(song, 'TV User');
   }, [queueStore]);
 
-  const handleSearch = useCallback(async (query: string): Promise<Song[]> => {
-    setRecentSearches(prev => [query, ...prev.filter(s => s !== query)].slice(0, 10));
+  const handleSearch = useCallback(async (query: string, continuation?: string | null): Promise<{ songs: Song[], continuation?: string | null }> => {
+    if (!continuation) {
+      setRecentSearches(prev => [query, ...prev.filter(s => s !== query)].slice(0, 10));
+    }
     
     try {
-      const result = await songLibrary.search(query);
-      return result.songs;
+      const result = await songLibrary.search(query, continuation || undefined);
+      return { 
+        songs: result.songs, 
+        continuation: result.nextPageToken || null 
+      };
     } catch (err) {
       console.error('[TV] Search error:', err);
-      return [];
+      return { songs: [], continuation: null };
     }
   }, [songLibrary]);
 

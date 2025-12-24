@@ -46,14 +46,6 @@ function PlayIcon() {
   );
 }
 
-function MusicIcon() {
-  return (
-    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-    </svg>
-  );
-}
-
 function QRCodeDisplay({ code }: { code: string }) {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [mobileUrl, setMobileUrl] = useState<string>('');
@@ -283,7 +275,7 @@ export function HomeScreen({
                 {waitingCount} bài
               </span>
             )}
-            <ThemeToggle />
+            <ThemeToggle row={0} col={10} />
           </div>
         </header>
 
@@ -297,7 +289,8 @@ export function HomeScreen({
           {/* Right - Main content */}
           <div className="flex-1 flex flex-col gap-4 min-w-0 overflow-visible">
             {/* Now Playing - Top - 2 rows layout like search results */}
-            {currentSong ? (
+            {/* Now Playing - only show when there's a song */}
+            {currentSong && (
               <FocusableButton
                 row={0}
                 col={0}
@@ -331,22 +324,12 @@ export function HomeScreen({
                   </div>
                 </div>
               </FocusableButton>
-            ) : (
-              <div className="bg-white/5 backdrop-blur rounded-2xl p-4">
-                <p className="text-base text-gray-400 mb-3">Đang phát</p>
-                <div className="flex flex-col items-center opacity-50 py-6">
-                  <div className="w-24 h-24 bg-gray-700 rounded-xl flex items-center justify-center mb-3">
-                    <MusicIcon />
-                  </div>
-                  <p className="text-lg text-gray-400">Chưa có bài hát</p>
-                </div>
-              </div>
             )}
 
             {/* Action buttons */}
             <div className="flex gap-4">
               <FocusableButton
-                row={1}
+                row={currentSong ? 1 : 0}
                 col={0}
                 onSelect={onSearchSelect}
                 variant="primary"
@@ -359,7 +342,7 @@ export function HomeScreen({
               </FocusableButton>
               
               <FocusableButton
-                row={1}
+                row={currentSong ? 1 : 0}
                 col={1}
                 onSelect={onQueueSelect}
                 variant="secondary"
@@ -374,7 +357,7 @@ export function HomeScreen({
             {/* Play Now button */}
             {waitingCount > 0 && !currentSong && onPlayNow && (
               <FocusableButton
-                row={2}
+                row={1}
                 col={0}
                 onSelect={onPlayNow}
                 variant="primary"
@@ -395,9 +378,12 @@ export function HomeScreen({
                     .filter(item => item.status === 'waiting')
                     .slice(0, 6)
                     .map((item, index) => {
-                      // Row 2 if no PlayNow button, Row 3 if PlayNow button exists
-                      const hasPlayNow = waitingCount > 0 && !currentSong && onPlayNow;
-                      const queueRow = hasPlayNow ? 3 : 2;
+                      // Calculate row based on what's above:
+                      // - Row 0: Now Playing (if currentSong) OR Buttons (if no currentSong)
+                      // - Row 1: Buttons (if currentSong) OR PlayNow (if no currentSong but has queue)
+                      // - Row 2: Queue preview (if currentSong) OR Queue preview (if PlayNow shown)
+                      const showPlayNow = !currentSong && onPlayNow;
+                      const queueRow = currentSong ? 2 : (showPlayNow ? 2 : 1);
                       return (
                         <FocusableButton
                           key={item.id}
@@ -439,11 +425,23 @@ export function HomeScreen({
                     {suggestions.map((song, index) => {
                       const isAdded = addedIds.has(song.youtubeId);
                       // Calculate base row based on what's visible above
-                      const hasPlayNow = waitingCount > 0 && !currentSong && onPlayNow;
+                      // When no currentSong: buttons at row 0, PlayNow at row 1 (if shown), queue at row 1 or 2
+                      // When currentSong: nowPlaying at row 0, buttons at row 1, queue at row 2
+                      const showPlayNow = !currentSong && onPlayNow && waitingCount > 0;
                       const hasQueuePreview = waitingCount > 0;
-                      let baseRow = 2;
-                      if (hasPlayNow) baseRow++;
-                      if (hasQueuePreview) baseRow++;
+                      
+                      let baseRow: number;
+                      if (currentSong) {
+                        // With currentSong: row 0=nowPlaying, row 1=buttons, row 2=queue, row 3+=suggestions
+                        baseRow = hasQueuePreview ? 3 : 2;
+                      } else {
+                        // No currentSong: row 0=buttons, row 1=PlayNow (if shown), row 1 or 2=queue, next=suggestions
+                        if (showPlayNow) {
+                          baseRow = hasQueuePreview ? 3 : 2;
+                        } else {
+                          baseRow = hasQueuePreview ? 2 : 1;
+                        }
+                      }
                       
                       // 2 columns
                       const suggestionRow = baseRow + Math.floor(index / 2);

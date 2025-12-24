@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { FocusableButton } from './FocusableButton';
 
 /**
  * Sun icon for light mode
@@ -24,11 +25,16 @@ function MoonIcon() {
   );
 }
 
+interface ThemeToggleProps {
+  row?: number;
+  col?: number;
+}
+
 /**
  * ThemeToggle component - Toggle between light and dark mode
- * Default is light mode
+ * Supports d-pad navigation when row/col props are provided
  */
-export function ThemeToggle() {
+export function ThemeToggle({ row, col }: ThemeToggleProps) {
   const [isDark, setIsDark] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -40,7 +46,6 @@ export function ThemeToggle() {
       setIsDark(true);
       document.documentElement.classList.add('dark');
     } else {
-      // Default to light mode
       setIsDark(false);
       document.documentElement.classList.remove('dark');
     }
@@ -63,17 +68,33 @@ export function ThemeToggle() {
   // Prevent hydration mismatch
   if (!mounted) {
     return (
-      <button className="p-2 rounded-tv bg-tv-card border border-tv-border opacity-50">
+      <div className="p-2 rounded-lg bg-tv-card border border-tv-border opacity-50">
         <div className="w-6 h-6" />
-      </button>
+      </div>
     );
   }
 
+  // If row/col provided, use FocusableButton for d-pad navigation
+  if (row !== undefined && col !== undefined) {
+    return (
+      <FocusableButton
+        row={row}
+        col={col}
+        onSelect={toggleTheme}
+        variant="ghost"
+        className="!p-2 !min-w-0 !min-h-0"
+        aria-label={isDark ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'}
+      >
+        {isDark ? <SunIcon /> : <MoonIcon />}
+      </FocusableButton>
+    );
+  }
+
+  // Fallback to regular button
   return (
     <button
       onClick={toggleTheme}
       tabIndex={0}
-      data-focusable="true"
       className="p-2 rounded-lg bg-white/10 dark:bg-tv-card border border-slate-200 dark:border-tv-border hover:bg-slate-100 dark:hover:bg-tv-hover transition-all focus:outline-none focus:ring-2 focus:ring-primary-400/60 focus:scale-105"
       aria-label={isDark ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'}
       title={isDark ? 'Chế độ sáng' : 'Chế độ tối'}

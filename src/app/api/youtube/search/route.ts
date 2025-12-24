@@ -21,11 +21,71 @@ function parseDuration(text: string): number {
   return 0;
 }
 
-// Scrape YouTube search results directly
-async function searchYouTube(query: string): Promise<VideoResult[]> {
-  console.log('[Search] Scraping YouTube for:', query);
+// Scrape with continuation token for pagination
+async function searchYouTubeWithContinuation(query: string, continuationToken?: string): Promise<{ videos: VideoResult[], continuation?: string }> {
+  console.log('[Search] Scraping YouTube for:', query, continuationToken ? '(continuation)' : '');
   
   try {
+    let html: string;
+    let data: any;
+    
+    if (continuationToken) {
+      // Use continuation API
+      const response = await fetch('https://www.youtube.com/youtubei/v1/search?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+        body: JSON.stringify({
+          context: {
+            client: {
+              clientName: 'WEB',
+              clientVersion: '2.20231219.04.00',
+              hl: 'vi',
+              gl: 'VN',
+            },
+          },
+          continuation: continuationToken,
+        }),
+      });
+      
+      if (!response.ok) return { videos: [] };
+      data = await response.json();
+      
+      // Parse continuation response
+      const items = data?.onResponseReceivedCommands?.[0]?.appendContinuationItemsAction?.continuationItems || [];
+      const videos: VideoResult[] = [];
+      let nextContinuation: string | undefined;
+      
+      for (const item of items) {
+        if (item.continuationItemRenderer) {
+          nextContinuation = item.continuationItemRenderer.continuationEndpoint?.continuationCommand?.token;
+          continue;
+        }
+        
+        const video = item.videoRenderer;
+        if (!video?.videoId) continue;
+        
+        let title = video.title?.runs?.[0]?.text || video.title?.simpleText || '';
+        if (!title) continue;
+        
+        let channelName = video.ownerText?.runs?.[0]?.text || video.shortBylineText?.runs?.[0]?.text || 'Unknown';
+        const durationText = video.lengthText?.simpleText || '';
+        
+        videos.push({
+          youtubeId: video.videoId,
+          title,
+          thumbnail: `https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg`,
+          channelName,
+          duration: parseDuration(durationText),
+        });
+      }
+      
+      return { videos, continuation: nextContinuation };
+    }
+    
+    // Initial search
     const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=EgIQAQ%253D%253D`;
     
     const controller = new AbortController();
@@ -45,112 +105,85 @@ async function searchYouTube(query: string): Promise<VideoResult[]> {
     
     if (!response.ok) {
       console.log('[Search] YouTube returned:', response.status);
-      return [];
+      return { videos: [] };
     }
     
-    const html = await response.text();
-    console.log('[Search] Got HTML, length:', html.length);
+    html = await response.text();
     
     // Extract ytInitialData JSON
-    const match = html.match(/var ytInitialData = ({.+?});<\/script>/s);
+    const match = html.match(/var ytInitialData = ({.+?});<\/script>/s) || html.match(/ytInitialData\s*=\s*({.+?});/s);
     if (!match) {
-      // Try alternative pattern
-      const altMatch = html.match(/ytInitialData\s*=\s*({.+?});/s);
-      if (!altMatch) {
-        console.log('[Search] No ytInitialData found');
-        return [];
-      }
-      return parseYouTubeData(altMatch[1]);
+      console.log('[Search] No ytInitialData found');
+      return { videos: [] };
     }
     
-    return parseYouTubeData(match[1]);
-  } catch (err: any) {
-    console.log('[Search] Scrape error:', err.message);
-    return [];
-  }
-}
-
-function parseYouTubeData(jsonStr: string): VideoResult[] {
-  try {
-    const data = JSON.parse(jsonStr);
+    data = JSON.parse(match[1]);
     const videos: VideoResult[] = [];
+    let nextContinuation: string | undefined;
     
     // Navigate to search results
     const contents = data?.contents?.twoColumnSearchResultsRenderer?.primaryContents
       ?.sectionListRenderer?.contents || [];
     
     for (const section of contents) {
+      // Check for continuation token
+      if (section.continuationItemRenderer) {
+        nextContinuation = section.continuationItemRenderer.continuationEndpoint?.continuationCommand?.token;
+        continue;
+      }
+      
       const items = section?.itemSectionRenderer?.contents || [];
       
       for (const item of items) {
         const video = item.videoRenderer;
         if (!video?.videoId) continue;
         
-        // Get title
-        let title = '';
-        if (video.title?.runs?.[0]?.text) {
-          title = video.title.runs[0].text;
-        } else if (video.title?.simpleText) {
-          title = video.title.simpleText;
-        }
-        
+        let title = video.title?.runs?.[0]?.text || video.title?.simpleText || '';
         if (!title) continue;
         
-        // Get channel
-        let channelName = 'Unknown';
-        if (video.ownerText?.runs?.[0]?.text) {
-          channelName = video.ownerText.runs[0].text;
-        } else if (video.shortBylineText?.runs?.[0]?.text) {
-          channelName = video.shortBylineText.runs[0].text;
-        }
-        
-        // Get duration
-        const durationText = video.lengthText?.simpleText || 
-                            video.lengthText?.accessibility?.accessibilityData?.label || '';
-        const duration = parseDuration(durationText);
+        let channelName = video.ownerText?.runs?.[0]?.text || video.shortBylineText?.runs?.[0]?.text || 'Unknown';
+        const durationText = video.lengthText?.simpleText || '';
         
         videos.push({
           youtubeId: video.videoId,
           title,
           thumbnail: `https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg`,
           channelName,
-          duration,
+          duration: parseDuration(durationText),
         });
-        
-        if (videos.length >= 20) break;
       }
-      
-      if (videos.length >= 20) break;
     }
     
-    console.log('[Search] Parsed', videos.length, 'videos');
-    return videos;
+    console.log('[Search] Parsed', videos.length, 'videos, has continuation:', !!nextContinuation);
+    return { videos, continuation: nextContinuation };
   } catch (err: any) {
-    console.log('[Search] Parse error:', err.message);
-    return [];
+    console.log('[Search] Scrape error:', err.message);
+    return { videos: [] };
   }
 }
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('q') || '';
+  const continuation = searchParams.get('continuation') || undefined;
   
-  console.log('[Search API] Request:', query);
+  console.log('[Search API] Request:', query, continuation ? '(page)' : '');
   
   if (!query.trim()) {
-    return NextResponse.json({ songs: [] });
+    return NextResponse.json({ songs: [], continuation: null });
   }
   
   // Add "karaoke" if not present
   const karaokeQuery = query.toLowerCase().includes('karaoke') ? query : `${query} karaoke`;
   
   // Scrape YouTube directly
-  let songs = await searchYouTube(karaokeQuery);
+  const result = await searchYouTubeWithContinuation(karaokeQuery, continuation);
+  let songs = result.videos;
   
   console.log('[Search API] Got', songs.length, 'songs');
   
-  // Prioritize karaoke videos
-  if (songs.length > 0) {
+  // Prioritize karaoke videos (only for first page)
+  if (songs.length > 0 && !continuation) {
     const karaokeKeywords = ['karaoke', 'beat', 'instrumental', 'lyrics'];
     songs.sort((a, b) => {
       const aK = karaokeKeywords.some(k => a.title.toLowerCase().includes(k));
@@ -162,7 +195,7 @@ export async function GET(request: NextRequest) {
   }
   
   return NextResponse.json(
-    { songs },
+    { songs, continuation: result.continuation || null },
     { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' } }
   );
 }

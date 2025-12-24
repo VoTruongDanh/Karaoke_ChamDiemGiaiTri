@@ -50,6 +50,7 @@ const KEY_MAP: Record<string, NavigationDirection | 'select'> = {
   ArrowRight: 'right',
   Enter: 'select',
   ' ': 'select', // Space bar
+  Tab: 'right', // Tab moves right
   
   // Samsung/LG TV remote codes
   '38': 'up',    // Up
@@ -57,6 +58,7 @@ const KEY_MAP: Record<string, NavigationDirection | 'select'> = {
   '37': 'left',  // Left
   '39': 'right', // Right
   '13': 'select', // Enter/OK
+  '9': 'right',  // Tab
   
   // Some TV browsers use these
   'Up': 'up',
@@ -217,7 +219,6 @@ export function useTVNavigation(config: TVNavigationConfig = {}): TVNavigationRe
       if (nextPos) {
         setCurrentFocus(nextPos);
       }
-      // If at boundary, maintain current focus (per Requirements 1.2)
     },
     [currentFocus, findNextPosition]
   );
@@ -256,26 +257,34 @@ export function useTVNavigation(config: TVNavigationConfig = {}): TVNavigationRe
     const handleKeyDown = (event: KeyboardEvent) => {
       // Try key first, then keyCode for older TV browsers
       const action = KEY_MAP[event.key] || KEY_MAP[String(event.keyCode)];
+      
       if (!action) return; // Ignore unsupported keys
 
+      // Handle Shift+Tab as left
+      if (event.key === 'Tab' && event.shiftKey) {
+        const nextPos = findNextPosition('left', currentFocus.row, currentFocus.col);
+        if (nextPos) {
+          event.preventDefault();
+          event.stopPropagation();
+          setCurrentFocus(nextPos);
+        }
+        return;
+      }
+
       if (action === 'select') {
-        // Check if current focus is on a registered element
         const element = getFocusedElement();
         if (element) {
           event.preventDefault();
           event.stopPropagation();
           selectCurrent();
         }
-        // Otherwise let browser handle it (for native buttons)
       } else {
-        // Try to move focus within grid
         const nextPos = findNextPosition(action, currentFocus.row, currentFocus.col);
         if (nextPos) {
           event.preventDefault();
           event.stopPropagation();
           moveFocus(action);
         }
-        // If no next position, let browser handle native focus
       }
     };
 

@@ -52,18 +52,18 @@ const SIZE_CLASSES = {
  */
 const VARIANT_CLASSES = {
   primary: {
-    base: 'bg-primary-600 text-white border-2 border-primary-500 shadow-sm',
-    focused: 'bg-primary-500 border-primary-300',
+    base: 'bg-primary-600 text-white border-2 border-primary-600 shadow-sm',
+    focused: 'bg-primary-500',
     disabled: 'bg-primary-900/50 text-primary-400 border-primary-900',
   },
   secondary: {
     base: 'bg-white dark:bg-tv-card text-slate-800 dark:text-white border-2 border-slate-200 dark:border-tv-border shadow-sm',
-    focused: 'bg-slate-50 dark:bg-tv-hover border-primary-400',
+    focused: 'bg-slate-50 dark:bg-tv-hover',
     disabled: 'bg-slate-100 dark:bg-tv-surface/50 text-slate-400 dark:text-gray-500 border-slate-200 dark:border-tv-border/50',
   },
   ghost: {
     base: 'bg-transparent text-slate-700 dark:text-white border-2 border-transparent',
-    focused: 'bg-slate-100 dark:bg-white/10 border-primary-400/50',
+    focused: 'bg-slate-100 dark:bg-white/10',
     disabled: 'text-slate-400 dark:text-gray-600 border-transparent',
   },
 };
@@ -158,13 +158,9 @@ export function FocusableButton({
     sizeStyles,
     // Variant base styles
     variantStyles.base,
-    // Focus state styles - minimal
+    // Focus state styles
     isFocused && !disabled && variantStyles.focused,
-    isFocused && !disabled && [
-      'scale-[1.01]', // Very subtle scale
-      'ring-1 ring-primary-400/50', // Thin ring
-      'z-10',
-    ].join(' '),
+    isFocused && !disabled && 'scale-[1.03] z-10',
     // Disabled state
     disabled && variantStyles.disabled,
     disabled && 'cursor-not-allowed opacity-60',
