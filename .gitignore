@@ -30,3 +30,7 @@ npm-debug.log*
 
 # Testing
 coverage/
+
+# TypeScript build info
+tsconfig.tsbuildinfo
+*.tsbuildinfo

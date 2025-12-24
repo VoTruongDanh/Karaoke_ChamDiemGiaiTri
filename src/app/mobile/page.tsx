@@ -175,6 +175,15 @@ function MobileAppContent() {
     }
   }, [isJoined, currentScreen, clearFinishedSong]);
 
+  // Session validity check - if session lost while on controller/queue, return to connect
+  useEffect(() => {
+    if (!isJoined && !isReconnecting && !isAttemptingJoin && currentScreen !== 'connect' && currentScreen !== 'result') {
+      // Session was lost - return to connect screen
+      console.log('[Mobile] Session lost, returning to connect screen');
+      setCurrentScreen('connect');
+    }
+  }, [isJoined, isReconnecting, isAttemptingJoin, currentScreen]);
+
   // Show result when song finishes - ignore if within 3s of joining (old data)
   useEffect(() => {
     if (finishedSong && isJoined && currentScreen !== 'connect') {
