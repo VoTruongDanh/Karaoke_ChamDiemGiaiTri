@@ -463,35 +463,21 @@ export function useSilentScoring({
     if (isRecordingRef.current) return;
 
     try {
-      // Request mic with settings to keep it active
+      // Check if getUserMedia is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.log('[Silent Scoring] getUserMedia not available - scoring disabled');
+        setError(null); // Don't show error, just disable silently
+        return;
+      }
+      
+      // Small delay to allow other mic users (like SpeechRecognition) to fully release
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Request mic with minimal constraints for better WebView compatibility
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          // Keep mic active - prevent auto-suspend
-          channelCount: 1,
-          sampleRate: 44100,
-        }
+        audio: true // Simplified - let browser choose best settings
       });
       streamRef.current = stream;
-      
-      // Monitor track state to detect disconnection
-      const audioTrack = stream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.onended = () => {
-          console.log('[Silent Scoring] Audio track ended - will attempt reconnect');
-          if (isRecordingRef.current) {
-            handleMicDisconnect();
-          }
-        };
-        audioTrack.onmute = () => {
-          console.log('[Silent Scoring] Audio track muted');
-        };
-        audioTrack.onunmute = () => {
-          console.log('[Silent Scoring] Audio track unmuted');
-        };
-      }
 
       audioContextRef.current = new AudioContext();
       
@@ -534,22 +520,17 @@ export function useSilentScoring({
       const bufferLength = analyser.fftSize;
       const dataArray = new Float32Array(bufferLength);
       
-      // Periodic check to ensure mic is still active
+      // Periodic check to ensure audio context is active
       checkMicActiveRef.current = setInterval(() => {
         if (!isRecordingRef.current) return;
         
-        const track = streamRef.current?.getAudioTracks()[0];
-        if (!track || track.readyState === 'ended' || !track.enabled) {
-          console.log('[Silent Scoring] Mic check failed - reconnecting');
-          handleMicDisconnect();
-        }
-        
-        // Also check audio context state
+        // Only check and resume audio context if suspended
+        // Don't check track state as it can be unreliable on some devices
         if (audioContextRef.current?.state === 'suspended') {
           console.log('[Silent Scoring] Audio context suspended - resuming');
           audioContextRef.current.resume().catch(() => {});
         }
-      }, 3000); // Check every 3 seconds
+      }, 5000); // Check every 5 seconds
 
       const analyze = () => {
         if (!isRecordingRef.current) return;
@@ -603,22 +584,29 @@ export function useSilentScoring({
       const errorMessage = err?.message || err?.name || 'Unknown error';
       console.error('[Silent Scoring] Mic error:', errorMessage, err);
       
-      // Show specific error message
-      if (errorMessage.includes('Permission') || errorMessage.includes('NotAllowed')) {
-        setError('Chưa cấp quyền mic');
-      } else if (errorMessage.includes('NotFound') || errorMessage.includes('DevicesNotFound')) {
-        setError('Không tìm thấy mic');
-      } else if (errorMessage.includes('NotReadable') || errorMessage.includes('TrackStartError')) {
-        setError('Mic đang được sử dụng');
-      } else {
-        setError(`Lỗi mic: ${errorMessage.substring(0, 30)}`);
-      }
-      
       setIsRecording(false);
       
-      // Try to reconnect if playing
-      if (isPlaying) {
+      // Check if this is a WebView/permission issue that won't be fixed by retrying
+      const isPermanentError = 
+        errorMessage.includes('Permission') || 
+        errorMessage.includes('NotAllowed') ||
+        errorMessage.includes('NotSupported') ||
+        errorMessage.includes('SecurityError');
+      
+      if (isPermanentError) {
+        // Don't retry, don't show error - just disable scoring silently
+        console.log('[Silent Scoring] Permanent error, disabling scoring');
+        reconnectAttemptsRef.current = 999; // Prevent further retries
+        setError(null);
+        return;
+      }
+      
+      // For temporary errors, try to reconnect (limited attempts)
+      if (isPlaying && reconnectAttemptsRef.current < 2) {
         scheduleReconnect();
+      } else {
+        // Give up silently after 2 attempts
+        setError(null);
       }
     }
   }, [calculateSegmentScore, isPlaying]);

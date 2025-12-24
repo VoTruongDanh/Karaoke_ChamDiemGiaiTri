@@ -513,6 +513,16 @@ export function ControllerScreen({
     setIsListening(false);
   }, []);
 
+  // Stop voice search when song starts playing (release mic for scoring)
+  useEffect(() => {
+    if (currentSong && recognitionRef.current) {
+      console.log('[Controller] Song started, stopping voice search to release mic');
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+      setIsListening(false);
+    }
+  }, [currentSong]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
