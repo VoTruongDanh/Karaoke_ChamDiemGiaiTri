@@ -59,7 +59,7 @@ function SongCard({ song, row, col, onSelect, isLarge = false }: {
       col={col}
       onSelect={onSelect}
       variant="ghost"
-      className={`!p-0 !min-w-0 text-left !border-0 ${
+      className={`!p-0 !min-w-0 text-left !border-0 !rounded-xl ${
         isLarge ? '!min-h-[200px]' : '!min-h-[180px]'
       }`}
     >
@@ -424,11 +424,13 @@ export function SearchScreen({
             row={0}
             col={1}
             onSelect={isListening ? stopVoiceSearch : startVoiceSearch}
-            variant="primary"
+            variant="secondary"
             size="lg"
             icon={<MicIcon className="w-6 h-6" />}
             autoFocus
-            className={`!px-6 ${isListening ? '!bg-red-500 animate-pulse' : ''}`}
+            className={`!px-6 !bg-rose-500 !text-white !border-rose-500 ${
+              isListening ? '!bg-rose-600 animate-pulse' : ''
+            }`}
           >
             {isListening ? 'Đang nghe...' : 'Tìm bằng giọng nói'}
           </FocusableButton>
@@ -557,7 +559,7 @@ export function SearchScreen({
               </div>
             ) : displaySongs.length > 0 ? (
               <div ref={resultsContainerRef} className="flex-1 overflow-y-auto hide-scrollbar">
-                <div className={`grid gap-4 p-1 ${
+                <div className={`grid gap-4 p-2 ${
                   showKeyboard ? 'grid-cols-2 lg:grid-cols-3' : 'grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
                 }`}>
                   {displaySongs.map((song, index) => {

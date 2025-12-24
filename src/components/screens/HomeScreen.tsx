@@ -332,11 +332,11 @@ export function HomeScreen({
                 row={currentSong ? 1 : 0}
                 col={0}
                 onSelect={onSearchSelect}
-                variant="primary"
+                variant="secondary"
                 size="md"
                 icon={<SearchIcon />}
                 autoFocus
-                className="flex-1 !whitespace-nowrap"
+                className="flex-1 !whitespace-nowrap !bg-rose-500 !text-white !border-rose-500"
               >
                 Tìm kiếm
               </FocusableButton>
