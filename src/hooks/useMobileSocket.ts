@@ -21,6 +21,8 @@ export interface MobileSocketState {
   isConnected: boolean;
   /** Whether joined to a session */
   isJoined: boolean;
+  /** Whether TV is online */
+  isTvOnline: boolean;
   /** Current session info */
   session: Session | null;
   /** Current queue from server */
@@ -45,6 +47,8 @@ export interface UseMobileSocketReturn extends MobileSocketState {
   addToQueue: (song: Song) => void;
   /** Remove a song from the queue */
   removeFromQueue: (itemId: string) => void;
+  /** Reorder a song in the queue */
+  reorderQueue: (itemId: string, newIndex: number) => void;
   /** Request to play/start the queue */
   requestPlay: () => void;
   /** Request to pause playback */
@@ -106,10 +110,13 @@ export function useMobileSocket(): UseMobileSocketReturn {
   const isInitializedRef = useRef(false);
   const pendingJoinRef = useRef<string | null>(null);
   const isJoinedRef = useRef(false);
+  const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastPongRef = useRef<number>(Date.now());
   
   const [state, setState] = useState<MobileSocketState>({
     isConnected: false,
     isJoined: false,
+    isTvOnline: true,
     session: null,
     queue: [],
     currentSong: null,
@@ -196,13 +203,73 @@ export function useMobileSocket(): UseMobileSocketReturn {
     socket.on('session:joined', (session: Session) => {
       console.log('[Mobile Socket] Joined session:', session.code);
       isJoinedRef.current = true;
+      lastPongRef.current = Date.now();
       setState((prev) => ({
         ...prev,
         isJoined: true,
+        isTvOnline: true,
         session,
         queue: session.queue || [],
         currentSong: session.currentSong || null,
         error: null,
+      }));
+      
+      // Start ping interval to check session health
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
+      }
+      pingIntervalRef.current = setInterval(() => {
+        if (socketRef.current?.connected && isJoinedRef.current) {
+          socketRef.current.emit('session:ping' as keyof ClientToServerEvents);
+        }
+      }, 15000); // Ping every 15 seconds
+    });
+
+    // Session ping response
+    socket.on('session:pong', (data: { tvOnline: boolean; mobileCount: number }) => {
+      lastPongRef.current = Date.now();
+      
+      if (data.tvOnline) {
+        // TV is online - clear any error about TV disconnection
+        setState((prev) => ({
+          ...prev,
+          isTvOnline: true,
+          error: prev.error === 'TV đã ngắt kết nối' || prev.error === 'Mất kết nối với TV' ? null : prev.error,
+        }));
+      } else if (isJoinedRef.current) {
+        // TV is offline
+        setState((prev) => ({
+          ...prev,
+          isTvOnline: false,
+          error: 'TV đã ngắt kết nối',
+        }));
+      }
+    });
+
+    // Session ended (TV disconnected)
+    socket.on('session:ended', () => {
+      console.log('[Mobile Socket] Session ended - TV disconnected');
+      isJoinedRef.current = false;
+      sessionCodeRef.current = null; // Clear saved code so we don't auto-rejoin
+      
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
+        pingIntervalRef.current = null;
+      }
+      
+      // Clear localStorage
+      try {
+        localStorage.removeItem('karaoke_session_code');
+      } catch {}
+      
+      setState((prev) => ({
+        ...prev,
+        isJoined: false,
+        isTvOnline: false,
+        session: null,
+        queue: [],
+        currentSong: null,
+        error: 'TV đã ngắt kết nối - phiên kết thúc',
       }));
     });
 
@@ -260,6 +327,12 @@ export function useMobileSocket(): UseMobileSocketReturn {
 
     // Cleanup on unmount - but don't disconnect in dev mode
     return () => {
+      // Clear ping interval
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
+        pingIntervalRef.current = null;
+      }
+      
       // In development, React StrictMode will call this
       // We keep the socket alive to prevent reconnection issues
       if (process.env.NODE_ENV === 'production') {
@@ -344,6 +417,21 @@ export function useMobileSocket(): UseMobileSocketReturn {
   }, []);
 
   /**
+   * Reorder a song in the queue
+   */
+  const reorderQueue = useCallback((itemId: string, newIndex: number) => {
+    console.log('[Mobile Socket] reorderQueue called:', itemId, newIndex);
+    console.log('[Mobile Socket] connected:', socketRef.current?.connected, 'joined:', isJoinedRef.current);
+    
+    if (socketRef.current?.connected && isJoinedRef.current) {
+      console.log('[Mobile Socket] Emitting queue:reorder');
+      socketRef.current.emit('queue:reorder', itemId, newIndex);
+    } else {
+      console.warn('[Mobile Socket] Cannot reorder - not connected or not joined');
+    }
+  }, []);
+
+  /**
    * Request to play/start the queue
    */
   const requestPlay = useCallback(() => {
@@ -379,12 +467,20 @@ export function useMobileSocket(): UseMobileSocketReturn {
   const disconnect = useCallback(() => {
     sessionCodeRef.current = null;
     isJoinedRef.current = false;
+    
+    // Clear ping interval
+    if (pingIntervalRef.current) {
+      clearInterval(pingIntervalRef.current);
+      pingIntervalRef.current = null;
+    }
+    
     if (socketRef.current) {
       socketRef.current.disconnect();
     }
     setState({
       isConnected: false,
       isJoined: false,
+      isTvOnline: true,
       session: null,
       queue: [],
       currentSong: null,
@@ -427,6 +523,7 @@ export function useMobileSocket(): UseMobileSocketReturn {
     joinSession,
     addToQueue,
     removeFromQueue,
+    reorderQueue,
     requestPlay,
     requestPause,
     requestSkip,

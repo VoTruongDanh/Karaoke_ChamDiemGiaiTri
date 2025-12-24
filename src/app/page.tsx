@@ -929,11 +929,40 @@ function TVAppContent() {
     }
   }, [songLibrary]);
 
-  const handleSongEnd = useCallback((score?: ScoreData) => {
+  const handleSongEnd = useCallback((score?: ScoreData, videoProgress?: number) => {
     const current = queueStore.getCurrent();
     
     // Use mobile score if available
-    const finalScore = score || mobileScoreRef.current || undefined;
+    let finalScore = score || mobileScoreRef.current || undefined;
+    
+    // Apply duration multiplier based on video progress
+    // < 10% watched: 20% score (severe penalty)
+    // 10-30% watched: 50% score
+    // 30-55% watched: 100% score
+    // > 55% watched: 110% score (bonus)
+    if (finalScore && videoProgress !== undefined) {
+      const progressPercent = videoProgress * 100;
+      let multiplier = 1.0;
+      
+      if (progressPercent < 10) {
+        multiplier = 0.2;
+        console.log(`[TV] Duration severe penalty: ${progressPercent.toFixed(1)}% watched, 0.2x multiplier`);
+      } else if (progressPercent < 30) {
+        multiplier = 0.5;
+        console.log(`[TV] Duration penalty: ${progressPercent.toFixed(1)}% watched, 0.5x multiplier`);
+      } else if (progressPercent > 55) {
+        multiplier = 1.1;
+        console.log(`[TV] Duration bonus: ${progressPercent.toFixed(1)}% watched, 1.1x multiplier`);
+      }
+      
+      if (multiplier !== 1.0) {
+        finalScore = {
+          ...finalScore,
+          totalScore: Math.min(100, Math.round(finalScore.totalScore * multiplier)),
+        };
+        console.log(`[TV] Final score after multiplier: ${finalScore.totalScore}`);
+      }
+    }
     
     if (current) {
       queueStore.setItemStatus(current.id, 'completed');
@@ -946,7 +975,9 @@ function TVAppContent() {
     }
   }, [queueStore, notifySongEnded]);
 
-  const handleSkip = useCallback(() => handleSongEnd(), [handleSongEnd]);
+  // handleSkip is called from mobile command - we don't know exact progress
+  // So we pass undefined to skip the duration multiplier
+  const handleSkip = useCallback(() => handleSongEnd(undefined, undefined), [handleSongEnd]);
 
   const handleStartPlaying = useCallback(() => {
     const next = queueStore.getNext();
@@ -1149,8 +1180,7 @@ function TVAppContent() {
           <PlayingScreen
             currentSong={currentSong}
             onSongEnd={handleSongEnd}
-            onBack={goBack}
-            onSkip={handleSkip}
+            onBack={goBack} 
             scoringEnabled={!!mobileScore}
             scoreData={mobileScore}
             onError={handleYouTubeError}

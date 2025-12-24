@@ -197,6 +197,7 @@ export function ControllerScreen({
   const [recentlyAddedSongs, setRecentlyAddedSongs] = useState<Song[]>([]);
   const [ytSuggestions, setYtSuggestions] = useState<Song[]>([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [isLoadingMoreSuggestions, setIsLoadingMoreSuggestions] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
@@ -205,7 +206,6 @@ export function ControllerScreen({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const currentQueryRef = useRef<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const suggestionsLoadedRef = useRef(false);
 
   const waitingCount = queue.filter(item => item.status === 'waiting').length;
 
@@ -223,16 +223,61 @@ export function ControllerScreen({
 
   // Track if initial popular suggestions have been loaded
   const initialLoadDoneRef = useRef(false);
+  const lastSuggestionSourceRef = useRef<string>('');
+  const loadedSuggestionIdsRef = useRef<Set<string>>(new Set());
 
-  // Load initial popular karaoke suggestions when no songs in queue
+  // Load more suggestions based on last suggestion
+  const loadMoreSuggestions = useCallback(async () => {
+    if (!onGetSuggestions || isLoadingMoreSuggestions) return;
+    if (ytSuggestions.length === 0) return;
+    
+    console.log('[Controller] Loading more suggestions...');
+    setIsLoadingMoreSuggestions(true);
+    
+    // Use last few suggestions as seed for more
+    const lastSuggestions = ytSuggestions.slice(-3);
+    const videoIds = lastSuggestions.map(s => s.youtubeId);
+    
+    // Track all loaded IDs to avoid duplicates
+    const existingIds = new Set([
+      ...Array.from(loadedSuggestionIdsRef.current),
+      ...ytSuggestions.map(s => s.youtubeId),
+      ...queueSongs.map(s => s.youtubeId),
+      ...recentlyAddedSongs.map(s => s.youtubeId),
+    ]);
+    
+    try {
+      const newSuggestions = await onGetSuggestions(videoIds);
+      console.log('[Controller] Got more suggestions:', newSuggestions.length);
+      const filtered = newSuggestions.filter(s => !existingIds.has(s.youtubeId));
+      console.log('[Controller] Filtered new suggestions:', filtered.length);
+      
+      if (filtered.length > 0) {
+        filtered.forEach(s => loadedSuggestionIdsRef.current.add(s.youtubeId));
+        setYtSuggestions(prev => [...prev, ...filtered.slice(0, 8)]);
+      }
+    } catch (err) {
+      console.error('[Controller] Load more suggestions error:', err);
+    } finally {
+      setIsLoadingMoreSuggestions(false);
+    }
+  }, [onGetSuggestions, isLoadingMoreSuggestions, ytSuggestions, queueSongs, recentlyAddedSongs]);
+
+  // Load initial popular karaoke suggestions when first entering
   useEffect(() => {
     if (!onGetSuggestions) return;
     
-    // If we have songs, skip initial load
-    if (queueSongs.length > 0 || recentlyAddedSongs.length > 0) return;
+    // Skip if already loaded initial suggestions
+    if (initialLoadDoneRef.current && ytSuggestions.length > 0) return;
     
-    // Skip if already loaded
-    if (initialLoadDoneRef.current) return;
+    // If we have songs in queue, use them for suggestions instead
+    if (queueSongs.length > 0) {
+      initialLoadDoneRef.current = true;
+      return;
+    }
+    
+    // Skip if already loading
+    if (isLoadingSuggestions) return;
     
     console.log('[Controller] Loading initial popular karaoke suggestions');
     initialLoadDoneRef.current = true;
@@ -242,8 +287,10 @@ export function ControllerScreen({
     onGetSuggestions([])
       .then(suggestions => {
         console.log('[Controller] Got initial suggestions:', suggestions.length);
-        setYtSuggestions(suggestions.slice(0, 6));
-        suggestionsLoadedRef.current = true;
+        if (suggestions.length > 0) {
+          setYtSuggestions(suggestions.slice(0, 12));
+          lastSuggestionSourceRef.current = 'initial';
+        }
       })
       .catch((err) => {
         console.error('[Controller] Initial suggestions error:', err);
@@ -251,7 +298,7 @@ export function ControllerScreen({
         initialLoadDoneRef.current = false;
       })
       .finally(() => setIsLoadingSuggestions(false));
-  }, [onGetSuggestions, queueSongs.length, recentlyAddedSongs.length]);
+  }, [onGetSuggestions, queueSongs.length, isLoadingSuggestions, ytSuggestions.length]);
 
   // Load YouTube suggestions when songs are added OR when joining with existing queue
   useEffect(() => {
@@ -262,41 +309,33 @@ export function ControllerScreen({
     
     if (songsForSuggestions.length === 0) return;
     
-    // Prevent duplicate loads for same songs
-    const songIds = songsForSuggestions.slice(0, 3).map(s => s.youtubeId).join(',');
-    if (suggestionsLoadedRef.current && ytSuggestions.length > 0) {
-      // Only reload if songs changed
-      return;
-    }
+    // Create a source key to track what we're loading suggestions for
+    const sourceKey = songsForSuggestions.slice(0, 3).map(s => s.youtubeId).join(',');
     
-    console.log('[Controller] Loading suggestions for:', songsForSuggestions.slice(0, 3).map(s => s.youtubeId));
+    // Skip if already loaded for this source
+    if (lastSuggestionSourceRef.current === sourceKey) return;
+    
+    console.log('[Controller] Loading suggestions for:', songsForSuggestions.slice(0, 3).map(s => s.title));
     setIsLoadingSuggestions(true);
-    suggestionsLoadedRef.current = true;
+    lastSuggestionSourceRef.current = sourceKey;
     
     const videoIds = songsForSuggestions.slice(0, 3).map(s => s.youtubeId);
     const addedIds = new Set([...recentlyAddedSongs.map(s => s.youtubeId), ...queueSongs.map(s => s.youtubeId)]);
     
     onGetSuggestions(videoIds)
       .then(suggestions => {
-        console.log('[Controller] Got suggestions:', suggestions.length, suggestions.map(s => s.title));
+        console.log('[Controller] Got suggestions:', suggestions.length);
         // Filter out songs already in queue or added
         const filtered = suggestions.filter(s => !addedIds.has(s.youtubeId));
         console.log('[Controller] Filtered suggestions:', filtered.length);
-        setYtSuggestions(filtered.slice(0, 6));
+        setYtSuggestions(filtered.slice(0, 12));
       })
       .catch((err) => {
         console.error('[Controller] Suggestions error:', err);
-        setYtSuggestions([]);
+        // Don't clear suggestions on error, keep old ones
       })
       .finally(() => setIsLoadingSuggestions(false));
   }, [recentlyAddedSongs, queueSongs, onGetSuggestions]);
-
-  // Reset suggestions loaded flag when queue changes significantly
-  useEffect(() => {
-    if (queueSongs.length === 0) {
-      suggestionsLoadedRef.current = false;
-    }
-  }, [queueSongs.length]);
 
   // Generate smart keyword suggestions based on history
   const smartSuggestions = useMemo(() => 
@@ -356,11 +395,19 @@ export function ControllerScreen({
     if (!container) return;
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = container;
-      if (scrollHeight - scrollTop - clientHeight < 200) loadMore();
+      if (scrollHeight - scrollTop - clientHeight < 200) {
+        // If searching, load more search results
+        if (searchQuery.trim()) {
+          loadMore();
+        } else {
+          // If not searching, load more suggestions
+          loadMoreSuggestions();
+        }
+      }
     };
     container.addEventListener('scroll', handleScroll);
     return () => container.removeEventListener('scroll', handleScroll);
-  }, [loadMore]);
+  }, [loadMore, loadMoreSuggestions, searchQuery]);
 
   const handleAddToQueue = useCallback((song: Song) => {
     onAddToQueue(song);
@@ -599,10 +646,12 @@ export function ControllerScreen({
               </div>
             </div>
 
-            {/* YouTube Suggestions */}
+            {/* YouTube Suggestions - Always show if available */}
             {ytSuggestions.length > 0 && (
               <div>
-                <p className="text-sm text-slate-500 mb-2">Gợi ý cho bạn</p>
+                <p className="text-sm text-slate-500 mb-2">
+                  {queueSongs.length > 0 ? '🎵 Gợi ý tiếp theo' : '🔥 Karaoke phổ biến'}
+                </p>
                 <div className="grid grid-cols-2 gap-3">
                   {ytSuggestions.map((song) => (
                     <button
@@ -620,6 +669,7 @@ export function ControllerScreen({
                           src={song.thumbnail}
                           alt=""
                           className="w-full h-full object-cover"
+                          loading="lazy"
                         />
                         {addedSongsSet.has(song.youtubeId) && (
                           <div className="absolute inset-0 bg-accent-green/30 flex items-center justify-center">
@@ -643,17 +693,28 @@ export function ControllerScreen({
                     </button>
                   ))}
                 </div>
+                
+                {/* Load more suggestions indicator */}
+                {isLoadingMoreSuggestions && (
+                  <div className="flex items-center justify-center gap-2 py-4 mt-2">
+                    <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-xs text-slate-400">Đang tải thêm...</span>
+                  </div>
+                )}
+                
+                {/* Load more button */}
+                {!isLoadingMoreSuggestions && ytSuggestions.length >= 8 && (
+                  <button
+                    onClick={loadMoreSuggestions}
+                    className="w-full mt-3 py-3 bg-slate-100 dark:bg-tv-card hover:bg-slate-200 dark:hover:bg-tv-hover rounded-xl text-sm text-slate-600 dark:text-slate-300 transition-colors active:scale-[0.98]"
+                  >
+                    Tải thêm gợi ý
+                  </button>
+                )}
               </div>
             )}
             
-            {/* Debug: Show suggestion count */}
-            {recentlyAddedSongs.length > 0 && ytSuggestions.length === 0 && !isLoadingSuggestions && (
-              <p className="text-xs text-slate-400 text-center py-2">
-                Đang tìm gợi ý cho &ldquo;{recentlyAddedSongs[0]?.title?.slice(0, 20)}...&rdquo;
-              </p>
-            )}
-
-            {isLoadingSuggestions && (
+            {isLoadingSuggestions && ytSuggestions.length === 0 && (
               <div className="flex items-center justify-center gap-2 py-4">
                 <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
                 <span className="text-xs text-slate-400">Đang tải gợi ý...</span>

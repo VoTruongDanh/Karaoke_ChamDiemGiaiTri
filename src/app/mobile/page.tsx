@@ -48,6 +48,7 @@ function MobileAppContent() {
   const {
     isConnected,
     isJoined,
+    isTvOnline,
     session,
     queue,
     currentSong,
@@ -57,6 +58,7 @@ function MobileAppContent() {
     joinSession,
     addToQueue,
     removeFromQueue,
+    reorderQueue,
     requestPlay,
     requestSkip,
     sendScore,
@@ -65,9 +67,11 @@ function MobileAppContent() {
   } = useMobileSocket();
 
   // Silent scoring - background recording with auto-reconnect
+  // Pass song duration for duration-based score multiplier
   const { isRecording: isMicActive, error: micError } = useSilentScoring({
     isPlaying: !!currentSong,
     onScoreUpdate: sendScore,
+    songDuration: currentSong?.song?.duration,
   });
 
   const handleDisconnect = useCallback(() => {
@@ -93,14 +97,18 @@ function MobileAppContent() {
   }, [songLibrary]);
 
   const handleGetSuggestions = useCallback(async (videoIds: string[]): Promise<Song[]> => {
-    if (videoIds.length > 0) {
-      try {
-        return await songLibrary.getSuggestions(videoIds, 6);
-      } catch {
-        return [];
+    try {
+      if (videoIds.length > 0) {
+        // Get related videos based on provided IDs
+        return await songLibrary.getSuggestions(videoIds, 12);
+      } else {
+        // No video IDs - search for popular karaoke
+        const result = await songLibrary.search('karaoke việt nam 2024');
+        return result.songs.slice(0, 12);
       }
+    } catch {
+      return [];
     }
-    return [];
   }, [songLibrary]);
 
   const sessionCode = session?.code || '';
@@ -184,6 +192,13 @@ function MobileAppContent() {
     }
   }, [isJoined, isReconnecting, isAttemptingJoin, currentScreen]);
 
+  // Handle TV offline - show warning but don't disconnect immediately
+  useEffect(() => {
+    if (isJoined && !isTvOnline && currentScreen !== 'connect') {
+      console.log('[Mobile] TV went offline');
+    }
+  }, [isJoined, isTvOnline, currentScreen]);
+
   // Show result when song finishes - ignore if within 3s of joining (old data)
   useEffect(() => {
     if (finishedSong && isJoined && currentScreen !== 'connect') {
@@ -238,6 +253,8 @@ function MobileAppContent() {
             currentSong={currentSong}
             onBack={() => setCurrentScreen('controller')}
             onRemove={removeFromQueue}
+            onAddToQueue={addToQueue}
+            onReorder={reorderQueue}
           />
         );
 
@@ -258,8 +275,18 @@ function MobileAppContent() {
 
   return (
     <main className="min-h-screen bg-slate-50 dark:bg-tv-bg">
+      {/* TV offline warning */}
+      {isJoined && !isTvOnline && currentScreen !== 'connect' && (
+        <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center gap-2 px-3 py-2 bg-red-500 text-white text-sm">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <span>TV đã ngắt kết nối</span>
+        </div>
+      )}
+      
       {/* Reconnecting indicator */}
-      {isReconnecting && isJoined && (
+      {isReconnecting && isJoined && isTvOnline && (
         <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center gap-2 px-3 py-1.5 bg-yellow-500 text-white text-xs">
           <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
           <span>Đang kết nối lại...</span>

@@ -40,7 +40,7 @@ declare global {
 
 export interface PlayingScreenProps {
   currentSong: QueueItem;
-  onSongEnd: (score?: ScoreData) => void;
+  onSongEnd: (score?: ScoreData, videoProgress?: number) => void;
   onBack: () => void;
   onSkip?: () => void;
   scoreData?: ScoreData | null;
@@ -315,6 +315,9 @@ export function PlayingScreen({
   const timeUpdateRef = useRef<NodeJS.Timeout | null>(null);
   const seekTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
+  // Track real wall-clock time for duration penalty
+  const startTimeRef = useRef<number>(Date.now());
+  
   // Button refs for focus management
   const backButtonRef = useRef<HTMLButtonElement>(null);
   const skipButtonRef = useRef<HTMLButtonElement>(null);
@@ -345,6 +348,8 @@ export function PlayingScreen({
     setCurrentTime(0);
     setDuration(0);
     setErrorFocused(0);
+    // Reset wall-clock timer
+    startTimeRef.current = Date.now();
   }, [currentSong.id]);
 
   // Update time periodically - use longer interval to reduce re-renders
@@ -604,15 +609,25 @@ export function PlayingScreen({
   }, [onError]);
 
   const handleSkipNow = useCallback(() => {
-    onSkip?.() || onSongEnd();
-  }, [onSkip, onSongEnd]);
+    // When skipping, calculate real-time progress
+    const songDuration = currentSong.song.duration;
+    const elapsedSeconds = (Date.now() - startTimeRef.current) / 1000;
+    const progress = songDuration > 0 ? Math.min(1, elapsedSeconds / songDuration) : 0;
+    console.log(`[PlayingScreen] Skip - elapsed: ${elapsedSeconds.toFixed(1)}s, duration: ${songDuration}s, progress: ${(progress * 100).toFixed(1)}%`);
+    onSkip?.() || onSongEnd(undefined, progress);
+  }, [onSkip, onSongEnd, currentSong.song.duration]);
 
   const scoreDataRef = useRef(scoreData);
   scoreDataRef.current = scoreData;
 
   const handleSongEnd = useCallback(() => {
-    onSongEnd(scoreDataRef.current || undefined);
-  }, [onSongEnd]);
+    // Video ended - calculate real-time progress (not video progress)
+    const songDuration = currentSong.song.duration;
+    const elapsedSeconds = (Date.now() - startTimeRef.current) / 1000;
+    const progress = songDuration > 0 ? Math.min(1, elapsedSeconds / songDuration) : 1.0;
+    console.log(`[PlayingScreen] End - elapsed: ${elapsedSeconds.toFixed(1)}s, duration: ${songDuration}s, progress: ${(progress * 100).toFixed(1)}%`);
+    onSongEnd(scoreDataRef.current || undefined, progress);
+  }, [onSongEnd, currentSong.song.duration]);
 
   const getButtonClass = (button: typeof focusedButton) => {
     const base = "p-3 rounded-full transition-all focus:outline-none";

@@ -19,6 +19,8 @@ interface UseSilentScoringProps {
   onScoreUpdate?: (score: ScoreData) => void;
   /** Song ID for tracking previous scores */
   songId?: string;
+  /** Song duration in seconds */
+  songDuration?: number;
 }
 
 interface UseSilentScoringReturn {
@@ -219,6 +221,7 @@ export function useSilentScoring({
   isPlaying, 
   onScoreUpdate,
   songId,
+  songDuration,
 }: UseSilentScoringProps): UseSilentScoringReturn {
   const [currentScore, setCurrentScore] = useState<ScoreData>({ 
     pitchAccuracy: 0, 
@@ -238,6 +241,10 @@ export function useSilentScoring({
   // Previous score tracking
   const previousScoreRef = useRef<number | null>(null);
   const isFirstScoreRef = useRef(true);
+  
+  // Time tracking for duration multiplier
+  const startTimeRef = useRef<number>(0);
+  const songDurationRef = useRef<number>(0);
   
   // Scoring data - segment based
   const currentSegmentRef = useRef<number[]>([]); // Current singing segment pitches
@@ -268,6 +275,14 @@ export function useSilentScoring({
   useEffect(() => {
     onScoreUpdateRef.current = onScoreUpdate;
   });
+  
+  // Update song duration when prop changes
+  useEffect(() => {
+    if (songDuration && songDuration > 0) {
+      songDurationRef.current = songDuration;
+      console.log(`[Silent Scoring] Song duration updated: ${songDuration}s`);
+    }
+  }, [songDuration]);
   
   // Load previous score on mount
   useEffect(() => {
@@ -331,8 +346,57 @@ export function useSilentScoring({
     }
   }, []);
 
+  // Calculate duration multiplier based on actual singing time vs song duration
+  // Uses the MINIMUM of:
+  // 1. Singing frames ratio (how much user actually sang)
+  // 2. Wall clock time ratio (how long the session lasted)
+  // This prevents cheating by either:
+  // - Singing a lot then skipping (wall clock is short)
+  // - Letting video play without singing then skipping (singing frames is low)
+  const calculateDurationMultiplier = useCallback((): number => {
+    const duration = songDurationRef.current;
+    console.log(`[Silent Scoring] calculateDurationMultiplier - songDuration: ${duration}`);
+    
+    if (!duration || duration <= 0) {
+      console.log(`[Silent Scoring] No duration, returning 1.0x`);
+      return 1.0; // No duration info, no multiplier
+    }
+    
+    // Method 1: Wall clock time
+    const elapsedSeconds = (Date.now() - startTimeRef.current) / 1000;
+    const wallClockPercent = (elapsedSeconds / duration) * 100;
+    
+    // Method 2: Singing frames
+    const expectedFrames = duration * 60; // ~60fps
+    const segments = segmentsRef.current;
+    const currentSegment = currentSegmentRef.current;
+    let totalSingingFrames = 0;
+    for (const seg of segments) {
+      totalSingingFrames += seg.pitches.length;
+    }
+    totalSingingFrames += currentSegment.length;
+    const singingPercent = (totalSingingFrames / expectedFrames) * 100;
+    
+    // Use the MINIMUM to prevent cheating
+    const percentSung = Math.min(wallClockPercent, singingPercent);
+    
+    console.log(`[Silent Scoring] Wall clock: ${wallClockPercent.toFixed(1)}%, Singing: ${singingPercent.toFixed(1)}%, Using: ${percentSung.toFixed(1)}%`);
+    
+    if (percentSung < 30) {
+      console.log(`[Silent Scoring] < 30%, applying 0.5x penalty`);
+      return 0.5; // Less than 30% - half score
+    } else if (percentSung <= 55) {
+      console.log(`[Silent Scoring] 30-55%, no multiplier`);
+      return 1.0; // 30-55% - normal score
+    } else {
+      console.log(`[Silent Scoring] > 55%, applying 1.1x bonus`);
+      return 1.1; // More than 55% - bonus 10%
+    }
+  }, []);
+
   // Calculate score from segments only (ignores instrumental parts)
-  const calculateSegmentScore = useCallback(() => {
+  // Note: Duration multiplier is now applied on TV side based on video progress
+  const calculateSegmentScore = useCallback((isFinalScore: boolean = false) => {
     const segments = segmentsRef.current;
     const currentSegment = currentSegmentRef.current;
     
@@ -381,13 +445,17 @@ export function useSilentScoring({
       : 0;
     
     // Total score - balanced formula
-    // pitchAccuracy and timing both contribute equally
-    const rawTotalScore = Math.round((pitchAccuracy + timing) / 2);
+    let rawTotalScore = Math.round((pitchAccuracy + timing) / 2);
     
-    // Apply score smoothing based on previous score
-    const totalScore = applyScoreSmoothing(rawTotalScore, previousScoreRef.current);
+    // Apply smoothing for final score (compare with previous song)
+    if (isFinalScore) {
+      const previousSongScore = previousScoreRef.current;
+      const smoothedScore = applyScoreSmoothing(rawTotalScore, previousSongScore);
+      console.log(`[Silent Scoring] Final - Raw: ${rawTotalScore}, PrevSong: ${previousSongScore}, Smoothed: ${smoothedScore}`);
+      return { pitchAccuracy, timing, totalScore: smoothedScore };
+    }
     
-    return { pitchAccuracy, timing, totalScore };
+    return { pitchAccuracy, timing, totalScore: rawTotalScore };
   }, []);
 
   // Start recording
@@ -455,6 +523,10 @@ export function useSilentScoring({
       silenceCountRef.current = 0;
       frameCountRef.current = 0;
       segmentStartRef.current = 0;
+      
+      // Track start time and song duration for multiplier
+      startTimeRef.current = Date.now();
+      songDurationRef.current = songDuration || 0;
 
       // Start analysis loop
       const analyser = analyserRef.current;
@@ -613,6 +685,7 @@ export function useSilentScoring({
 
   // Stop recording
   const stopRecording = useCallback(() => {
+    console.log('[Silent Scoring] stopRecording called');
     isRecordingRef.current = false;
     setIsRecording(false);
     
@@ -645,9 +718,12 @@ export function useSilentScoring({
     releaseWakeLock();
     stopKeepAlive();
 
-    // Calculate and send final score
-    const finalScore = calculateSegmentScore();
+    // Calculate and send final score WITH duration multiplier applied
+    const finalScore = calculateSegmentScore(true);
+    console.log('[Silent Scoring] Final score calculated:', finalScore);
     setCurrentScore(finalScore);
+    
+    // Send final score immediately - this is the important one with multiplier
     onScoreUpdateRef.current?.(finalScore);
     
     // Save score for next time (only if there was actual singing)

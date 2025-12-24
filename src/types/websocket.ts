@@ -23,10 +23,14 @@ export interface TVToServerEvents {
 export interface MobileToServerEvents {
   /** Join an existing session by code */
   'session:join': (code: string) => void;
+  /** Ping to check if session is still alive */
+  'session:ping': () => void;
   /** Add a song to the queue */
   'queue:add': (song: Song) => void;
   /** Remove a song from the queue */
   'queue:remove': (itemId: string) => void;
+  /** Reorder a song in the queue */
+  'queue:reorder': (itemId: string, newIndex: number) => void;
   /** Request to play/start the queue */
   'playback:play': () => void;
   /** Request to pause playback */
@@ -45,6 +49,10 @@ export interface MobileToServerEvents {
 export interface ServerToClientEvents {
   /** Session joined successfully */
   'session:joined': (session: Session) => void;
+  /** Session ping response - confirms session is alive */
+  'session:pong': (data: { tvOnline: boolean; mobileCount: number }) => void;
+  /** Session ended (TV disconnected) */
+  'session:ended': () => void;
   /** Queue has been updated */
   'queue:updated': (queue: QueueItem[]) => void;
   /** A song is now playing */

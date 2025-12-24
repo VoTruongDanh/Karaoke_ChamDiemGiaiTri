@@ -2565,3 +2565,20 @@
 .animate-twinkle {
   animation: twinkleEffect 0.8s ease-in-out infinite;
 }
+
+/* QR Scanner scan line animation */
+@keyframes scanLine {
+  0% {
+    top: 0;
+  }
+  50% {
+    top: calc(100% - 2px);
+  }
+  100% {
+    top: 0;
+  }
+}
+
+.animate-scan {
+  animation: scanLine 2s ease-in-out infinite;
+}

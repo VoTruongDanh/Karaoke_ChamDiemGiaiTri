@@ -205,6 +205,51 @@ export function setupSocketHandlers(io: TypedServer, sessionStore: SessionStore)
     });
 
     /**
+     * Mobile reorders a song in the queue
+     */
+    socket.on('queue:reorder', (itemId: string, newIndex: number) => {
+      try {
+        console.log(`[Reorder] Request: itemId=${itemId}, newIndex=${newIndex}`);
+        
+        const session = sessionStore.getSessionBySocket(socket.id);
+        if (!session) {
+          socket.emit('error', 'Session not found');
+          return;
+        }
+
+        // Find the item and reorder
+        const waitingItems = session.queue.filter(item => item.status === 'waiting');
+        const itemIndex = waitingItems.findIndex(item => item.id === itemId);
+        
+        console.log(`[Reorder] Found item at index ${itemIndex}, total waiting: ${waitingItems.length}`);
+        
+        if (itemIndex === -1 || newIndex < 0 || newIndex >= waitingItems.length) {
+          socket.emit('error', 'Invalid reorder request');
+          return;
+        }
+
+        // Remove item from current position
+        const [item] = waitingItems.splice(itemIndex, 1);
+        // Insert at new position
+        waitingItems.splice(newIndex, 0, item);
+        
+        // Rebuild queue with non-waiting items first, then reordered waiting items
+        const nonWaitingItems = session.queue.filter(item => item.status !== 'waiting');
+        const newQueue = [...nonWaitingItems, ...waitingItems];
+        
+        sessionStore.updateQueue(session.id, newQueue);
+
+        // Broadcast updated queue to all clients
+        io.to(session.id).emit('queue:updated', newQueue);
+        
+        console.log(`Song reordered: ${itemId} to position ${newIndex}`);
+      } catch (err) {
+        console.error('[Reorder] Error:', err);
+        socket.emit('error', 'Failed to reorder queue');
+      }
+    });
+
+    /**
      * Mobile requests to play/start the queue
      */
     socket.on('playback:play', () => {
@@ -247,6 +292,27 @@ export function setupSocketHandlers(io: TypedServer, sessionStore: SessionStore)
       // Send skip command to TV
       io.to(session.id).emit('playback:command', 'skip');
       console.log(`Playback skip requested for session: ${session.code}`);
+    });
+
+    /**
+     * Mobile pings to check if session is still alive
+     * Returns TV online status and mobile count
+     */
+    socket.on('session:ping', () => {
+      const session = sessionStore.getSessionBySocket(socket.id);
+      if (!session) {
+        socket.emit('session:pong', { tvOnline: false, mobileCount: 0 });
+        return;
+      }
+
+      // Check if TV socket is still in the session
+      const tvSocket = io.sockets.sockets.get(session.tvSocketId);
+      const tvOnline = !!tvSocket?.connected;
+      
+      socket.emit('session:pong', { 
+        tvOnline, 
+        mobileCount: session.mobileConnections.length 
+      });
     });
 
     /**
@@ -295,18 +361,36 @@ export function setupSocketHandlers(io: TypedServer, sessionStore: SessionStore)
      * Requirements: 7.2 - Connection events
      */
     socket.on('disconnect', () => {
-      const { session, isTv, userId } = sessionStore.handleDisconnect(socket.id);
+      // Get session info BEFORE handling disconnect (which may cleanup)
+      const session = sessionStore.getSessionBySocket(socket.id);
       
       if (session) {
+        const isTv = session.tvSocketId === socket.id;
+        
         if (isTv) {
-          // TV disconnected - notify all mobiles
-          io.to(session.id).emit('error', 'TV disconnected - session ended');
+          // TV disconnected - notify all mobiles BEFORE cleanup
+          console.log(`TV disconnected, notifying mobiles in session ${session.code}`);
+          
+          // Emit to all mobile sockets directly (not via room since we're about to cleanup)
+          session.mobileConnections.forEach(mobileSocketId => {
+            const mobileSocket = io.sockets.sockets.get(mobileSocketId);
+            if (mobileSocket) {
+              mobileSocket.emit('session:ended');
+              mobileSocket.emit('error', 'TV đã ngắt kết nối - phiên kết thúc');
+            }
+          });
+          
           console.log(`TV disconnected, session ${session.code} ended`);
-        } else if (userId) {
-          // Mobile disconnected - notify others
-          socket.to(session.id).emit('mobile:disconnected', userId);
-          console.log(`Mobile disconnected: ${userId}`);
         }
+      }
+      
+      // Now handle the disconnect (cleanup)
+      const { session: cleanedSession, isTv, userId } = sessionStore.handleDisconnect(socket.id);
+      
+      if (cleanedSession && !isTv && userId) {
+        // Mobile disconnected - notify others
+        socket.to(cleanedSession.id).emit('mobile:disconnected', userId);
+        console.log(`Mobile disconnected: ${userId}`);
       }
       
       console.log(`Client disconnected: ${socket.id}`);
