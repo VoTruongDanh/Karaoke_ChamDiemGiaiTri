@@ -143,191 +143,177 @@ function getRandomQuote(grade: GradeInfo): string {
 }
 
 
-// ============ CINEMATIC SCORE REVEAL - High-end visual effect ============
-function CinematicScoreReveal({ target, onComplete, glowColor, isHighScore }: { 
+// ============ CINEMATIC SCORE REVEAL - Ultra High-end visual effect ============
+function CinematicScoreReveal({ target, onComplete, glowColor }: { 
   target: number; 
   onComplete?: () => void; 
   glowColor?: string;
   isHighScore?: boolean;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const displayValueRef = useRef(0);
-  const [, forceUpdate] = useState(0); // Force re-render
-  const phaseRef = useRef<'buildup' | 'counting' | 'reveal' | 'celebrate'>('buildup');
-  const showNumberRef = useRef(false);
+  const [displayValue, setDisplayValue] = useState(0);
+  const [phase, setPhase] = useState<'intro' | 'buildup' | 'counting' | 'impact' | 'celebrate'>('intro');
   const audioRef = useRef<AudioContext | null>(null);
+  const onCompleteRef = useRef(onComplete);
   const hasCompletedRef = useRef(false);
+  
+  // Keep callback ref updated but don't trigger re-render
+  onCompleteRef.current = onComplete;
 
   const color = glowColor || '#FFD700';
+  const isHigh = target >= 80;
 
-  // Initialize audio once
+  // Initialize audio
   useEffect(() => {
-    if (!audioRef.current) {
-      try { 
-        audioRef.current = new (window.AudioContext || (window as any).webkitAudioContext)(); 
-      } catch {}
-    }
+    try { 
+      audioRef.current = new (window.AudioContext || (window as any).webkitAudioContext)(); 
+    } catch {}
     return () => { 
       audioRef.current?.close().catch(() => {}); 
-      audioRef.current = null;
     };
   }, []);
 
   // Sound effects
-  const playSound = useCallback((type: 'tick' | 'whoosh' | 'impact' | 'fanfare') => {
-    if (!audioRef.current) return;
+  const playSound = useCallback((type: 'whoosh' | 'tick' | 'boom' | 'fanfare') => {
+    if (!audioRef.current || audioRef.current.state === 'closed') return;
     const ctx = audioRef.current;
     try {
-      if (type === 'tick') {
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.type = 'sine';
-        o.frequency.value = 800 + Math.random() * 400;
-        g.gain.setValueAtTime(0.08, ctx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03);
-        o.connect(g); g.connect(ctx.destination);
-        o.start(); o.stop(ctx.currentTime + 0.03);
-      } else if (type === 'whoosh') {
+      if (type === 'whoosh') {
         const o = ctx.createOscillator();
         const g = ctx.createGain();
         o.type = 'sawtooth';
-        o.frequency.setValueAtTime(200, ctx.currentTime);
-        o.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.15);
-        g.gain.setValueAtTime(0.15, ctx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+        o.frequency.setValueAtTime(100, ctx.currentTime);
+        o.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.3);
+        g.gain.setValueAtTime(0.2, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
         o.connect(g); g.connect(ctx.destination);
-        o.start(); o.stop(ctx.currentTime + 0.2);
-      } else if (type === 'impact') {
+        o.start(); o.stop(ctx.currentTime + 0.35);
+      } else if (type === 'tick') {
         const o = ctx.createOscillator();
         const g = ctx.createGain();
         o.type = 'sine';
-        o.frequency.setValueAtTime(120, ctx.currentTime);
-        o.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.4);
-        g.gain.setValueAtTime(0.5, ctx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        o.frequency.value = 1000 + Math.random() * 500;
+        g.gain.setValueAtTime(0.1, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
         o.connect(g); g.connect(ctx.destination);
-        o.start(); o.stop(ctx.currentTime + 0.4);
+        o.start(); o.stop(ctx.currentTime + 0.05);
+      } else if (type === 'boom') {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(150, ctx.currentTime);
+        o.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 0.5);
+        g.gain.setValueAtTime(0.6, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(); o.stop(ctx.currentTime + 0.6);
       } else if (type === 'fanfare') {
-        [523, 659, 784, 1047].forEach((f, i) => {
+        const notes = isHigh ? [523, 659, 784, 1047, 1319] : [523, 659, 784];
+        notes.forEach((f, i) => {
           const o = ctx.createOscillator();
           const g = ctx.createGain();
           o.type = 'sine'; o.frequency.value = f;
-          g.gain.setValueAtTime(0.2, ctx.currentTime + i * 0.12);
-          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.5);
+          g.gain.setValueAtTime(0.25, ctx.currentTime + i * 0.1);
+          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.1 + 0.6);
           o.connect(g); g.connect(ctx.destination);
-          o.start(ctx.currentTime + i * 0.12);
-          o.stop(ctx.currentTime + i * 0.12 + 0.5);
+          o.start(ctx.currentTime + i * 0.1);
+          o.stop(ctx.currentTime + i * 0.1 + 0.6);
         });
       }
     } catch {}
-  }, []);
+  }, [isHigh]);
 
-  // Main animation sequence - runs once on mount
+  // Main animation - only run once on mount, ignore all re-renders
   useEffect(() => {
+    // Skip if already completed
     if (hasCompletedRef.current) return;
     
     let cancelled = false;
-    let fastInterval: ReturnType<typeof setInterval> | null = null;
-    let slowInterval: ReturnType<typeof setInterval> | null = null;
     
-    const update = () => forceUpdate(n => n + 1);
-    
-    // Phase 1: Buildup (0.5s)
-    const t1 = setTimeout(() => {
+    // Start animation
+    const runAnimation = async () => {
+      // Buildup
+      await new Promise(r => setTimeout(r, 100));
       if (cancelled) return;
-      phaseRef.current = 'counting';
-      playSound('whoosh');
-      update();
-    }, 500);
-
-    // Phase 2: Fast counting
-    const t2 = setTimeout(() => {
-      if (cancelled) return;
-      showNumberRef.current = true;
-      let val = 0;
-      const fastTarget = Math.floor(target * 0.75);
+      setPhase('buildup');
       
-      fastInterval = setInterval(() => {
-        if (cancelled) {
-          if (fastInterval) clearInterval(fastInterval);
-          return;
-        }
-        val += Math.ceil(target / 15);
-        if (val >= fastTarget) {
-          val = fastTarget;
-          if (fastInterval) clearInterval(fastInterval);
-          
-          // Phase 3: Slow dramatic counting
-          let slowVal = fastTarget;
-          slowInterval = setInterval(() => {
-            if (cancelled) {
-              if (slowInterval) clearInterval(slowInterval);
-              return;
-            }
-            slowVal += 1;
-            displayValueRef.current = slowVal;
-            playSound('tick');
-            update();
-            
-            if (slowVal >= target) {
-              if (slowInterval) clearInterval(slowInterval);
-              phaseRef.current = 'reveal';
-              playSound('impact');
-              update();
-              
-              setTimeout(() => {
-                if (cancelled || hasCompletedRef.current) return;
-                hasCompletedRef.current = true;
-                phaseRef.current = 'celebrate';
-                playSound('fanfare');
-                update();
-                onComplete?.();
-              }, 300);
-            }
-          }, 100);
-        }
-        displayValueRef.current = val;
-        update();
-      }, 40);
-    }, 600);
-
+      // Counting
+      await new Promise(r => setTimeout(r, 300));
+      if (cancelled) return;
+      setPhase('counting');
+      playSound('whoosh');
+      
+      // Fast count to 70%
+      const fastTarget = Math.floor(target * 0.7);
+      for (let val = 0; val <= fastTarget; val += Math.ceil(target / 10)) {
+        if (cancelled) return;
+        setDisplayValue(Math.min(val, fastTarget));
+        await new Promise(r => setTimeout(r, 25));
+      }
+      
+      // Slow count remaining
+      for (let val = fastTarget; val <= target; val++) {
+        if (cancelled) return;
+        setDisplayValue(val);
+        playSound('tick');
+        await new Promise(r => setTimeout(r, 60));
+      }
+      
+      // Impact
+      await new Promise(r => setTimeout(r, 150));
+      if (cancelled) return;
+      setPhase('impact');
+      playSound('boom');
+      
+      // Celebrate
+      await new Promise(r => setTimeout(r, 300));
+      if (cancelled) return;
+      hasCompletedRef.current = true;
+      setPhase('celebrate');
+      playSound('fanfare');
+      onCompleteRef.current?.();
+    };
+    
+    runAnimation();
+    
     return () => {
       cancelled = true;
-      clearTimeout(t1);
-      clearTimeout(t2);
-      if (fastInterval) clearInterval(fastInterval);
-      if (slowInterval) clearInterval(slowInterval);
     };
-  }, []); // Empty deps - run once on mount
-
-  const displayValue = displayValueRef.current;
-  const phase = phaseRef.current;
-  const showNumber = showNumberRef.current;
+  }, []); // Empty deps - run only once on mount
 
   const digits = displayValue.toString().split('');
-  const isRevealed = phase === 'reveal' || phase === 'celebrate';
+  const isImpact = phase === 'impact' || phase === 'celebrate';
 
   return (
-    <div ref={containerRef} className="relative">
+    <div className="relative inline-block">
+      {/* Buildup glow */}
+      {phase === 'buildup' && (
+        <div 
+          className="absolute inset-0 animate-pulse rounded-full blur-3xl opacity-50 -z-10"
+          style={{ backgroundColor: color, transform: 'scale(3)' }}
+        />
+      )}
+      
       {/* Score number */}
       <div 
-        className={`relative z-10 flex items-baseline gap-1 ${isRevealed ? 'animate-cinematic-reveal' : ''}`}
-        style={{
-          filter: isRevealed ? `drop-shadow(0 0 30px ${color}) drop-shadow(0 0 60px ${color})` : undefined,
-        }}
+        className={`relative z-10 flex items-baseline justify-center transition-all duration-200
+          ${phase === 'intro' ? 'opacity-0 scale-50' : ''}
+          ${phase === 'buildup' ? 'opacity-60 scale-90' : ''}
+          ${phase === 'counting' ? 'opacity-100 scale-100' : ''}
+          ${isImpact ? 'opacity-100 scale-110' : ''}
+        `}
       >
-        {showNumber && digits.map((digit, i) => (
+        {digits.map((digit, i) => (
           <span
-            key={`${i}-${digit}`}
-            className={`inline-block font-black transition-all ${
-              isRevealed ? 'animate-digit-cinematic' : 'animate-digit-counting'
-            }`}
+            key={i}
+            className={`inline-block font-black tabular-nums ${isImpact ? 'animate-score-impact' : ''}`}
             style={{
-              animationDelay: isRevealed ? `${i * 0.05}s` : '0s',
+              fontSize: isImpact ? '100px' : '90px',
               color: '#FFFFFF',
-              textShadow: isRevealed 
-                ? `0 0 20px ${color}, 0 0 40px ${color}, 0 0 60px ${color}, 0 0 80px ${color}`
-                : `0 0 10px ${color}`,
+              textShadow: isImpact 
+                ? `0 0 20px ${color}, 0 0 40px ${color}, 0 0 80px ${color}, 0 0 120px ${color}, 0 8px 0 rgba(0,0,0,0.4)`
+                : `0 0 10px ${color}, 0 4px 0 rgba(0,0,0,0.3)`,
+              animationDelay: isImpact ? `${i * 0.05}s` : '0s',
+              letterSpacing: '0.05em',
             }}
           >
             {digit}
@@ -335,26 +321,30 @@ function CinematicScoreReveal({ target, onComplete, glowColor, isHighScore }: {
         ))}
       </div>
       
-      {/* Celebration particles */}
-      {phase === 'celebrate' && isHighScore && (
-        <div className="absolute inset-0 pointer-events-none">
-          {[...Array(20)].map((_, i) => (
+      {/* Impact flash */}
+      {phase === 'impact' && (
+        <div 
+          className="absolute inset-0 bg-white rounded-full animate-flash-out -z-10 pointer-events-none"
+          style={{ transform: 'scale(5)' }}
+        />
+      )}
+      
+      {/* Celebration sparkles */}
+      {phase === 'celebrate' && isHigh && (
+        <div className="absolute inset-0 pointer-events-none z-20 overflow-visible">
+          {[...Array(12)].map((_, i) => (
             <div
               key={i}
-              className="absolute left-1/2 top-1/2 animate-celebration-particle"
+              className="absolute left-1/2 top-1/2 animate-sparkle-burst"
               style={{
-                '--angle': `${(i * 18)}deg`,
-                '--distance': `${80 + Math.random() * 60}px`,
-                '--delay': `${Math.random() * 0.3}s`,
+                '--angle': `${i * 30}deg`,
+                '--distance': `${80 + Math.random() * 40}px`,
+                animationDelay: `${i * 0.03}s`,
               } as React.CSSProperties}
             >
-              <div 
-                className="w-3 h-3 rounded-full"
-                style={{ 
-                  backgroundColor: ['#FFD700', '#FF6B6B', '#4ECDC4', '#A855F7', '#FFFFFF'][i % 5],
-                  boxShadow: `0 0 10px currentColor`,
-                }}
-              />
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill={color}>
+                <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z" />
+              </svg>
             </div>
           ))}
         </div>
@@ -2021,7 +2011,12 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
                         fontFamily: 'system-ui, -apple-system, sans-serif',
                         fontWeight: 900,
                       }}>
-                      <AnimatedScoreDramatic target={finalScore.totalScore} glowColor={grade.glowColor} onComplete={() => { setPhase('revealed'); fireConfetti(); }} />
+                      <AnimatedScoreDramatic 
+                        key={`score-${finalScore.totalScore}`}
+                        target={finalScore.totalScore} 
+                        glowColor={grade.glowColor} 
+                        onComplete={() => { setPhase('revealed'); fireConfetti(); }} 
+                      />
                     </span>
                     <span className="text-2xl text-white font-bold" style={{ textShadow: '0 3px 15px rgba(0,0,0,0.8)' }}>điểm</span>
                   </div>

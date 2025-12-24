@@ -2228,3 +2228,181 @@
   animation: celebrationParticle 1s ease-out forwards;
   animation-delay: var(--delay);
 }
+
+
+/* ========== CINEMATIC SCORE REVEAL ANIMATIONS ========== */
+
+/* Pulse fast for buildup */
+@keyframes pulseFast {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}
+
+.animate-pulse-fast {
+  animation: pulseFast 0.5s ease-in-out infinite;
+}
+
+/* Score tick animation */
+@keyframes scoreTick {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+.animate-score-tick {
+  animation: scoreTick 0.08s ease-out;
+}
+
+/* Score impact animation */
+@keyframes scoreImpact {
+  0% {
+    transform: scale(1) translateY(0);
+  }
+  30% {
+    transform: scale(1.15) translateY(-10px);
+  }
+  50% {
+    transform: scale(1.1) translateY(-5px);
+  }
+  70% {
+    transform: scale(1.05) translateY(-2px);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-score-impact {
+  animation: scoreImpact 0.5s ease-out forwards;
+}
+
+/* Flash out animation */
+@keyframes flashOut {
+  0% {
+    opacity: 0.8;
+    transform: scale(0.5);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(2);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(3);
+  }
+}
+
+.animate-flash-out {
+  animation: flashOut 0.4s ease-out forwards;
+}
+
+/* Sparkle burst animation */
+@keyframes sparkleBurst {
+  0% {
+    transform: translate(-50%, -50%) rotate(calc(var(--angle, 0deg))) translateX(0) scale(0);
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(calc(var(--angle, 0deg))) translateX(var(--distance, 60px)) scale(1);
+    opacity: 0;
+  }
+}
+
+.animate-sparkle-burst {
+  animation: sparkleBurst 0.8s ease-out forwards;
+}
+
+/* Zoom in bounce */
+@keyframes zoomInBounce {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  80% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-zoom-in-bounce {
+  animation: zoomInBounce 0.5s ease-out forwards;
+}
+
+/* Electric pulse for high scores */
+@keyframes electricPulse {
+  0%, 100% {
+    filter: brightness(1) drop-shadow(0 0 10px currentColor);
+  }
+  25% {
+    filter: brightness(1.3) drop-shadow(0 0 20px currentColor);
+  }
+  50% {
+    filter: brightness(1) drop-shadow(0 0 15px currentColor);
+  }
+  75% {
+    filter: brightness(1.2) drop-shadow(0 0 25px currentColor);
+  }
+}
+
+.animate-electric-pulse {
+  animation: electricPulse 1s ease-in-out infinite;
+}
+
+/* Victory dance animation */
+@keyframes victoryDance {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-5px) rotate(-2deg);
+  }
+  75% {
+    transform: translateY(-5px) rotate(2deg);
+  }
+}
+
+.animate-victory-dance {
+  animation: victoryDance 0.6s ease-in-out infinite;
+}
+
+/* Score celebrate animation */
+@keyframes scoreCelebrate {
+  0% {
+    transform: scale(1);
+  }
+  10% {
+    transform: scale(1.1);
+  }
+  20% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.05);
+  }
+  40% {
+    transform: scale(1);
+  }
+}
+
+.animate-score-celebrate {
+  animation: scoreCelebrate 1s ease-out;
+}

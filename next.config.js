@@ -1,7 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // TV Optimization settings
-  reactStrictMode: true,
+  // Disable strict mode to prevent double rendering of animations
+  reactStrictMode: false,
   
   // Optimize for TV browsers (typically Chromium-based)
   compiler: {
