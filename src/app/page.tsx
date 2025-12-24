@@ -774,6 +774,30 @@ function TVAppContent() {
   // Keep mobileScore in ref to avoid stale closure
   const mobileScoreRef = useRef(mobileScore);
   mobileScoreRef.current = mobileScore;
+  
+  // Track all scores for averaging (filter out 0s which are mic errors)
+  // Only store when score changes to avoid spam of same value
+  const scoreHistoryRef = useRef<number[]>([]);
+  const lastScoreRef = useRef<number>(0);
+  
+  // Update score history when mobileScore changes (only if different from last)
+  useEffect(() => {
+    if (mobileScore && mobileScore.totalScore > 0) {
+      // Only add if different from last score
+      if (mobileScore.totalScore !== lastScoreRef.current) {
+        scoreHistoryRef.current.push(mobileScore.totalScore);
+        lastScoreRef.current = mobileScore.totalScore;
+      }
+    }
+  }, [mobileScore]);
+  
+  // Reset score history when song changes
+  useEffect(() => {
+    if (currentSong) {
+      scoreHistoryRef.current = [];
+      lastScoreRef.current = 0;
+    }
+  }, [currentSong?.id]);
 
   // Back button protection - prevent accidental browser navigation
   useEffect(() => {
@@ -932,8 +956,20 @@ function TVAppContent() {
   const handleSongEnd = useCallback((score?: ScoreData, videoProgress?: number) => {
     const current = queueStore.getCurrent();
     
-    // Use mobile score if available
-    let finalScore = score || mobileScoreRef.current || undefined;
+    // Calculate average score from history (excluding 0s which are mic errors)
+    const validScores = scoreHistoryRef.current.filter(s => s > 0);
+    let averageScore: number | undefined;
+    
+    if (validScores.length > 0) {
+      averageScore = Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length);
+      console.log(`[TV] Score history: [${validScores.join(', ')}], average: ${averageScore}`);
+    }
+    
+    // Use average score if available, otherwise fall back to last score
+    let finalScore = score || (averageScore !== undefined ? { 
+      ...mobileScoreRef.current!, 
+      totalScore: averageScore 
+    } : mobileScoreRef.current) || undefined;
     
     // Apply duration multiplier based on video progress
     // < 10% watched: 20% score (severe penalty)
@@ -973,6 +1009,10 @@ function TVAppContent() {
         completedAt: new Date(),
       }]);
     }
+    
+    // Reset score history for next song
+    scoreHistoryRef.current = [];
+    lastScoreRef.current = 0;
   }, [queueStore, notifySongEnded]);
 
   // handleSkip is called from mobile command - we don't know exact progress
