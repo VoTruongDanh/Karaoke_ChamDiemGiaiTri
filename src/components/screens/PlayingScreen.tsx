@@ -612,7 +612,8 @@ export function PlayingScreen({
     // When skipping, calculate real-time progress
     const songDuration = currentSong.song.duration;
     const elapsedSeconds = (Date.now() - startTimeRef.current) / 1000;
-    const progress = songDuration > 0 ? Math.min(1, elapsedSeconds / songDuration) : 0;
+    // If duration is 0 or unknown, use elapsed time as penalty indicator
+    const progress = songDuration > 0 ? Math.min(1, elapsedSeconds / songDuration) : Math.min(1, elapsedSeconds / 180); // assume 3 min if unknown
     console.log(`[PlayingScreen] Skip - elapsed: ${elapsedSeconds.toFixed(1)}s, duration: ${songDuration}s, progress: ${(progress * 100).toFixed(1)}%`);
     onSkip?.() || onSongEnd(undefined, progress);
   }, [onSkip, onSongEnd, currentSong.song.duration]);
@@ -624,7 +625,8 @@ export function PlayingScreen({
     // Video ended - calculate real-time progress (not video progress)
     const songDuration = currentSong.song.duration;
     const elapsedSeconds = (Date.now() - startTimeRef.current) / 1000;
-    const progress = songDuration > 0 ? Math.min(1, elapsedSeconds / songDuration) : 1.0;
+    // If duration is 0 or unknown, use elapsed time as penalty indicator (assume 3 min song)
+    const progress = songDuration > 0 ? Math.min(1, elapsedSeconds / songDuration) : Math.min(1, elapsedSeconds / 180);
     console.log(`[PlayingScreen] End - elapsed: ${elapsedSeconds.toFixed(1)}s, duration: ${songDuration}s, progress: ${(progress * 100).toFixed(1)}%`);
     onSongEnd(scoreDataRef.current || undefined, progress);
   }, [onSongEnd, currentSong.song.duration]);
