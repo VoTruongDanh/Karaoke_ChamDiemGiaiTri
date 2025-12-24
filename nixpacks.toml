@@ -1,0 +1,7 @@
+[phases.build]
+cmds = ["npm run build"]
+
+# Disable problematic cache paths
+[phases.build.cacheDirectories]
+# Only cache .next/cache and node_modules/.cache
+paths = [".next/cache", "node_modules/.cache"]
