@@ -535,15 +535,36 @@ export function ControllerScreen({
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-tv-bg flex flex-col">
-      <header className="p-3 border-b border-slate-200 dark:border-tv-border sticky top-0 bg-white/95 dark:bg-tv-bg/95 backdrop-blur-sm z-10">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-sm font-medium text-primary-600 dark:text-primary-400">{sessionCode}</span>
+      <header className="p-3 border-b border-slate-200 dark:border-tv-border sticky top-0 bg-white dark:bg-tv-bg z-50">
+        <div className="flex items-center gap-2 mb-3">
+          {/* Session code */}
+          <div className="h-12 px-4 bg-primary-50 dark:bg-primary-900/30 rounded-xl flex items-center">
+            <span className="text-xl font-bold text-primary-600 dark:text-primary-400 tracking-wider">{sessionCode}</span>
+          </div>
+          
+          {/* Disconnect button */}
+          <button 
+            onClick={onDisconnect}
+            className="h-12 w-12 flex items-center justify-center bg-slate-100 dark:bg-tv-card text-slate-400 dark:text-slate-500 rounded-xl border border-slate-200 dark:border-tv-border active:scale-95 transition-all"
+            title="Đăng xuất"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </button>
+          
           <div className="flex-1" />
-          <button onClick={onViewQueue} className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          
+          {/* Queue button */}
+          <button 
+            onClick={onViewQueue} 
+            className="h-12 flex items-center gap-2 px-4 bg-slate-100 dark:bg-tv-card rounded-xl text-slate-600 dark:text-slate-300 active:scale-95 transition-all"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
             </svg>
-            {waitingCount > 0 && <span className="px-1.5 py-0.5 bg-primary-500 text-white rounded-full text-xs">{waitingCount}</span>}
+            <span className="text-sm font-medium">Hàng đợi</span>
+            {waitingCount > 0 && <span className="px-2 py-0.5 bg-primary-500 text-white rounded-full text-xs font-bold">{waitingCount}</span>}
           </button>
         </div>
         <div className="relative flex gap-2">
@@ -573,12 +594,11 @@ export function ControllerScreen({
           {canUseVoiceSearch && (
             <button
               onClick={isListening ? stopVoiceSearch : startVoiceSearch}
-              className={`p-2.5 rounded-xl transition-all active:scale-95 ${
+              className={`p-2.5 rounded-xl transition-all active:scale-95 flex-shrink-0 ${
                 isListening 
                   ? 'bg-red-500 text-white animate-pulse' 
-                  : 'bg-slate-100 dark:bg-tv-card text-slate-600 dark:text-slate-300 hover:bg-primary-100 dark:hover:bg-tv-hover'
+                  : 'bg-slate-100 dark:bg-tv-card text-slate-600 dark:text-slate-300'
               }`}
-              title={isListening ? "Dừng" : "Tìm bằng giọng nói"}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
@@ -758,36 +778,6 @@ export function ControllerScreen({
           </div>
         )}
       </main>
-
-      <footer className="p-3 border-t border-slate-200 dark:border-tv-border bg-white dark:bg-tv-surface">
-        <div className="flex gap-2">
-          <button
-            onClick={onViewQueue}
-            className="flex-1 py-3 bg-slate-100 dark:bg-tv-card hover:bg-slate-200 dark:hover:bg-tv-hover rounded-xl flex items-center justify-center gap-2 transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-            </svg>
-            <span>Hàng đợi</span>
-            {waitingCount > 0 && (
-              <span className="px-2 py-0.5 bg-primary-500 text-white rounded-full text-xs">{waitingCount}</span>
-            )}
-          </button>
-          <button
-            onClick={() => {
-              if (window.confirm('Bạn có chắc muốn ngắt kết nối?')) {
-                onDisconnect();
-              }
-            }}
-            className="px-4 py-3 bg-slate-100 dark:bg-tv-card hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-500 hover:text-red-500 rounded-xl transition-colors"
-            title="Ngắt kết nối"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-          </button>
-        </div>
-      </footer>
     </div>
   );
 }

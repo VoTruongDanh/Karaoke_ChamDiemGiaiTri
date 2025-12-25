@@ -1,24 +1,15 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import type { QueueItem } from '@/types/queue';
 import type { Song } from '@/types/song';
 
-/**
- * Props for MobileQueueScreen component
- */
 export interface MobileQueueScreenProps {
-  /** Current queue items */
   queue: QueueItem[];
-  /** Currently playing song */
   currentSong: QueueItem | null;
-  /** Callback to go back to controller */
   onBack: () => void;
-  /** Callback to remove a song from queue */
   onRemove?: (itemId: string) => void;
-  /** Callback to add a song to queue (for replay) */
   onAddToQueue?: (song: Song) => void;
-  /** Callback to reorder queue */
   onReorder?: (itemId: string, newIndex: number) => void;
 }
 
@@ -54,22 +45,6 @@ function ReplayIcon() {
   );
 }
 
-function ChevronUpIcon() {
-  return (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-    </svg>
-  );
-}
-
-function ChevronDownIcon() {
-  return (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-    </svg>
-  );
-}
-
 function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
@@ -98,11 +73,7 @@ function NowPlayingCard({ currentSong }: { currentSong: QueueItem | null }) {
     <div className="bg-gradient-to-br from-primary-500/20 to-primary-600/10 dark:from-primary-900/50 dark:to-tv-card rounded-2xl p-4 mb-4 border border-primary-500/30">
       <div className="flex items-center gap-4">
         <div className="relative">
-          <img
-            src={currentSong.song.thumbnail}
-            alt={currentSong.song.title}
-            className="w-20 h-20 object-cover rounded-xl"
-          />
+          <img src={currentSong.song.thumbnail} alt="" className="w-20 h-20 object-cover rounded-xl" />
           <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-xl">
             <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
               <div className="w-3 h-3 bg-white rounded-sm" />
@@ -122,123 +93,6 @@ function NowPlayingCard({ currentSong }: { currentSong: QueueItem | null }) {
   );
 }
 
-function QueueItemCard({
-  item,
-  index,
-  totalItems,
-  onRemove,
-  onReplay,
-  onMoveUp,
-  onMoveDown,
-  canReorder,
-  isReplayAdded,
-}: {
-  item: QueueItem;
-  index: number;
-  totalItems: number;
-  onRemove?: () => void;
-  onReplay?: () => void;
-  onMoveUp?: () => void;
-  onMoveDown?: () => void;
-  canReorder?: boolean;
-  isReplayAdded?: boolean;
-}) {
-  const isCompleted = item.status === 'completed';
-  const isWaiting = item.status === 'waiting';
-
-  return (
-    <div className={`flex items-center gap-3 p-3 bg-white dark:bg-tv-card rounded-xl ${isCompleted ? 'opacity-60' : ''}`}>
-      {/* Position number */}
-      <div className="w-8 h-8 bg-slate-100 dark:bg-tv-surface rounded-lg flex items-center justify-center text-sm font-medium text-slate-500 dark:text-gray-400 flex-shrink-0">
-        {index + 1}
-      </div>
-      
-      {/* Thumbnail */}
-      <img
-        src={item.song.thumbnail}
-        alt={item.song.title}
-        className="w-14 h-10 object-cover rounded-lg flex-shrink-0"
-      />
-      
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <p className={`text-sm font-medium truncate text-slate-800 dark:text-white ${isCompleted ? 'line-through text-slate-400 dark:text-gray-500' : ''}`}>
-          {item.song.title}
-        </p>
-        <p className="text-xs text-slate-500 dark:text-gray-400 truncate">
-          {formatDuration(item.song.duration)}
-        </p>
-      </div>
-      
-      {/* Actions */}
-      <div className="flex items-center gap-1 flex-shrink-0">
-        {/* Move up/down for waiting items */}
-        {isWaiting && canReorder && totalItems > 1 && (
-          <div className="flex flex-col -my-1">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onMoveUp) onMoveUp();
-              }}
-              disabled={index === 0}
-              className="p-2 text-slate-400 hover:text-primary-500 active:bg-primary-100 dark:active:bg-primary-900/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded"
-            >
-              <ChevronUpIcon />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onMoveDown) onMoveDown();
-              }}
-              disabled={index === totalItems - 1}
-              className="p-2 text-slate-400 hover:text-primary-500 active:bg-primary-100 dark:active:bg-primary-900/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded"
-            >
-              <ChevronDownIcon />
-            </button>
-          </div>
-        )}
-        
-        {/* Remove for waiting items */}
-        {isWaiting && onRemove && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemove();
-            }}
-            className="p-2 text-slate-400 hover:text-red-500 active:bg-red-100 dark:active:bg-red-900/30 transition-colors rounded"
-          >
-            <TrashIcon />
-          </button>
-        )}
-        
-        {/* Replay for completed items */}
-        {isCompleted && onReplay && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onReplay();
-            }}
-            disabled={isReplayAdded}
-            className={`p-2 transition-colors rounded ${
-              isReplayAdded 
-                ? 'text-green-500' 
-                : 'text-slate-400 hover:text-primary-500 active:bg-primary-100 dark:active:bg-primary-900/30'
-            }`}
-          >
-            {isReplayAdded ? (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            ) : (
-              <ReplayIcon />
-            )}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export function MobileQueueScreen({
   queue,
   currentSong,
@@ -248,22 +102,20 @@ export function MobileQueueScreen({
   onReorder,
 }: MobileQueueScreenProps) {
   const [replayAddedIds, setReplayAddedIds] = useState<Set<string>>(new Set());
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [targetIndex, setTargetIndex] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const startY = useRef(0);
+  const currentY = useRef(0);
   
-  // Separate waiting and completed items
   const waitingItems = queue.filter(item => item.status === 'waiting');
   const completedItems = queue.filter(item => item.status === 'completed');
 
-  // Handle replay - add song back to queue
   const handleReplay = useCallback((item: QueueItem) => {
-    console.log('[Queue] Replay:', item.song.title);
-    if (!onAddToQueue) {
-      console.log('[Queue] onAddToQueue not provided');
-      return;
-    }
+    if (!onAddToQueue) return;
     onAddToQueue(item.song);
     setReplayAddedIds(prev => new Set(prev).add(item.id));
-    
-    // Clear the added state after 2 seconds
     setTimeout(() => {
       setReplayAddedIds(prev => {
         const next = new Set(prev);
@@ -273,57 +125,125 @@ export function MobileQueueScreen({
     }, 2000);
   }, [onAddToQueue]);
 
+  // Simple touch-based reorder
+  const handleTouchStart = (e: React.TouchEvent, index: number) => {
+    if (!onReorder || waitingItems.length <= 1) return;
+    startY.current = e.touches[0].clientY;
+    currentY.current = e.touches[0].clientY;
+    setDraggedIndex(index);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (draggedIndex === null || !onReorder) return;
+    e.preventDefault();
+    currentY.current = e.touches[0].clientY;
+    
+    // Find which item we're over
+    let newTarget = draggedIndex;
+    itemRefs.current.forEach((ref, i) => {
+      if (ref && i !== draggedIndex) {
+        const rect = ref.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        if (currentY.current > midY && i > draggedIndex) {
+          newTarget = i;
+        } else if (currentY.current < midY && i < draggedIndex) {
+          newTarget = i;
+        }
+      }
+    });
+    setTargetIndex(newTarget !== draggedIndex ? newTarget : null);
+  };
+
+  const handleTouchEnd = () => {
+    if (draggedIndex !== null && targetIndex !== null && onReorder) {
+      const item = waitingItems[draggedIndex];
+      console.log('[Queue] Reorder:', item.id, 'from', draggedIndex, 'to', targetIndex);
+      onReorder(item.id, targetIndex);
+    }
+    setDraggedIndex(null);
+    setTargetIndex(null);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-tv-bg flex flex-col">
       {/* Header */}
       <header className="p-4 border-b border-slate-200 dark:border-tv-border bg-white dark:bg-tv-surface">
         <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="p-2 -ml-2 hover:bg-slate-100 dark:hover:bg-tv-card rounded-lg transition-colors"
-          >
+          <button onClick={onBack} className="p-2 -ml-2 hover:bg-slate-100 dark:hover:bg-tv-card rounded-lg">
             <BackIcon />
           </button>
           <div>
             <h1 className="text-lg font-semibold text-slate-800 dark:text-white">Hàng đợi</h1>
             <p className="text-xs text-slate-500 dark:text-gray-400">
-              {waitingItems.length} bài chờ hát
-              {completedItems.length > 0 && ` • ${completedItems.length} đã hát`}
+              {waitingItems.length} bài chờ • {completedItems.length} đã hát
             </p>
           </div>
         </div>
       </header>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-y-auto p-4">
-        {/* Now playing */}
+      {/* Main */}
+      <main className="flex-1 overflow-y-auto p-4" ref={containerRef}>
         <NowPlayingCard currentSong={currentSong} />
 
-        {/* Waiting queue */}
         {waitingItems.length > 0 ? (
           <div className="mb-6">
-            <h2 className="text-sm font-medium text-slate-500 dark:text-gray-400 mb-3">Tiếp theo</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-medium text-slate-500 dark:text-gray-400">Tiếp theo</h2>
+              {onReorder && waitingItems.length > 1 && (
+                <span className="text-xs text-primary-500">Giữ & kéo để đổi</span>
+              )}
+            </div>
             <div className="space-y-2">
               {waitingItems.map((item, index) => (
-                <QueueItemCard
+                <div
                   key={item.id}
-                  item={item}
-                  index={index}
-                  totalItems={waitingItems.length}
-                  canReorder={!!onReorder}
-                  onRemove={onRemove ? () => {
-                    console.log('[Queue] Remove clicked:', item.id);
-                    onRemove(item.id);
-                  } : undefined}
-                  onMoveUp={onReorder ? () => {
-                    console.log('[Queue] MoveUp clicked:', item.id, index, '->', index - 1);
-                    onReorder(item.id, index - 1);
-                  } : undefined}
-                  onMoveDown={onReorder ? () => {
-                    console.log('[Queue] MoveDown clicked:', item.id, index, '->', index + 1);
-                    onReorder(item.id, index + 1);
-                  } : undefined}
-                />
+                  ref={el => { itemRefs.current[index] = el; }}
+                  onTouchStart={(e) => handleTouchStart(e, index)}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                  className={`flex items-center gap-3 p-3 rounded-xl transition-all select-none ${
+                    draggedIndex === index 
+                      ? 'bg-primary-100 dark:bg-primary-900/50 scale-[1.02] shadow-lg z-10' 
+                      : targetIndex === index
+                        ? 'bg-primary-50 dark:bg-primary-900/30 border-2 border-dashed border-primary-400'
+                        : 'bg-white dark:bg-tv-card'
+                  }`}
+                  style={{ touchAction: onReorder && waitingItems.length > 1 ? 'none' : 'auto' }}
+                >
+                  {/* Drag indicator */}
+                  {onReorder && waitingItems.length > 1 && (
+                    <div className="text-slate-300 dark:text-gray-600 flex-shrink-0">
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                        <circle cx="9" cy="6" r="1.5" />
+                        <circle cx="15" cy="6" r="1.5" />
+                        <circle cx="9" cy="12" r="1.5" />
+                        <circle cx="15" cy="12" r="1.5" />
+                        <circle cx="9" cy="18" r="1.5" />
+                        <circle cx="15" cy="18" r="1.5" />
+                      </svg>
+                    </div>
+                  )}
+                  
+                  <div className="w-6 h-6 bg-slate-100 dark:bg-tv-surface rounded flex items-center justify-center text-xs font-medium text-slate-500 flex-shrink-0">
+                    {index + 1}
+                  </div>
+                  
+                  <img src={item.song.thumbnail} alt="" className="w-12 h-9 object-cover rounded flex-shrink-0" />
+                  
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate text-slate-800 dark:text-white">{item.song.title}</p>
+                    <p className="text-xs text-slate-500 truncate">{formatDuration(item.song.duration)}</p>
+                  </div>
+                  
+                  {onRemove && (
+                    <button
+                      onClick={() => onRemove(item.id)}
+                      className="p-2 text-slate-400 hover:text-red-500 rounded flex-shrink-0"
+                    >
+                      <TrashIcon />
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           </div>
@@ -333,38 +253,43 @@ export function MobileQueueScreen({
               <MusicIcon />
             </div>
             <p className="text-slate-500 dark:text-gray-400">Hàng đợi trống</p>
-            <p className="text-sm text-slate-400 dark:text-gray-500 mt-1">Tìm và thêm bài hát để bắt đầu</p>
           </div>
         )}
 
-        {/* Completed songs */}
         {completedItems.length > 0 && (
           <div>
-            <h2 className="text-sm font-medium text-slate-500 dark:text-gray-400 mb-3">
-              Đã hát ({completedItems.length})
-            </h2>
+            <h2 className="text-sm font-medium text-slate-500 dark:text-gray-400 mb-3">Đã hát</h2>
             <div className="space-y-2">
-              {completedItems.map((item, index) => (
-                <QueueItemCard
-                  key={item.id}
-                  item={item}
-                  index={waitingItems.length + index}
-                  totalItems={completedItems.length}
-                  onReplay={onAddToQueue ? () => handleReplay(item) : undefined}
-                  isReplayAdded={replayAddedIds.has(item.id)}
-                />
+              {completedItems.map((item) => (
+                <div key={item.id} className="flex items-center gap-3 p-3 bg-white dark:bg-tv-card rounded-xl opacity-50">
+                  <img src={item.song.thumbnail} alt="" className="w-12 h-9 object-cover rounded flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm truncate text-slate-500 line-through">{item.song.title}</p>
+                  </div>
+                  {onAddToQueue && (
+                    <button
+                      onClick={() => handleReplay(item)}
+                      disabled={replayAddedIds.has(item.id)}
+                      className={`p-2 rounded flex-shrink-0 ${replayAddedIds.has(item.id) ? 'text-green-500' : 'text-slate-400 hover:text-primary-500'}`}
+                    >
+                      {replayAddedIds.has(item.id) ? (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <ReplayIcon />
+                      )}
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           </div>
         )}
       </main>
 
-      {/* Footer */}
       <footer className="p-4 border-t border-slate-200 dark:border-tv-border bg-white dark:bg-tv-surface">
-        <button
-          onClick={onBack}
-          className="w-full py-3 bg-primary-600 hover:bg-primary-500 rounded-xl font-medium text-white transition-colors active:scale-[0.98]"
-        >
+        <button onClick={onBack} className="w-full py-3 bg-primary-600 rounded-xl font-medium text-white active:scale-[0.98]">
           Thêm bài hát
         </button>
       </footer>
