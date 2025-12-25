@@ -4,6 +4,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { NavigationGrid } from '@/components/NavigationGrid';
 import { FocusableButton } from '@/components/FocusableButton';
 import { LazyImage } from '@/components/LazyImage';
+import { useBackButton } from '@/hooks/useBackButton';
 import type { Song } from '@/types/song';
 
 export interface SearchScreenProps {
@@ -417,8 +418,20 @@ export function SearchScreen({
   }, []);
 
   const displaySongs = hasSearched ? results : suggestions;
-  const KEYBOARD_ROWS = KEYBOARD_LAYOUT.length;
-  const resultsStartRow = showKeyboard ? KEYBOARD_ROWS + 2 : 2;
+  
+  // Fixed row layout for d-pad navigation:
+  // Row 0: Header buttons (Back, Voice, Keyboard)
+  // Row 1-4: Keyboard (if shown)
+  // Row 5-6: Quick search tags (if keyboard shown)
+  // Row 10+: Song results (always start at row 10 for simplicity)
+  const RESULTS_START_ROW = 10;
+
+  // Handle back button
+  useBackButton({
+    onBack: () => {
+      onBack();
+    }
+  });
 
   return (
     <NavigationGrid className="h-screen bg-tv-bg overflow-hidden">
@@ -519,7 +532,7 @@ export function SearchScreen({
                   {POPULAR_KEYWORDS.map((keyword, index) => (
                     <FocusableButton
                       key={keyword}
-                      row={KEYBOARD_ROWS + 1}
+                      row={5}
                       col={index}
                       onSelect={() => doSearch(keyword)}
                       variant="ghost"
@@ -538,7 +551,7 @@ export function SearchScreen({
                       {recentSearches.slice(0, 4).map((search, index) => (
                         <FocusableButton
                           key={`recent-${index}`}
-                          row={KEYBOARD_ROWS + 2}
+                          row={6}
                           col={index}
                           onSelect={() => handleRecentSearch(search)}
                           variant="secondary"
@@ -558,15 +571,11 @@ export function SearchScreen({
           {/* Results / Suggestions */}
           <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
             {/* Section header */}
-            <div className="flex items-center justify-between mb-3 flex-shrink-0">
-              <h2 className="text-lg font-semibold text-gray-300">
+            <div className="flex items-center justify-between mb-2 flex-shrink-0">
+              <h2 className="text-base font-semibold text-gray-300">
                 {isSearching ? 'Đang tìm kiếm...' : 
-                 hasSearched ? `Kết quả cho "${query}"` : 
-                 'Gợi ý cho bạn'}
+                 hasSearched ? `Kết quả cho "${query}"` : ''}
               </h2>
-              {displaySongs.length > 0 && (
-                <span className="text-sm text-gray-500">{displaySongs.length} bài</span>
-              )}
             </div>
 
             {/* Content */}
@@ -579,7 +588,7 @@ export function SearchScreen({
               </div>
             ) : displaySongs.length > 0 ? (
               <div ref={resultsContainerRef} className="flex-1 overflow-y-auto hide-scrollbar">
-                <div className={`grid gap-5 p-4 ${
+                <div className={`grid gap-4 p-2 ${
                   showKeyboard ? 'grid-cols-2 lg:grid-cols-3' : 'grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
                 }`}>
                   {displaySongs.map((song, index) => {
@@ -588,7 +597,7 @@ export function SearchScreen({
                       <SongCard
                         key={song.youtubeId}
                         song={song}
-                        row={resultsStartRow + Math.floor(index / cols)}
+                        row={RESULTS_START_ROW + Math.floor(index / cols)}
                         col={index % cols}
                         onSelect={() => onPlayNow ? onPlayNow(song) : onSongSelect(song)}
                         isLarge={!showKeyboard}
@@ -609,7 +618,7 @@ export function SearchScreen({
                 {continuation && !isLoadingMore && hasSearched && (
                   <div className="flex justify-center py-4">
                     <FocusableButton
-                      row={resultsStartRow + Math.ceil(displaySongs.length / (showKeyboard ? 3 : 5))}
+                      row={RESULTS_START_ROW + Math.ceil(displaySongs.length / (showKeyboard ? 3 : 5))}
                       col={0}
                       onSelect={loadMore}
                       variant="secondary"
@@ -625,7 +634,7 @@ export function SearchScreen({
                 {!hasSearched && !isLoadingMore && displaySongs.length >= 4 && onGetSuggestions && (
                   <div className="flex justify-center py-4">
                     <FocusableButton
-                      row={resultsStartRow + Math.ceil(displaySongs.length / (showKeyboard ? 3 : 5))}
+                      row={RESULTS_START_ROW + Math.ceil(displaySongs.length / (showKeyboard ? 3 : 5))}
                       col={0}
                       onSelect={() => {
                         if (!onGetSuggestions || displaySongs.length === 0) return;

@@ -13,12 +13,7 @@ const QUALITY_STORAGE_KEY = 'karaoke_video_quality';
 
 // Get saved quality or default to 720p
 function getSavedQuality(): QualityLevel {
-  try {
-    const saved = localStorage.getItem(QUALITY_STORAGE_KEY);
-    if (saved && QUALITY_LEVELS.includes(saved as QualityLevel)) {
-      return saved as QualityLevel;
-    }
-  } catch {}
+  // Always start with 720p max - ignore saved quality
   return 'hd720';
 }
 
@@ -158,13 +153,14 @@ function YouTubePlayer({
   const [error, setError] = useState<string | null>(null);
   const isMountedRef = useRef(true);
   
-  // Adaptive quality state
-  const [currentQuality, setCurrentQuality] = useState<QualityLevel>(getSavedQuality());
+  // Adaptive quality state - start with 720p max
+  const [targetQuality, setTargetQuality] = useState<QualityLevel>('hd720');
   const bufferingCountRef = useRef(0);
   const bufferingStartRef = useRef<number>(0);
   const lastPlayTimeRef = useRef<number>(0);
-  const qualityDowngradeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const qualityCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isDowngradingRef = useRef(false);
+  const forceReloadCountRef = useRef(0);
   
   const onEndRef = useRef(onEnd);
   const onReadyRef = useRef(onReady);
@@ -178,49 +174,58 @@ function YouTubePlayer({
     onQualityChangeRef.current = onQualityChange;
   });
 
-  // Downgrade quality and RELOAD player
-  const downgradeQuality = useCallback(() => {
-    if (isDowngradingRef.current) return;
+  // Force reload player with lower quality when buffering too much
+  const forceReloadWithLowerQuality = useCallback(() => {
+    if (isDowngradingRef.current || forceReloadCountRef.current >= 3) return;
     
-    const currentIndex = QUALITY_LEVELS.indexOf(currentQuality);
+    const currentIndex = QUALITY_LEVELS.indexOf(targetQuality);
     if (currentIndex < QUALITY_LEVELS.length - 1) {
       const newQuality = QUALITY_LEVELS[currentIndex + 1];
-      console.log(`[YouTube] FORCE Downgrading: ${currentQuality} -> ${newQuality}, will reload player`);
+      console.log(`[YouTube] FORCE reload with lower quality: ${targetQuality} -> ${newQuality}`);
       
       isDowngradingRef.current = true;
+      forceReloadCountRef.current++;
       
-      // Save current time before reload
+      // Save current time
       let currentTime = 0;
       try {
         currentTime = playerRef.current?.getCurrentTime() || 0;
       } catch {}
       
-      // Update quality state - this will trigger player reload via useEffect
-      setCurrentQuality(newQuality);
+      setTargetQuality(newQuality);
       saveQuality(newQuality);
       bufferingCountRef.current = 0;
       
-      // Reload video at current position with new quality
+      // Destroy and recreate player
       setTimeout(() => {
         if (playerRef.current) {
           try {
-            (playerRef.current as any).loadVideoById({
+            // Use cueVideoById then playVideo to force quality suggestion
+            (playerRef.current as any).cueVideoById({
               videoId: videoId,
               startSeconds: currentTime,
               suggestedQuality: newQuality
             });
-          } catch {}
+            setTimeout(() => {
+              playerRef.current?.playVideo();
+              isDowngradingRef.current = false;
+            }, 500);
+          } catch {
+            isDowngradingRef.current = false;
+          }
+        } else {
+          isDowngradingRef.current = false;
         }
-        isDowngradingRef.current = false;
       }, 100);
     }
-  }, [currentQuality, videoId]);
+  }, [targetQuality, videoId]);
 
   useEffect(() => {
     isMountedRef.current = true;
     setIsLoading(true);
     setError(null);
     bufferingCountRef.current = 0;
+    forceReloadCountRef.current = 0;
 
     const loadYouTubeAPI = () => {
       return new Promise<void>((resolve, reject) => {
@@ -264,7 +269,7 @@ function YouTubePlayer({
         containerRef.current.appendChild(playerDiv);
         playerDivRef.current = playerDiv;
 
-        console.log(`[YouTube] Creating player with max quality: ${currentQuality}`);
+        console.log(`[YouTube] Creating player with target quality: ${targetQuality}`);
 
         playerRef.current = new window.YT.Player(playerDiv, {
           videoId,
@@ -285,7 +290,8 @@ function YouTubePlayer({
             cc_load_policy: 0,
             hl: 'vi',
             enablejsapi: 1,
-            vq: currentQuality,
+            // vq parameter is deprecated but still try
+            vq: targetQuality,
           },
           events: {
             onReady: () => { 
@@ -295,17 +301,21 @@ function YouTubePlayer({
                 const player = playerRef.current;
                 if (player) {
                   try {
-                    // Force quality by loading video with specific quality
-                    const currentTime = player.getCurrentTime() || 0;
-                    // Use loadVideoById with suggestedQuality parameter
-                    (player as any).loadVideoById({
-                      videoId: videoId,
-                      startSeconds: currentTime,
-                      suggestedQuality: currentQuality
-                    });
-                    
                     player.mute();
                     player.playVideo();
+                    
+                    // Try to set quality multiple times
+                    const trySetQuality = (attempts: number) => {
+                      if (!playerRef.current || !isMountedRef.current || attempts <= 0) return;
+                      try {
+                        playerRef.current.setPlaybackQuality(targetQuality);
+                        const available = playerRef.current.getAvailableQualityLevels();
+                        console.log(`[YouTube] Available qualities:`, available);
+                      } catch {}
+                      setTimeout(() => trySetQuality(attempts - 1), 500);
+                    };
+                    trySetQuality(5);
+                    
                     const checkAndUnmute = () => {
                       if (!playerRef.current || !isMountedRef.current) return;
                       try {
@@ -313,8 +323,6 @@ function YouTubePlayer({
                         if (state === window.YT.PlayerState.PLAYING) {
                           playerRef.current.unMute();
                           lastPlayTimeRef.current = Date.now();
-                          // Keep trying to set quality
-                          playerRef.current.setPlaybackQuality(currentQuality);
                         } else if (state === window.YT.PlayerState.BUFFERING || state === window.YT.PlayerState.CUED) {
                           setTimeout(checkAndUnmute, 200);
                         } else {
@@ -336,24 +344,24 @@ function YouTubePlayer({
               if (event.data === window.YT.PlayerState.ENDED) {
                 onEndRef.current(); 
               } else if (event.data === window.YT.PlayerState.BUFFERING) {
-                // Track buffering for adaptive quality - more aggressive
+                // Track buffering for adaptive quality
                 bufferingCountRef.current++;
                 bufferingStartRef.current = Date.now();
                 
                 console.log(`[YouTube] Buffering detected (count: ${bufferingCountRef.current})`);
                 
-                // Downgrade immediately after 2 buffering events
-                if (bufferingCountRef.current >= 2) {
-                  console.log(`[YouTube] Too much buffering, downgrading NOW`);
-                  downgradeQuality();
+                // Downgrade after 3 buffering events (more lenient)
+                if (bufferingCountRef.current >= 3) {
+                  console.log(`[YouTube] Too much buffering, forcing reload with lower quality`);
+                  forceReloadWithLowerQuality();
                 }
               } else if (event.data === window.YT.PlayerState.PLAYING) {
-                // Check if buffering took too long (>2s = lag)
+                // Check if buffering took too long (>3s = lag)
                 if (bufferingStartRef.current > 0) {
                   const bufferDuration = Date.now() - bufferingStartRef.current;
-                  if (bufferDuration > 2000) {
-                    console.log(`[YouTube] Long buffer (${bufferDuration}ms), downgrading NOW`);
-                    downgradeQuality();
+                  if (bufferDuration > 3000) {
+                    console.log(`[YouTube] Long buffer (${bufferDuration}ms), forcing reload`);
+                    forceReloadWithLowerQuality();
                   }
                   bufferingStartRef.current = 0;
                 }
@@ -364,13 +372,8 @@ function YouTubePlayer({
               console.log(`[YouTube] Quality changed to: ${event.data}`);
               onQualityChangeRef.current?.(event.data);
               
-              // Force downgrade if quality is higher than our max (720p)
-              if (event.data === 'hd1080' || event.data === 'highres') {
-                console.log(`[YouTube] Quality too high (${event.data}), requesting 720p`);
-                try {
-                  playerRef.current?.setPlaybackQuality('hd720');
-                } catch {}
-              }
+              // Note: YouTube ignores setPlaybackQuality since 2020
+              // We can only detect and inform user, not force quality
             },
             onError: (event) => {
               const msg = YOUTUBE_ERROR_MESSAGES[event.data] || `Lỗi (${event.data})`;
@@ -378,6 +381,20 @@ function YouTubePlayer({
             },
           },
         });
+        
+        // Periodic quality check - if quality is too high and causing issues, reload
+        qualityCheckIntervalRef.current = setInterval(() => {
+          if (!playerRef.current || !isMountedRef.current) return;
+          try {
+            const currentQuality = playerRef.current.getPlaybackQuality();
+            // If playing at 1080p+ and we've had buffering issues, try to downgrade
+            if ((currentQuality === 'hd1080' || currentQuality === 'highres') && bufferingCountRef.current > 0) {
+              console.log(`[YouTube] High quality (${currentQuality}) with buffering issues, attempting downgrade`);
+              playerRef.current.setPlaybackQuality(targetQuality);
+            }
+          } catch {}
+        }, 5000);
+        
       } catch (err) {
         if (isMountedRef.current) {
           const msg = err instanceof Error ? err.message : 'Không thể tải video';
@@ -390,8 +407,8 @@ function YouTubePlayer({
     
     return () => { 
       isMountedRef.current = false;
-      if (qualityDowngradeTimerRef.current) {
-        clearTimeout(qualityDowngradeTimerRef.current);
+      if (qualityCheckIntervalRef.current) {
+        clearInterval(qualityCheckIntervalRef.current);
       }
       // Destroy player first
       if (playerRef.current) { 
@@ -404,7 +421,22 @@ function YouTubePlayer({
         playerDivRef.current = null;
       }
     };
-  }, [videoId, playerRef, currentQuality, downgradeQuality]);
+  }, [videoId, playerRef, targetQuality, forceReloadWithLowerQuality]);
+
+  // Calculate scale to fill screen while keeping 1280x720 internal resolution
+  useEffect(() => {
+    const updateScale = () => {
+      if (!containerRef.current) return;
+      const scaleX = window.innerWidth / 1280;
+      const scaleY = window.innerHeight / 720;
+      const scale = Math.max(scaleX, scaleY); // Use max to cover entire screen
+      containerRef.current.style.setProperty('--player-scale', String(scale));
+    };
+    
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    return () => window.removeEventListener('resize', updateScale);
+  }, []);
 
   if (error) {
     return (
@@ -417,13 +449,29 @@ function YouTubePlayer({
   }
 
   return (
-    <div className="w-full h-full bg-black overflow-hidden relative">
+    <div className="w-full h-full bg-black overflow-hidden relative flex items-center justify-center">
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
           <div className="w-8 h-8 border-3 border-primary-400 border-t-transparent rounded-full animate-spin" />
         </div>
       )}
-      <div ref={containerRef} className="w-full h-full [&>iframe]:w-full [&>iframe]:h-full" />
+      {/* 
+        Limit player size to 1280x720 max to force YouTube to choose 720p or lower.
+        YouTube auto-selects quality based on player dimensions.
+        Using CSS transform scale to fill screen while keeping internal resolution low.
+      */}
+      <div 
+        ref={containerRef} 
+        className="bg-black [&>div]:w-full [&>div]:h-full [&>iframe]:w-full [&>iframe]:h-full"
+        style={{
+          width: '1280px',
+          height: '720px',
+          maxWidth: '100vw',
+          maxHeight: '100vh',
+          transform: 'scale(var(--player-scale, 1))',
+          transformOrigin: 'center center',
+        }}
+      />
     </div>
   );
 }
@@ -873,10 +921,15 @@ export function PlayingScreen({
         />
       </div>
 
-      {/* Video quality indicator - show briefly when controls visible */}
+      {/* Video quality indicator - show when controls visible */}
       {showControls && videoQuality && (
-        <div className="absolute top-4 right-20 z-20 bg-black/60 px-2 py-1 rounded text-xs text-gray-300">
+        <div className={`absolute top-4 right-20 z-20 px-2 py-1 rounded text-xs ${
+          videoQuality === 'hd1080' || videoQuality === 'highres' 
+            ? 'bg-orange-600/80 text-white' 
+            : 'bg-black/60 text-gray-300'
+        }`}>
           {qualityNames[videoQuality] || videoQuality}
+          {(videoQuality === 'hd1080' || videoQuality === 'highres') && ' ⚠️'}
         </div>
       )}
 

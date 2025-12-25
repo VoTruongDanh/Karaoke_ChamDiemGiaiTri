@@ -306,7 +306,7 @@ export function HomeScreen({
             {/* Now Playing - only show when there's a song */}
             {currentSong && (
               <FocusableButton
-                row={0}
+                row={1}
                 col={0}
                 onSelect={onNowPlayingSelect || (() => {})}
                 variant="ghost"
@@ -340,10 +340,10 @@ export function HomeScreen({
               </FocusableButton>
             )}
 
-            {/* Action buttons */}
+            {/* Action buttons - always at row 2 */}
             <div className="flex gap-4">
               <FocusableButton
-                row={currentSong ? 1 : 0}
+                row={2}
                 col={0}
                 onSelect={onSearchSelect}
                 variant="secondary"
@@ -356,7 +356,7 @@ export function HomeScreen({
               </FocusableButton>
               
               <FocusableButton
-                row={currentSong ? 1 : 0}
+                row={2}
                 col={1}
                 onSelect={onQueueSelect}
                 variant="secondary"
@@ -368,10 +368,10 @@ export function HomeScreen({
               </FocusableButton>
             </div>
 
-            {/* Play Now button */}
+            {/* Play Now button - row 3 */}
             {waitingCount > 0 && !currentSong && onPlayNow && (
               <FocusableButton
-                row={1}
+                row={3}
                 col={0}
                 onSelect={onPlayNow}
                 variant="primary"
@@ -383,7 +383,7 @@ export function HomeScreen({
               </FocusableButton>
             )}
 
-            {/* Queue preview */}
+            {/* Queue preview - row 4 */}
             {waitingCount > 0 && (
               <div className="bg-white/5 dark:bg-white/5 backdrop-blur rounded-2xl p-4">
                 <p className="text-base text-gray-400 mb-3">Tiếp theo</p>
@@ -391,35 +391,27 @@ export function HomeScreen({
                   {queueItems
                     .filter(item => item.status === 'waiting')
                     .slice(0, 6)
-                    .map((item, index) => {
-                      // Calculate row based on what's above:
-                      // - Row 0: Now Playing (if currentSong) OR Buttons (if no currentSong)
-                      // - Row 1: Buttons (if currentSong) OR PlayNow (if no currentSong but has queue)
-                      // - Row 2: Queue preview (if currentSong) OR Queue preview (if PlayNow shown)
-                      const showPlayNow = !currentSong && onPlayNow;
-                      const queueRow = currentSong ? 2 : (showPlayNow ? 2 : 1);
-                      return (
-                        <FocusableButton
-                          key={item.id}
-                          row={queueRow}
-                          col={index}
-                          onSelect={onQueueSelect}
-                          variant="ghost"
-                          className="!p-0 !min-h-0 !min-w-0 flex-shrink-0 w-32 lg:w-36 text-left !rounded-lg"
-                        >
-                          <div className="w-full">
-                            <LazyImage 
-                              src={item.song.thumbnail} 
-                              alt={item.song.title}
-                              className="w-32 h-20 lg:w-36 lg:h-24 rounded-lg mb-1 object-cover"
-                              width={144}
-                              height={96}
-                            />
-                            <p className="text-base truncate">{item.song.title}</p>
-                          </div>
-                        </FocusableButton>
-                      );
-                    })}
+                    .map((item, index) => (
+                      <FocusableButton
+                        key={item.id}
+                        row={4}
+                        col={index}
+                        onSelect={onQueueSelect}
+                        variant="ghost"
+                        className="!p-0 !min-h-0 !min-w-0 flex-shrink-0 w-32 lg:w-36 text-left !rounded-lg"
+                      >
+                        <div className="w-full">
+                          <LazyImage 
+                            src={item.song.thumbnail} 
+                            alt={item.song.title}
+                            className="w-32 h-20 lg:w-36 lg:h-24 rounded-lg mb-1 object-cover"
+                            width={144}
+                            height={96}
+                          />
+                          <p className="text-base truncate">{item.song.title}</p>
+                        </div>
+                      </FocusableButton>
+                    ))}
                 </div>
               </div>
             )}
@@ -438,27 +430,9 @@ export function HomeScreen({
                   <div className="grid grid-cols-2 gap-5">
                     {suggestions.map((song, index) => {
                       const isAdded = addedIds.has(song.youtubeId);
-                      // Calculate base row based on what's visible above
-                      // When no currentSong: buttons at row 0, PlayNow at row 1 (if shown), queue at row 1 or 2
-                      // When currentSong: nowPlaying at row 0, buttons at row 1, queue at row 2
-                      const showPlayNow = !currentSong && onPlayNow && waitingCount > 0;
-                      const hasQueuePreview = waitingCount > 0;
-                      
-                      let baseRow: number;
-                      if (currentSong) {
-                        // With currentSong: row 0=nowPlaying, row 1=buttons, row 2=queue, row 3+=suggestions
-                        baseRow = hasQueuePreview ? 3 : 2;
-                      } else {
-                        // No currentSong: row 0=buttons, row 1=PlayNow (if shown), row 1 or 2=queue, next=suggestions
-                        if (showPlayNow) {
-                          baseRow = hasQueuePreview ? 3 : 2;
-                        } else {
-                          baseRow = hasQueuePreview ? 2 : 1;
-                        }
-                      }
-                      
-                      // 2 columns
-                      const suggestionRow = baseRow + Math.floor(index / 2);
+                      // Simple row calculation: suggestions start at row 10 to avoid conflicts
+                      // Row 10+ for suggestions (2 columns)
+                      const suggestionRow = 10 + Math.floor(index / 2);
                       const suggestionCol = index % 2;
                       
                       return (
@@ -489,16 +463,10 @@ export function HomeScreen({
                                 width={200}
                                 height={112}
                               />
-                              {isAdded ? (
+                              {isAdded && (
                                 <div className="absolute inset-0 bg-green-500/50 flex items-center justify-center">
                                   <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                  </svg>
-                                </div>
-                              ) : (
-                                <div className="absolute top-1 right-1 w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center">
-                                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                                   </svg>
                                 </div>
                               )}
@@ -525,21 +493,7 @@ export function HomeScreen({
                   {!isLoadingMore && suggestions.length >= 4 && (
                     <div className="flex justify-center pt-4">
                       <FocusableButton
-                        row={(() => {
-                          const showPlayNow = !currentSong && onPlayNow && waitingCount > 0;
-                          const hasQueuePreview = waitingCount > 0;
-                          let baseRow: number;
-                          if (currentSong) {
-                            baseRow = hasQueuePreview ? 3 : 2;
-                          } else {
-                            if (showPlayNow) {
-                              baseRow = hasQueuePreview ? 3 : 2;
-                            } else {
-                              baseRow = hasQueuePreview ? 2 : 1;
-                            }
-                          }
-                          return baseRow + Math.ceil(suggestions.length / 2);
-                        })()}
+                        row={10 + Math.ceil(suggestions.length / 2)}
                         col={0}
                         onSelect={loadMoreSuggestions}
                         variant="secondary"
