@@ -912,8 +912,9 @@ function TVAppContent() {
         if (next) {
           queueStore.setItemStatus(next.id, 'playing');
           notifySongStarted(next);
-          setCurrentScreen('playing');
           addToast({ type: 'info', message: `Đang phát: ${next.song.title}`, duration: 3000 });
+          // Additional delay for state to propagate
+          setTimeout(() => setCurrentScreen('playing'), 50);
         }
       }, 300);
     }
@@ -936,8 +937,9 @@ function TVAppContent() {
       queueStore.setItemStatus(queueItem.id, 'playing');
       notifySongStarted(queueItem);
       setExternalPause(false);
-      setCurrentScreen('playing');
       addToast({ type: 'info', message: `Đang phát: ${song.title}`, duration: 3000 });
+      // Small delay to ensure state is updated before screen change
+      setTimeout(() => setCurrentScreen('playing'), 50);
     }
   }, [queueStore, notifySongStarted, addToast]);
 
@@ -1105,7 +1107,8 @@ function TVAppContent() {
     if (next) {
       queueStore.setItemStatus(next.id, 'playing');
       notifySongStarted(next);
-      setCurrentScreen('playing');
+      // Small delay to ensure state is updated
+      setTimeout(() => setCurrentScreen('playing'), 50);
     } else {
       setCurrentScreen('home');
     }
