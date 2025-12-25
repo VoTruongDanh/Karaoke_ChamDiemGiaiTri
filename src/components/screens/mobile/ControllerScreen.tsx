@@ -426,7 +426,8 @@ export function ControllerScreen({
       const filtered = prev.filter(s => s.youtubeId !== song.youtubeId);
       return [song, ...filtered].slice(0, 10);
     });
-    inputRef.current?.focus();
+    // Don't focus input - it causes keyboard to pop up on mobile
+    // inputRef.current?.focus();
     setTimeout(() => {
       setAddedSongsSet(prev => {
         const next = new Set(prev);
