@@ -196,10 +196,6 @@ export function HomeScreen({
   const loadMoreSuggestions = useCallback(async () => {
     if (!onGetSuggestions || isLoadingMore || suggestions.length === 0) return;
     
-    const queueSongs = queueItems.map(item => item.song);
-    if (currentSong) queueSongs.unshift(currentSong.song);
-    if (queueSongs.length === 0) return;
-    
     setIsLoadingMore(true);
     
     // Use last suggestion as seed for more
@@ -208,10 +204,14 @@ export function HomeScreen({
     
     try {
       const results = await onGetSuggestions(videoIds, 8);
+      
+      // Build existing IDs set
       const existingIds = new Set([
-        ...queueSongs.map(s => s.youtubeId),
+        ...suggestions.map(s => s.youtubeId),
+        ...queueItems.map(item => item.song.youtubeId),
         ...Array.from(loadedIdsRef.current),
       ]);
+      if (currentSong) existingIds.add(currentSong.song.youtubeId);
       
       const newSuggestions = results.filter(s => !existingIds.has(s.youtubeId));
       

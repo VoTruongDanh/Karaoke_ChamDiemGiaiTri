@@ -423,6 +423,14 @@ export function PlayingScreen({
     const handleKeyDown = (e: KeyboardEvent) => {
       const player = playerRef.current;
       
+      // Handle Back button from TV remote (Escape, Backspace, or keyCode 461/10009)
+      if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'GoBack' || 
+          e.keyCode === 461 || e.keyCode === 10009 || e.keyCode === 8) {
+        e.preventDefault();
+        onBack();
+        return;
+      }
+      
       // If error is showing, handle error screen navigation
       if (error) {
         if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
