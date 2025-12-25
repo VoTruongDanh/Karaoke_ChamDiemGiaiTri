@@ -921,20 +921,6 @@ function TVAppContent() {
     prevQueueLengthRef.current = currentTotal;
   }, [queueItems, queueStore, notifySongStarted, addToast, currentScreen]);
 
-  // Handle playback commands from mobile
-  useEffect(() => {
-    onPlaybackCommand((command) => {
-      if (command === 'play') {
-        setExternalPause(false);
-        handleStartPlaying();
-      } else if (command === 'pause') {
-        setExternalPause(true);
-      } else if (command === 'skip') {
-        handleSkip();
-      }
-    });
-  }, [onPlaybackCommand, handleStartPlaying, handleSkip]);
-
   const navigateTo = useCallback((screen: Screen) => setCurrentScreen(screen), []);
   const goBack = useCallback(() => setCurrentScreen('home'), []);
 
@@ -1050,6 +1036,20 @@ function TVAppContent() {
     
     setTimeout(() => setCurrentScreen('playing'), 100);
   }, [queueStore, notifySongStarted, addToast]);
+
+  // Handle playback commands from mobile - must be after handleStartPlaying and handleSkip are defined
+  useEffect(() => {
+    onPlaybackCommand((command) => {
+      if (command === 'play') {
+        setExternalPause(false);
+        handleStartPlaying();
+      } else if (command === 'pause') {
+        setExternalPause(true);
+      } else if (command === 'skip') {
+        handleSkip();
+      }
+    });
+  }, [onPlaybackCommand, handleStartPlaying, handleSkip]);
 
   const handleShowSummary = useCallback(() => setCurrentScreen('summary'), []);
 
