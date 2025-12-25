@@ -25,16 +25,15 @@ type Screen = 'home' | 'search' | 'queue' | 'playing' | 'summary' | 'result';
 const YOUTUBE_API_KEY = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY || '';
 
 /**
- * Exit confirmation modal with d-pad support
+ * Exit confirmation modal - simple version
  */
 function ExitConfirmModal({ onStay, onExit }: { onStay: () => void; onExit: () => void }) {
-  const [focused, setFocused] = useState<'stay' | 'exit'>('stay');
   const stayRef = useRef<HTMLButtonElement>(null);
-  const exitRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     // Block navigation by setting a global flag
     (window as any).__exitModalOpen = true;
+    stayRef.current?.focus();
     
     return () => {
       (window as any).__exitModalOpen = false;
@@ -42,71 +41,41 @@ function ExitConfirmModal({ onStay, onExit }: { onStay: () => void; onExit: () =
   }, []);
 
   useEffect(() => {
-    // Capture all keyboard events when modal is open
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Block ALL keyboard events from reaching components below
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
       
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        setFocused(prev => prev === 'stay' ? 'exit' : 'stay');
-      } else if (e.key === 'Enter' || e.key === ' ') {
-        if (focused === 'stay') onStay();
-        else onExit();
+      if (e.key === 'Enter' || e.key === ' ') {
+        // Enter = stay
+        onStay();
       } else if (e.key === 'Escape' || e.key === 'Backspace' || e.keyCode === 461 || e.keyCode === 10009) {
-        // Back button = exit
+        // Back again = exit
         onExit();
       }
     };
 
-    // Use capture phase to intercept before other handlers
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [focused, onStay, onExit]);
-
-  useEffect(() => {
-    if (focused === 'stay') stayRef.current?.focus();
-    else exitRef.current?.focus();
-  }, [focused]);
+  }, [onStay, onExit]);
 
   return (
-    <div 
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="bg-slate-800 rounded-2xl p-6 max-w-sm mx-4 text-center shadow-2xl border border-slate-700">
-        <div className="w-16 h-16 mx-auto mb-4 bg-yellow-500/20 rounded-full flex items-center justify-center">
-          <svg className="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90">
+      <div className="bg-slate-800 rounded-2xl p-6 max-w-sm mx-4 text-center border border-slate-700">
+        <div className="w-14 h-14 mx-auto mb-4 bg-yellow-500/20 rounded-full flex items-center justify-center">
+          <svg className="w-7 h-7 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
         </div>
-        <h3 className="text-xl font-bold text-white mb-2">Thoát ứng dụng?</h3>
-        <p className="text-gray-400 mb-6">◀ ▶ để chọn • Enter xác nhận</p>
-        <div className="flex gap-3 justify-center">
-          <button
-            ref={stayRef}
-            onClick={onStay}
-            className={`px-6 py-3 rounded-lg font-medium transition-all ${
-              focused === 'stay' 
-                ? 'bg-primary-500 text-white ring-2 ring-primary-300 scale-105' 
-                : 'bg-slate-700 text-white hover:bg-slate-600'
-            }`}
-          >
-            Ở lại
-          </button>
-          <button
-            ref={exitRef}
-            onClick={onExit}
-            className={`px-6 py-3 rounded-lg font-medium transition-all ${
-              focused === 'exit' 
-                ? 'bg-red-600 text-white ring-2 ring-red-400 scale-105' 
-                : 'bg-slate-700 text-white hover:bg-slate-600'
-            }`}
-          >
-            Thoát
-          </button>
-        </div>
+        <h3 className="text-lg font-bold text-white mb-2">Nhấn Back lần nữa để thoát</h3>
+        <p className="text-gray-400 text-sm mb-5">Hoặc nhấn Enter để ở lại</p>
+        <button
+          ref={stayRef}
+          onClick={onStay}
+          className="px-8 py-3 bg-primary-500 text-white rounded-lg font-medium ring-2 ring-primary-300"
+        >
+          Ở lại
+        </button>
       </div>
     </div>
   );
@@ -1392,7 +1361,22 @@ function TVAppContent() {
       {showBackConfirm && (
         <ExitConfirmModal 
           onStay={() => setShowBackConfirm(false)}
-          onExit={() => window.history.go(-2)}
+          onExit={() => {
+            setShowBackConfirm(false);
+            // Try to exit app
+            try {
+              if ((window as any).webOS?.platformBack) {
+                (window as any).webOS.platformBack();
+              } else if ((window as any).tizen?.application) {
+                (window as any).tizen.application.getCurrentApplication().exit();
+              } else {
+                window.close();
+                setTimeout(() => { window.location.href = 'about:blank'; }, 100);
+              }
+            } catch {
+              window.location.href = 'about:blank';
+            }
+          }}
         />
       )}
       
