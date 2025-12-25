@@ -799,34 +799,34 @@ function FireworkCanvas({ show, intensity = 'high' }: { show: boolean; intensity
     };
     
     const createExplosion = (fw: Firework) => {
-      const particleCount = 80;
+      const particleCount = 50; // Reduced from 80
       const baseColor = fw.color;
       
       // Main burst
       for (let j = 0; j < particleCount; j++) {
         const angle = (Math.PI * 2 * j) / particleCount + Math.random() * 0.2;
-        const speed = 3 + Math.random() * 6;
+        const speed = 3 + Math.random() * 5;
         fw.particles.push({
           x: fw.x, y: fw.y,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
           life: 1,
           color: Math.random() > 0.2 ? baseColor : '#FFFFFF',
-          size: 2 + Math.random() * 3,
-          type: Math.random() > 0.8 ? 'sparkle' : 'normal',
+          size: 2 + Math.random() * 2,
+          type: Math.random() > 0.85 ? 'sparkle' : 'normal',
         });
       }
       
-      // Inner ring
-      for (let j = 0; j < 20; j++) {
-        const angle = (Math.PI * 2 * j) / 20;
+      // Inner ring - reduced
+      for (let j = 0; j < 12; j++) {
+        const angle = (Math.PI * 2 * j) / 12;
         fw.particles.push({
           x: fw.x, y: fw.y,
           vx: Math.cos(angle) * 2,
           vy: Math.sin(angle) * 2,
           life: 1,
           color: '#FFFFFF',
-          size: 3,
+          size: 2,
           type: 'sparkle',
         });
       }
@@ -1696,16 +1696,15 @@ function FireworkBursts({ show, color }: { show: boolean; color: string }) {
     const addBurst = () => {
       setBursts(prev => {
         const newBurst = { id: id++, x: 10 + Math.random() * 80, y: 8 + Math.random() * 45,
-          color: colors[Math.floor(Math.random() * colors.length)], size: 80 + Math.random() * 60 };
-        return [...prev.slice(-8), newBurst];
+          color: colors[Math.floor(Math.random() * colors.length)], size: 60 + Math.random() * 40 };
+        return [...prev.slice(-5), newBurst]; // Reduced from 8 to 5
       });
     };
     
     addBurst();
-    timers.push(setTimeout(addBurst, 150));
-    timers.push(setTimeout(addBurst, 300));
-    timers.push(setTimeout(addBurst, 500));
-    const interval = setInterval(addBurst, 600);
+    timers.push(setTimeout(addBurst, 200));
+    timers.push(setTimeout(addBurst, 400));
+    const interval = setInterval(addBurst, 800); // Slower interval
     return () => {
       timers.forEach(t => clearTimeout(t));
       clearInterval(interval);
@@ -1717,16 +1716,16 @@ function FireworkBursts({ show, color }: { show: boolean; color: string }) {
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
       {bursts.map(burst => (
         <div key={burst.id} className="absolute" style={{ left: `${burst.x}%`, top: `${burst.y}%` }}>
-          {[...Array(20)].map((_, i) => {
-            const angle = (i * 18) * (Math.PI / 180);
+          {[...Array(12)].map((_, i) => { // Reduced from 20 to 12 particles
+            const angle = (i * 30) * (Math.PI / 180);
             return (
-              <div key={i} className="absolute w-3 h-3 rounded-full animate-firework-particle"
-                style={{ backgroundColor: burst.color, boxShadow: `0 0 12px ${burst.color}, 0 0 24px ${burst.color}`,
+              <div key={i} className="absolute w-2 h-2 rounded-full animate-firework-particle"
+                style={{ backgroundColor: burst.color, boxShadow: `0 0 8px ${burst.color}`,
                   '--tx': `${Math.cos(angle) * burst.size}px`, '--ty': `${Math.sin(angle) * burst.size}px` } as React.CSSProperties} />
             );
           })}
-          <div className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full animate-firework-center"
-            style={{ backgroundColor: burst.color, boxShadow: `0 0 40px ${burst.color}, 0 0 80px ${burst.color}` }} />
+          <div className="absolute w-6 h-6 -translate-x-1/2 -translate-y-1/2 rounded-full animate-firework-center"
+            style={{ backgroundColor: burst.color, boxShadow: `0 0 30px ${burst.color}` }} />
         </div>
       ))}
     </div>
@@ -1757,8 +1756,8 @@ function GoldenRain({ show }: { show: boolean }) {
     
     const particles: GoldParticle[] = [];
     
-    // Create golden particles - reduced count
-    for (let i = 0; i < 40; i++) {
+    // Create golden particles - reduced count for TV
+    for (let i = 0; i < 25; i++) {
       particles.push({
         x: Math.random() * canvas.width,
         y: -50 - Math.random() * 300,
@@ -2037,27 +2036,26 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
     const timers: NodeJS.Timeout[] = [];
 
     if (isHigh) {
-      // Epic celebration for high scores
-      const end = Date.now() + 4000;
+      // Epic celebration for high scores - optimized for TV
+      const end = Date.now() + 3000; // Reduced from 4000
       const frame = () => {
-        c({ particleCount: 2, angle: 60, spread: 55, origin: { x: 0, y: 0.7 }, colors: ['#ffd700', '#ff6b6b', '#4d96ff', '#6bcb77', '#ff6bd6'] });
-        c({ particleCount: 2, angle: 120, spread: 55, origin: { x: 1, y: 0.7 }, colors: ['#ffd700', '#ff6b6b', '#4d96ff', '#6bcb77', '#ff6bd6'] });
+        c({ particleCount: 1, angle: 60, spread: 55, origin: { x: 0, y: 0.7 }, colors: ['#ffd700', '#ff6b6b', '#4d96ff'] });
+        c({ particleCount: 1, angle: 120, spread: 55, origin: { x: 1, y: 0.7 }, colors: ['#ffd700', '#ff6b6b', '#4d96ff'] });
         if (Date.now() < end) requestAnimationFrame(frame);
       };
       frame();
 
-      // Firework bursts
-      timers.push(setTimeout(() => c({ particleCount: 80, spread: 100, origin: { x: 0.5, y: 0.5 }, startVelocity: 45, colors: ['#ffd700', '#ff6b6b'] }), 100));
-      timers.push(setTimeout(() => c({ particleCount: 60, spread: 80, origin: { x: 0.3, y: 0.4 }, startVelocity: 35 }), 600));
-      timers.push(setTimeout(() => c({ particleCount: 60, spread: 80, origin: { x: 0.7, y: 0.4 }, startVelocity: 35 }), 1000));
-      timers.push(setTimeout(() => c({ particleCount: 100, spread: 120, origin: { x: 0.5, y: 0.6 }, startVelocity: 50, shapes: ['star'], colors: ['#ffd700', '#ffec8b'] }), 1500));
-      timers.push(setTimeout(() => c({ particleCount: 80, spread: 360, origin: { x: 0.5, y: 0.5 }, startVelocity: 40 }), 2200));
+      // Firework bursts - reduced particle counts for TV
+      timers.push(setTimeout(() => c({ particleCount: 50, spread: 100, origin: { x: 0.5, y: 0.5 }, startVelocity: 40, colors: ['#ffd700', '#ff6b6b'] }), 100));
+      timers.push(setTimeout(() => c({ particleCount: 40, spread: 80, origin: { x: 0.3, y: 0.4 }, startVelocity: 30 }), 700));
+      timers.push(setTimeout(() => c({ particleCount: 40, spread: 80, origin: { x: 0.7, y: 0.4 }, startVelocity: 30 }), 1200));
+      timers.push(setTimeout(() => c({ particleCount: 60, spread: 120, origin: { x: 0.5, y: 0.6 }, startVelocity: 45, colors: ['#ffd700', '#ffec8b'] }), 1800));
       if (isSRank) {
-        timers.push(setTimeout(() => c({ particleCount: 120, spread: 360, origin: { x: 0.5, y: 0.5 }, startVelocity: 55, gravity: 0.6, colors: ['#ffd700', '#ffec8b', '#fff'] }), 3000));
+        timers.push(setTimeout(() => c({ particleCount: 80, spread: 360, origin: { x: 0.5, y: 0.5 }, startVelocity: 50, gravity: 0.6, colors: ['#ffd700', '#ffec8b'] }), 2500));
       }
     } else if (finalScore && finalScore.totalScore >= 60) {
-      c({ particleCount: 50, spread: 60, origin: { x: 0.5, y: 0.6 }, colors: ['#6bcb77', '#4d96ff'] });
-      timers.push(setTimeout(() => c({ particleCount: 40, spread: 50, origin: { x: 0.5, y: 0.5 } }), 400));
+      c({ particleCount: 30, spread: 60, origin: { x: 0.5, y: 0.6 }, colors: ['#6bcb77', '#4d96ff'] });
+      timers.push(setTimeout(() => c({ particleCount: 25, spread: 50, origin: { x: 0.5, y: 0.5 } }), 400));
     }
     
     return () => {
