@@ -60,6 +60,25 @@
   html {
     scroll-behavior: smooth;
   }
+
+  /* TV Performance optimizations - reduce animation complexity */
+  @media (max-width: 1920px) {
+    /* Disable complex animations on TV/lower-end devices */
+    .tv-reduce-motion * {
+      animation-duration: 0.1s !important;
+      transition-duration: 0.1s !important;
+    }
+  }
+
+  /* GPU acceleration for animated elements */
+  .animate-spin,
+  .animate-pulse,
+  .animate-bounce,
+  [class*="animate-"] {
+    will-change: transform, opacity;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
 }
 
 @layer components {

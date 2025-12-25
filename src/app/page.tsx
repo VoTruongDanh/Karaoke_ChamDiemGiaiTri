@@ -942,6 +942,19 @@ function TVAppContent() {
     queueStore.add(song, 'TV User');
   }, [queueStore]);
 
+  // TV Priority: Play song immediately (skip queue)
+  const handlePlayNow = useCallback((song: Song) => {
+    // Add to queue and immediately start playing
+    const queueItem = queueStore.add(song, 'TV User');
+    if (queueItem) {
+      queueStore.setItemStatus(queueItem.id, 'playing');
+      notifySongStarted(queueItem);
+      setExternalPause(false);
+      setCurrentScreen('playing');
+      addToast({ type: 'info', message: `Đang phát: ${song.title}`, duration: 3000 });
+    }
+  }, [queueStore, notifySongStarted, addToast]);
+
   const handleSearch = useCallback(async (query: string, continuation?: string | null): Promise<{ songs: Song[], continuation?: string | null }> => {
     if (!continuation) {
       setRecentSearches(prev => [query, ...prev.filter(s => s !== query)].slice(0, 10));
@@ -1190,6 +1203,7 @@ function TVAppContent() {
             onNowPlayingSelect={currentSong ? () => navigateTo('playing') : undefined}
             onSummarySelect={completedSongs.length > 0 ? handleShowSummary : undefined}
             onPlayNow={handleStartPlaying}
+            onPlaySongNow={handlePlayNow}
             onGetSuggestions={songLibrary ? (videoIds, maxResults = 12) => songLibrary.getSuggestions(videoIds, maxResults) : undefined}
             onAddToQueue={handleSongSelect}
             lastPlayedVideoId={completedSongs.length > 0 ? completedSongs[completedSongs.length - 1].queueItem.song.youtubeId : undefined}
@@ -1200,6 +1214,7 @@ function TVAppContent() {
         return (
           <SearchScreen
             onSongSelect={handleSongSelect}
+            onPlayNow={handlePlayNow}
             onBack={goBack}
             onSearch={handleSearch}
             recentSearches={recentSearches}
@@ -1260,6 +1275,7 @@ function TVAppContent() {
             hasNextSong={queueStore.getNext() !== null}
             onGetSuggestions={songLibrary ? (videoIds, maxResults = 6) => songLibrary.getSuggestions(videoIds, maxResults) : undefined}
             onAddToQueue={handleSongSelect}
+            onPlayNow={(song) => { clearFinishedSong(); setResultData(null); handlePlayNow(song); }}
             onSearch={() => { clearFinishedSong(); setResultData(null); navigateTo('search'); }}
             onHome={() => { clearFinishedSong(); setResultData(null); navigateTo('home'); }}
           />

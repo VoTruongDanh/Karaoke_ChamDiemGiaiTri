@@ -17,6 +17,8 @@ export interface HomeScreenProps {
   onNowPlayingSelect?: () => void;
   onSummarySelect?: () => void;
   onPlayNow?: () => void;
+  /** Play a specific song immediately (TV priority) */
+  onPlaySongNow?: (song: Song) => void;
   onGetSuggestions?: (videoIds: string[], maxResults?: number) => Promise<Song[]>;
   onAddToQueue?: (song: Song) => void;
   lastPlayedVideoId?: string; // Video vừa hát xong - dùng để lấy gợi ý
@@ -98,6 +100,7 @@ export function HomeScreen({
   onQueueSelect,
   onNowPlayingSelect,
   onPlayNow,
+  onPlaySongNow,
   onGetSuggestions,
   onAddToQueue,
   lastPlayedVideoId,
@@ -250,18 +253,29 @@ export function HomeScreen({
     return () => container.removeEventListener('scroll', handleScroll);
   }, [loadMoreSuggestions, isLoadingMore]);
 
+  // TV Priority: Play song immediately when selected from suggestions
   const handleAddSuggestion = useCallback((song: Song) => {
+    // If onPlaySongNow is provided, play immediately (TV priority)
+    if (onPlaySongNow) {
+      onPlaySongNow(song);
+      return;
+    }
+    // Fallback to adding to queue
     if (!onAddToQueue) return;
     onAddToQueue(song);
     setAddedIds(prev => new Set(prev).add(song.youtubeId));
-    setTimeout(() => {
-      setAddedIds(prev => {
-        const next = new Set(prev);
-        next.delete(song.youtubeId);
-        return next;
-      });
+  }, [onPlaySongNow, onAddToQueue]);
+  
+  // Clear added indicator after 2s - separate effect to avoid memory leak
+  useEffect(() => {
+    if (addedIds.size === 0) return;
+    
+    const timer = setTimeout(() => {
+      setAddedIds(new Set());
     }, 2000);
-  }, [onAddToQueue]);
+    
+    return () => clearTimeout(timer);
+  }, [addedIds.size]);
 
   return (
     <NavigationGrid className="min-h-screen bg-tv-bg p-6 lg:p-8">

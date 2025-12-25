@@ -273,13 +273,27 @@ export function useMobileSocket(): UseMobileSocketReturn {
       }));
     });
 
-    // Queue events
+    // Queue events - debounce rapid updates
+    let queueUpdateTimeout: NodeJS.Timeout | null = null;
+    let pendingQueue: QueueItem[] | null = null;
+    
     socket.on('queue:updated', (queue: QueueItem[]) => {
       console.log('[Mobile Socket] Queue updated:', queue.length, 'items');
-      setState((prev) => ({
-        ...prev,
-        queue,
-      }));
+      
+      // Debounce rapid queue updates (e.g., during reorder)
+      pendingQueue = queue;
+      if (queueUpdateTimeout) {
+        clearTimeout(queueUpdateTimeout);
+      }
+      queueUpdateTimeout = setTimeout(() => {
+        if (pendingQueue) {
+          setState((prev) => ({
+            ...prev,
+            queue: pendingQueue!,
+          }));
+          pendingQueue = null;
+        }
+      }, 100); // 100ms debounce
     });
 
     // Song events
@@ -501,11 +515,23 @@ export function useMobileSocket(): UseMobileSocketReturn {
   }, []);
 
   /**
-   * Send score update to TV
+   * Send score update to TV - throttled to prevent spam
    */
+  const lastScoreSentRef = useRef<number>(0);
+  const lastScoreValueRef = useRef<number>(0);
+  
   const sendScore = useCallback((score: { pitchAccuracy: number; timing: number; totalScore: number }) => {
     if (socketRef.current?.connected && isJoinedRef.current) {
-      socketRef.current.emit('score:update' as keyof ClientToServerEvents, score);
+      const now = Date.now();
+      // Throttle: only send if 500ms passed OR score changed significantly (>5 points)
+      const timeSinceLastSend = now - lastScoreSentRef.current;
+      const scoreDiff = Math.abs(score.totalScore - lastScoreValueRef.current);
+      
+      if (timeSinceLastSend >= 500 || scoreDiff >= 5) {
+        socketRef.current.emit('score:update' as keyof ClientToServerEvents, score);
+        lastScoreSentRef.current = now;
+        lastScoreValueRef.current = score.totalScore;
+      }
     }
   }, []);
 

@@ -119,14 +119,18 @@ export function MobileQueueScreen({
     if (!onAddToQueue) return;
     onAddToQueue(item.song);
     setReplayAddedIds(prev => new Set(prev).add(item.id));
-    setTimeout(() => {
-      setReplayAddedIds(prev => {
-        const next = new Set(prev);
-        next.delete(item.id);
-        return next;
-      });
-    }, 2000);
   }, [onAddToQueue]);
+  
+  // Clear replay indicator after 2s - separate effect to avoid memory leak
+  React.useEffect(() => {
+    if (replayAddedIds.size === 0) return;
+    
+    const timer = setTimeout(() => {
+      setReplayAddedIds(new Set());
+    }, 2000);
+    
+    return () => clearTimeout(timer);
+  }, [replayAddedIds.size]);
 
   // Simple drag handlers using pointer events
   const handleDragStart = useCallback((index: number, clientY: number, itemTop: number) => {

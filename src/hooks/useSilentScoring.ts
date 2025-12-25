@@ -520,17 +520,16 @@ export function useSilentScoring({
       const bufferLength = analyser.fftSize;
       const dataArray = new Float32Array(bufferLength);
       
-      // Periodic check to ensure audio context is active
+      // Periodic check to ensure audio context is active - less frequent
       checkMicActiveRef.current = setInterval(() => {
         if (!isRecordingRef.current) return;
         
         // Only check and resume audio context if suspended
-        // Don't check track state as it can be unreliable on some devices
         if (audioContextRef.current?.state === 'suspended') {
           console.log('[Silent Scoring] Audio context suspended - resuming');
           audioContextRef.current.resume().catch(() => {});
         }
-      }, 5000); // Check every 5 seconds
+      }, 10000); // Check every 10 seconds (reduced from 5s)
 
       const analyze = () => {
         if (!isRecordingRef.current) return;
@@ -568,8 +567,8 @@ export function useSilentScoring({
           }
         }
 
-        // Update score every 15 frames (~250ms)
-        if (frameCountRef.current % 15 === 0) {
+        // Update score every 30 frames (~500ms) instead of 15 to reduce re-renders
+        if (frameCountRef.current % 30 === 0) {
           const score = calculateSegmentScore();
           setCurrentScore(score);
           onScoreUpdateRef.current?.(score);
@@ -645,7 +644,7 @@ export function useSilentScoring({
     }
   }, [isPlaying]);
   
-  // Schedule reconnect attempt
+  // Schedule reconnect attempt - silent after first failure
   const scheduleReconnect = useCallback(() => {
     if (reconnectTimerRef.current) {
       clearTimeout(reconnectTimerRef.current);
@@ -653,25 +652,28 @@ export function useSilentScoring({
     
     reconnectAttemptsRef.current++;
     
-    // Stop trying after 3 attempts - mic likely not available (WebView, permissions, etc.)
-    if (reconnectAttemptsRef.current > 3) {
+    // Stop trying after 2 attempts - mic likely not available (WebView, permissions, etc.)
+    if (reconnectAttemptsRef.current > 2) {
       console.log('[Silent Scoring] Max reconnect attempts reached, mic not available');
       setError(null); // Clear error message - don't spam user
       return;
     }
     
     console.log(`[Silent Scoring] Scheduling reconnect attempt ${reconnectAttemptsRef.current}`);
-    setError(`Đang kết nối mic... (${reconnectAttemptsRef.current}/3)`);
+    // Only show error on first attempt
+    if (reconnectAttemptsRef.current === 1) {
+      setError('Đang kết nối mic...');
+    }
     
-    // Exponential backoff: 2s, 4s, 8s
-    const delay = Math.min(RECONNECT_DELAY * Math.pow(2, reconnectAttemptsRef.current - 1), 8000);
+    // Exponential backoff: 2s, 4s
+    const delay = RECONNECT_DELAY * Math.pow(2, reconnectAttemptsRef.current - 1);
     
     reconnectTimerRef.current = setTimeout(() => {
-      if (isPlaying && !isRecordingRef.current) {
+      if (isPlayingRef.current && !isRecordingRef.current) {
         startRecording();
       }
     }, delay);
-  }, [isPlaying, startRecording]);
+  }, [startRecording]);
   
   // Manual reconnect function
   const reconnectMic = useCallback(() => {
@@ -741,57 +743,101 @@ export function useSilentScoring({
     }
   }, [calculateSegmentScore, releaseWakeLock, stopKeepAlive]);
 
-  // Auto start/stop based on isPlaying
+  // Auto start/stop based on isPlaying - with debounce to prevent rapid on/off
+  const isPlayingRef = useRef(isPlaying);
+  const startDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  
   useEffect(() => {
+    isPlayingRef.current = isPlaying;
+    
+    // Clear any pending start
+    if (startDebounceRef.current) {
+      clearTimeout(startDebounceRef.current);
+      startDebounceRef.current = null;
+    }
+    
     if (isPlaying && !isRecordingRef.current) {
-      startRecording();
+      // Debounce start to prevent rapid on/off when state changes quickly
+      startDebounceRef.current = setTimeout(() => {
+        // Double-check isPlaying is still true
+        if (isPlayingRef.current && !isRecordingRef.current) {
+          startRecording();
+        }
+      }, 500); // Wait 500ms before starting mic
     } else if (!isPlaying && isRecordingRef.current) {
+      // Stop immediately when not playing
       stopRecording();
     }
+    
+    return () => {
+      if (startDebounceRef.current) {
+        clearTimeout(startDebounceRef.current);
+      }
+    };
   }, [isPlaying, startRecording, stopRecording]);
   
   // Handle visibility change - re-acquire wake lock and reconnect mic when screen turns back on
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isPlaying) {
+      if (document.visibilityState === 'visible' && isPlayingRef.current) {
         console.log('[Silent Scoring] Page visible again, checking mic...');
         // Re-acquire wake lock
         requestWakeLock();
         
-        // Check if mic is still active, reconnect if not
-        const track = streamRef.current?.getAudioTracks()[0];
-        if (!track || track.readyState === 'ended' || !track.enabled) {
-          console.log('[Silent Scoring] Mic lost while hidden, reconnecting...');
-          if (!isRecordingRef.current) {
-            startRecording();
+        // Only check mic if we're supposed to be recording
+        if (isRecordingRef.current) {
+          // Resume audio context if suspended
+          if (audioContextRef.current?.state === 'suspended') {
+            audioContextRef.current.resume().catch(() => {});
           }
-        }
-        
-        // Resume audio context if suspended
-        if (audioContextRef.current?.state === 'suspended') {
-          audioContextRef.current.resume().catch(() => {});
         }
       }
     };
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [isPlaying, requestWakeLock, startRecording]);
+  }, [requestWakeLock]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      // Clear all timers
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
       }
       if (checkMicActiveRef.current) {
         clearInterval(checkMicActiveRef.current);
+        checkMicActiveRef.current = null;
       }
+      if (startDebounceRef.current) {
+        clearTimeout(startDebounceRef.current);
+        startDebounceRef.current = null;
+      }
+      
+      // Release resources
       releaseWakeLock();
       stopKeepAlive();
-      stopRecording();
+      
+      // Stop recording without sending final score (component unmounting)
+      isRecordingRef.current = false;
+      
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+      }
     };
-  }, [stopRecording, releaseWakeLock, stopKeepAlive]);
+  }, [releaseWakeLock, stopKeepAlive]);
 
   return {
     currentScore,

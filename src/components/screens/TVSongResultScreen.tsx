@@ -903,10 +903,11 @@ function FireworkCanvas({ show, intensity = 'high' }: { show: boolean; intensity
     
     // Start with a couple fireworks
     createFirework();
-    setTimeout(createFirework, 300);
+    const fireworkTimer = setTimeout(createFirework, 300);
     animate();
     
     return () => {
+      clearTimeout(fireworkTimer);
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
   }, [show, intensity]);
@@ -1690,6 +1691,7 @@ function FireworkBursts({ show, color }: { show: boolean; color: string }) {
     if (!show) return;
     const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#A855F7', '#F472B6', '#22D3EE', '#10B981'];
     let id = 0;
+    const timers: NodeJS.Timeout[] = [];
     
     const addBurst = () => {
       setBursts(prev => {
@@ -1699,9 +1701,15 @@ function FireworkBursts({ show, color }: { show: boolean; color: string }) {
       });
     };
     
-    addBurst(); setTimeout(addBurst, 150); setTimeout(addBurst, 300); setTimeout(addBurst, 500);
+    addBurst();
+    timers.push(setTimeout(addBurst, 150));
+    timers.push(setTimeout(addBurst, 300));
+    timers.push(setTimeout(addBurst, 500));
     const interval = setInterval(addBurst, 600);
-    return () => clearInterval(interval);
+    return () => {
+      timers.forEach(t => clearTimeout(t));
+      clearInterval(interval);
+    };
   }, [show]);
 
   if (!show) return null;
@@ -1968,11 +1976,13 @@ interface Props {
   hasNextSong: boolean;
   onGetSuggestions?: (videoIds: string[], maxResults?: number) => Promise<Song[]>;
   onAddToQueue?: (song: Song) => void;
+  /** Play song immediately (TV priority) */
+  onPlayNow?: (song: Song) => void;
   onSearch?: () => void;
   onHome?: () => void;
 }
 
-export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGetSuggestions, onAddToQueue, onSearch, onHome }: Props) {
+export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGetSuggestions, onAddToQueue, onPlayNow, onSearch, onHome }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [phase, setPhase] = useState<'enter' | 'counting' | 'revealed'>('enter');
   const confettiDone = useRef(false);
@@ -1999,11 +2009,18 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
       .finally(() => setIsLoadingSuggestions(false));
   }, [song.song.youtubeId, onGetSuggestions]);
   
+  // TV Priority: Play song immediately when selected from suggestions
   const handleAddSuggestion = useCallback((s: Song) => {
+    // If onPlayNow is provided, play immediately (TV priority)
+    if (onPlayNow) {
+      onPlayNow(s);
+      return;
+    }
+    // Fallback to adding to queue
     if (!onAddToQueue) return;
     onAddToQueue(s);
     setAddedIds(prev => new Set(prev).add(s.youtubeId));
-  }, [onAddToQueue]);
+  }, [onPlayNow, onAddToQueue]);
 
   // Fire confetti celebration
   const confettiInstanceRef = useRef<confetti.CreateTypes | null>(null);
@@ -2017,6 +2034,7 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
       confettiInstanceRef.current = confetti.create(canvasRef.current, { resize: true, useWorker: false });
     }
     const c = confettiInstanceRef.current;
+    const timers: NodeJS.Timeout[] = [];
 
     if (isHigh) {
       // Epic celebration for high scores
@@ -2029,18 +2047,22 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
       frame();
 
       // Firework bursts
-      setTimeout(() => c({ particleCount: 80, spread: 100, origin: { x: 0.5, y: 0.5 }, startVelocity: 45, colors: ['#ffd700', '#ff6b6b'] }), 100);
-      setTimeout(() => c({ particleCount: 60, spread: 80, origin: { x: 0.3, y: 0.4 }, startVelocity: 35 }), 600);
-      setTimeout(() => c({ particleCount: 60, spread: 80, origin: { x: 0.7, y: 0.4 }, startVelocity: 35 }), 1000);
-      setTimeout(() => c({ particleCount: 100, spread: 120, origin: { x: 0.5, y: 0.6 }, startVelocity: 50, shapes: ['star'], colors: ['#ffd700', '#ffec8b'] }), 1500);
-      setTimeout(() => c({ particleCount: 80, spread: 360, origin: { x: 0.5, y: 0.5 }, startVelocity: 40 }), 2200);
+      timers.push(setTimeout(() => c({ particleCount: 80, spread: 100, origin: { x: 0.5, y: 0.5 }, startVelocity: 45, colors: ['#ffd700', '#ff6b6b'] }), 100));
+      timers.push(setTimeout(() => c({ particleCount: 60, spread: 80, origin: { x: 0.3, y: 0.4 }, startVelocity: 35 }), 600));
+      timers.push(setTimeout(() => c({ particleCount: 60, spread: 80, origin: { x: 0.7, y: 0.4 }, startVelocity: 35 }), 1000));
+      timers.push(setTimeout(() => c({ particleCount: 100, spread: 120, origin: { x: 0.5, y: 0.6 }, startVelocity: 50, shapes: ['star'], colors: ['#ffd700', '#ffec8b'] }), 1500));
+      timers.push(setTimeout(() => c({ particleCount: 80, spread: 360, origin: { x: 0.5, y: 0.5 }, startVelocity: 40 }), 2200));
       if (isSRank) {
-        setTimeout(() => c({ particleCount: 120, spread: 360, origin: { x: 0.5, y: 0.5 }, startVelocity: 55, gravity: 0.6, colors: ['#ffd700', '#ffec8b', '#fff'] }), 3000);
+        timers.push(setTimeout(() => c({ particleCount: 120, spread: 360, origin: { x: 0.5, y: 0.5 }, startVelocity: 55, gravity: 0.6, colors: ['#ffd700', '#ffec8b', '#fff'] }), 3000));
       }
     } else if (finalScore && finalScore.totalScore >= 60) {
       c({ particleCount: 50, spread: 60, origin: { x: 0.5, y: 0.6 }, colors: ['#6bcb77', '#4d96ff'] });
-      setTimeout(() => c({ particleCount: 40, spread: 50, origin: { x: 0.5, y: 0.5 } }), 400);
+      timers.push(setTimeout(() => c({ particleCount: 40, spread: 50, origin: { x: 0.5, y: 0.5 } }), 400));
     }
+    
+    return () => {
+      timers.forEach(t => clearTimeout(t));
+    };
   }, [isHigh, isSRank, finalScore]);
 
   // Setup canvas size once on mount (no resize listener to avoid offscreen canvas issues)

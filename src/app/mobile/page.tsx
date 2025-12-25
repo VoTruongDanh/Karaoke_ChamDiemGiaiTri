@@ -88,9 +88,11 @@ function MobileAppContent() {
   }, [requestPause]);
 
   // Silent scoring - background recording with auto-reconnect
+  // Only activate when there's a song AND we're on controller screen (not search/queue)
   // Pass song duration for duration-based score multiplier
+  const shouldRecordMic = !!currentSong && currentScreen === 'controller' && isPlaying;
   const { isRecording: isMicActive, error: micError } = useSilentScoring({
-    isPlaying: !!currentSong,
+    isPlaying: shouldRecordMic,
     onScoreUpdate: sendScore,
     songDuration: currentSong?.song?.duration,
   });
@@ -316,20 +318,20 @@ function MobileAppContent() {
         </div>
       )}
       
-      {/* Mic status indicator - show when playing */}
-      {currentSong && isJoined && currentScreen === 'controller' && (
+      {/* Mic status indicator - only show when actively recording or has error */}
+      {currentSong && isJoined && currentScreen === 'controller' && (micError || isMicActive) && (
         <div className="fixed top-1 left-1/2 -translate-x-1/2 z-[60]">
           {micError ? (
             <div className="flex items-center gap-1.5 px-3 py-1 bg-yellow-500 text-white text-xs rounded-full shadow-lg">
               <div className="w-2 h-2 border border-white border-t-transparent rounded-full animate-spin" />
               <span>{micError}</span>
             </div>
-          ) : isMicActive ? (
+          ) : (
             <div className="flex items-center gap-1.5 px-3 py-1 bg-green-500 text-white text-xs rounded-full shadow-lg">
               <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
               <span>🎤 Đang ghi</span>
             </div>
-          ) : null}
+          )}
         </div>
       )}
       

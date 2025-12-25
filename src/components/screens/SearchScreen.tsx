@@ -8,6 +8,8 @@ import type { Song } from '@/types/song';
 
 export interface SearchScreenProps {
   onSongSelect: (song: Song) => void;
+  /** Play song immediately (TV priority) */
+  onPlayNow?: (song: Song) => void;
   onBack: () => void;
   onSearch: (query: string, continuation?: string | null) => Promise<{ songs: Song[], continuation?: string | null }>;
   recentSearches?: string[];
@@ -155,6 +157,7 @@ function OnScreenKeyboard({
 
 export function SearchScreen({
   onSongSelect,
+  onPlayNow,
   onBack,
   onSearch,
   recentSearches = [],
@@ -273,12 +276,23 @@ export function SearchScreen({
     doSearch(searchQuery);
   }, [onRecentSearchSelect, doSearch]);
 
+  // Voice error auto-clear
+  const voiceErrorTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const voiceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const clearVoiceErrorAfterDelay = useCallback((delay: number) => {
+    if (voiceErrorTimerRef.current) {
+      clearTimeout(voiceErrorTimerRef.current);
+    }
+    voiceErrorTimerRef.current = setTimeout(() => setVoiceError(null), delay);
+  }, []);
+
   // Voice search
   const startVoiceSearch = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setVoiceError('Trình duyệt không hỗ trợ nhận dạng giọng nói');
-      setTimeout(() => setVoiceError(null), 3000);
+      clearVoiceErrorAfterDelay(3000);
       return;
     }
 
@@ -358,7 +372,7 @@ export function SearchScreen({
         
         if (event.error !== 'aborted') {
           setVoiceError(errorMessages[event.error] || `Lỗi: ${event.error}`);
-          setTimeout(() => setVoiceError(null), 4000);
+          clearVoiceErrorAfterDelay(4000);
         }
       };
 
@@ -369,7 +383,11 @@ export function SearchScreen({
         }
       };
 
-      setTimeout(() => {
+      // Clear any existing timeout
+      if (voiceTimeoutRef.current) {
+        clearTimeout(voiceTimeoutRef.current);
+      }
+      voiceTimeoutRef.current = setTimeout(() => {
         if (recognitionRef.current) {
           try { recognitionRef.current.stop(); } catch {}
         }
@@ -378,9 +396,9 @@ export function SearchScreen({
       recognition.start();
     } catch (err: any) {
       setVoiceError(`Không thể khởi động mic`);
-      setTimeout(() => setVoiceError(null), 3000);
+      clearVoiceErrorAfterDelay(3000);
     }
-  }, [doSearch]);
+  }, [doSearch, clearVoiceErrorAfterDelay]);
 
   const stopVoiceSearch = useCallback(() => {
     if (recognitionRef.current) {
@@ -393,6 +411,8 @@ export function SearchScreen({
   useEffect(() => {
     return () => {
       if (recognitionRef.current) recognitionRef.current.stop();
+      if (voiceErrorTimerRef.current) clearTimeout(voiceErrorTimerRef.current);
+      if (voiceTimeoutRef.current) clearTimeout(voiceTimeoutRef.current);
     };
   }, []);
 
@@ -570,7 +590,7 @@ export function SearchScreen({
                         song={song}
                         row={resultsStartRow + Math.floor(index / cols)}
                         col={index % cols}
-                        onSelect={() => onSongSelect(song)}
+                        onSelect={() => onPlayNow ? onPlayNow(song) : onSongSelect(song)}
                         isLarge={!showKeyboard}
                       />
                     );

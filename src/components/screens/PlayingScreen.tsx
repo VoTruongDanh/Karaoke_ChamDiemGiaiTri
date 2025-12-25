@@ -4,6 +4,31 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import type { QueueItem } from '@/types/queue';
 import type { ScoreData } from '@/types/score';
 
+// Adaptive quality levels - from highest to lowest
+const QUALITY_LEVELS = ['hd720', 'large', 'medium', 'small'] as const;
+type QualityLevel = typeof QUALITY_LEVELS[number];
+
+// Quality storage key
+const QUALITY_STORAGE_KEY = 'karaoke_video_quality';
+
+// Get saved quality or default to 720p
+function getSavedQuality(): QualityLevel {
+  try {
+    const saved = localStorage.getItem(QUALITY_STORAGE_KEY);
+    if (saved && QUALITY_LEVELS.includes(saved as QualityLevel)) {
+      return saved as QualityLevel;
+    }
+  } catch {}
+  return 'hd720';
+}
+
+// Save quality preference
+function saveQuality(quality: QualityLevel) {
+  try {
+    localStorage.setItem(QUALITY_STORAGE_KEY, quality);
+  } catch {}
+}
+
 interface YTPlayer {
   destroy: () => void;
   playVideo: () => void;
@@ -14,6 +39,9 @@ interface YTPlayer {
   mute: () => void;
   unMute: () => void;
   getPlayerState: () => number;
+  setPlaybackQuality: (quality: string) => void;
+  getPlaybackQuality: () => string;
+  getAvailableQualityLevels: () => string[];
 }
 
 interface YTPlayerOptions {
@@ -25,6 +53,7 @@ interface YTPlayerOptions {
     onReady?: () => void;
     onStateChange?: (event: { data: number }) => void;
     onError?: (event: { data: number }) => void;
+    onPlaybackQualityChange?: (event: { data: string }) => void;
   };
 }
 
@@ -114,12 +143,14 @@ function YouTubePlayer({
   onReady,
   onError,
   playerRef,
+  onQualityChange,
 }: {
   videoId: string;
   onEnd: () => void;
   onReady?: () => void;
   onError?: (errorMessage: string) => void;
   playerRef: React.MutableRefObject<YTPlayer | null>;
+  onQualityChange?: (quality: string) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const playerDivRef = useRef<HTMLDivElement | null>(null);
@@ -127,20 +158,51 @@ function YouTubePlayer({
   const [error, setError] = useState<string | null>(null);
   const isMountedRef = useRef(true);
   
+  // Adaptive quality state
+  const [currentQuality, setCurrentQuality] = useState<QualityLevel>(getSavedQuality());
+  const bufferingCountRef = useRef(0);
+  const bufferingStartRef = useRef<number>(0);
+  const lastPlayTimeRef = useRef<number>(0);
+  const qualityDowngradeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
   const onEndRef = useRef(onEnd);
   const onReadyRef = useRef(onReady);
   const onErrorRef = useRef(onError);
+  const onQualityChangeRef = useRef(onQualityChange);
   
   useEffect(() => {
     onEndRef.current = onEnd;
     onReadyRef.current = onReady;
     onErrorRef.current = onError;
+    onQualityChangeRef.current = onQualityChange;
   });
+
+  // Downgrade quality when buffering too much
+  const downgradeQuality = useCallback(() => {
+    const currentIndex = QUALITY_LEVELS.indexOf(currentQuality);
+    if (currentIndex < QUALITY_LEVELS.length - 1) {
+      const newQuality = QUALITY_LEVELS[currentIndex + 1];
+      console.log(`[YouTube] Downgrading quality: ${currentQuality} -> ${newQuality}`);
+      setCurrentQuality(newQuality);
+      saveQuality(newQuality);
+      
+      // Try to set quality on existing player
+      if (playerRef.current) {
+        try {
+          playerRef.current.setPlaybackQuality(newQuality);
+        } catch {}
+      }
+      
+      // Reset buffering counter after downgrade
+      bufferingCountRef.current = 0;
+    }
+  }, [currentQuality, playerRef]);
 
   useEffect(() => {
     isMountedRef.current = true;
     setIsLoading(true);
     setError(null);
+    bufferingCountRef.current = 0;
 
     const loadYouTubeAPI = () => {
       return new Promise<void>((resolve, reject) => {
@@ -184,27 +246,28 @@ function YouTubePlayer({
         containerRef.current.appendChild(playerDiv);
         playerDivRef.current = playerDiv;
 
+        console.log(`[YouTube] Creating player with quality: ${currentQuality}`);
+
         playerRef.current = new window.YT.Player(playerDiv, {
           videoId,
           width: '100%',
           height: '100%',
           playerVars: { 
             autoplay: 1, 
-            controls: 0,           // Ẩn controls
-            modestbranding: 1,     // Ẩn logo YouTube
-            rel: 0,                // Không hiện video liên quan khi kết thúc
-            fs: 0,                 // Ẩn nút fullscreen
+            controls: 0,
+            modestbranding: 1,
+            rel: 0,
+            fs: 0,
             origin: window.location.origin, 
             playsinline: 1, 
             mute: 1,
-            iv_load_policy: 3,     // Ẩn annotations
-            disablekb: 1,          // Tắt keyboard controls
-            showinfo: 0,           // Ẩn tiêu đề video (deprecated nhưng vẫn thử)
-            cc_load_policy: 0,     // Không tự động bật phụ đề
-            hl: 'vi',              // Ngôn ngữ
-            // Performance optimizations
+            iv_load_policy: 3,
+            disablekb: 1,
+            showinfo: 0,
+            cc_load_policy: 0,
+            hl: 'vi',
             enablejsapi: 1,
-            vq: 'hd720',           // Giới hạn 720p cho TV mượt hơn
+            vq: currentQuality, // Use adaptive quality
           },
           events: {
             onReady: () => { 
@@ -214,6 +277,9 @@ function YouTubePlayer({
                 const player = playerRef.current;
                 if (player) {
                   try {
+                    // Set quality explicitly after ready
+                    player.setPlaybackQuality(currentQuality);
+                    
                     player.mute();
                     player.playVideo();
                     const checkAndUnmute = () => {
@@ -222,6 +288,7 @@ function YouTubePlayer({
                         const state = playerRef.current.getPlayerState();
                         if (state === window.YT.PlayerState.PLAYING) {
                           playerRef.current.unMute();
+                          lastPlayTimeRef.current = Date.now();
                         } else if (state === window.YT.PlayerState.BUFFERING || state === window.YT.PlayerState.CUED) {
                           setTimeout(checkAndUnmute, 200);
                         } else {
@@ -238,9 +305,48 @@ function YouTubePlayer({
               } 
             },
             onStateChange: (event) => { 
-              if (event.data === window.YT.PlayerState.ENDED && isMountedRef.current) {
+              if (!isMountedRef.current) return;
+              
+              if (event.data === window.YT.PlayerState.ENDED) {
                 onEndRef.current(); 
+              } else if (event.data === window.YT.PlayerState.BUFFERING) {
+                // Track buffering for adaptive quality
+                bufferingCountRef.current++;
+                bufferingStartRef.current = Date.now();
+                
+                // If buffering too frequently (3+ times in short period), downgrade
+                if (bufferingCountRef.current >= 3) {
+                  const timeSinceStart = Date.now() - lastPlayTimeRef.current;
+                  // If buffered 3+ times within first 30 seconds, quality is too high
+                  if (timeSinceStart < 30000) {
+                    console.log(`[YouTube] Too much buffering (${bufferingCountRef.current}x in ${timeSinceStart}ms), downgrading...`);
+                    downgradeQuality();
+                    bufferingCountRef.current = 0;
+                  }
+                }
+              } else if (event.data === window.YT.PlayerState.PLAYING) {
+                // Check if buffering took too long (>3s)
+                if (bufferingStartRef.current > 0) {
+                  const bufferDuration = Date.now() - bufferingStartRef.current;
+                  if (bufferDuration > 3000) {
+                    console.log(`[YouTube] Long buffer (${bufferDuration}ms), scheduling quality downgrade...`);
+                    // Schedule downgrade if this happens again
+                    if (qualityDowngradeTimerRef.current) {
+                      clearTimeout(qualityDowngradeTimerRef.current);
+                    }
+                    qualityDowngradeTimerRef.current = setTimeout(() => {
+                      if (bufferingCountRef.current >= 2) {
+                        downgradeQuality();
+                      }
+                    }, 5000);
+                  }
+                  bufferingStartRef.current = 0;
+                }
               }
+            },
+            onPlaybackQualityChange: (event) => {
+              console.log(`[YouTube] Quality changed to: ${event.data}`);
+              onQualityChangeRef.current?.(event.data);
             },
             onError: (event) => {
               const msg = YOUTUBE_ERROR_MESSAGES[event.data] || `Lỗi (${event.data})`;
@@ -260,6 +366,9 @@ function YouTubePlayer({
     
     return () => { 
       isMountedRef.current = false;
+      if (qualityDowngradeTimerRef.current) {
+        clearTimeout(qualityDowngradeTimerRef.current);
+      }
       // Destroy player first
       if (playerRef.current) { 
         try { playerRef.current.destroy(); } catch {} 
@@ -271,7 +380,7 @@ function YouTubePlayer({
         playerDivRef.current = null;
       }
     };
-  }, [videoId, playerRef]);
+  }, [videoId, playerRef, currentQuality, downgradeQuality]);
 
   if (error) {
     return (
@@ -316,6 +425,7 @@ export function PlayingScreen({
   const [duration, setDuration] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
   const [errorFocused, setErrorFocused] = useState(0); // 0 = skip, 1 = back
+  const [videoQuality, setVideoQuality] = useState<string>(''); // Current video quality
   const playerRef = useRef<YTPlayer | null>(null);
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
   const progressRef = useRef<HTMLDivElement>(null);
@@ -329,6 +439,17 @@ export function PlayingScreen({
   const backButtonRef = useRef<HTMLButtonElement>(null);
   const skipButtonRef = useRef<HTMLButtonElement>(null);
   const playButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Quality display names
+  const qualityNames: Record<string, string> = {
+    'hd1080': '1080p',
+    'hd720': '720p',
+    'large': '480p',
+    'medium': '360p',
+    'small': '240p',
+    'tiny': '144p',
+    'auto': 'Auto',
+  };
 
   // Row 0: back (col 0), skip (col 1)
   // Row 1: rewind (col 0), play (col 1), forward (col 2)
@@ -355,6 +476,7 @@ export function PlayingScreen({
     setCurrentTime(0);
     setDuration(0);
     setErrorFocused(0);
+    setVideoQuality('');
     // Reset wall-clock timer
     startTimeRef.current = Date.now();
   }, [currentSong.id]);
@@ -368,14 +490,14 @@ export function PlayingScreen({
           const newTime = player.getCurrentTime() || 0;
           const dur = player.getDuration();
           // Only update state if changed significantly (reduce re-renders)
-          setCurrentTime(prev => Math.abs(prev - newTime) > 0.5 ? newTime : prev);
+          setCurrentTime(prev => Math.abs(prev - newTime) > 1 ? newTime : prev);
           if (dur > 0 && duration === 0) setDuration(dur);
         } catch {}
       }
     };
     
-    // Longer interval when controls hidden
-    const interval = showControls ? 500 : 2000;
+    // Longer interval when controls hidden - TV optimization
+    const interval = showControls ? 1000 : 5000;
     timeUpdateRef.current = setInterval(updateTime, interval);
     return () => {
       if (timeUpdateRef.current) clearInterval(timeUpdateRef.current);
@@ -723,8 +845,16 @@ export function PlayingScreen({
           onEnd={handleSongEnd}
           onError={handleError}
           playerRef={playerRef}
+          onQualityChange={setVideoQuality}
         />
       </div>
+
+      {/* Video quality indicator - show briefly when controls visible */}
+      {showControls && videoQuality && (
+        <div className="absolute top-4 right-20 z-20 bg-black/60 px-2 py-1 rounded text-xs text-gray-300">
+          {qualityNames[videoQuality] || videoQuality}
+        </div>
+      )}
 
       {/* Seek indicator */}
       {seekIndicator && (

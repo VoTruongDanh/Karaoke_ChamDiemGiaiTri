@@ -447,14 +447,18 @@ export function ControllerScreen({
     });
     // Don't focus input - it causes keyboard to pop up on mobile
     // inputRef.current?.focus();
-    setTimeout(() => {
-      setAddedSongsSet(prev => {
-        const next = new Set(prev);
-        next.delete(song.youtubeId);
-        return next;
-      });
-    }, 2000);
   }, [onAddToQueue]);
+  
+  // Clear added indicator after 2s - separate effect to avoid memory leak
+  useEffect(() => {
+    if (addedSongsSet.size === 0) return;
+    
+    const timer = setTimeout(() => {
+      setAddedSongsSet(new Set());
+    }, 2000);
+    
+    return () => clearTimeout(timer);
+  }, [addedSongsSet.size]);
 
   const handleQuickSearch = useCallback((tag: string) => {
     setSearchQuery(tag);
@@ -543,11 +547,20 @@ export function ControllerScreen({
     }
   }, [currentSong]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount - clear all timers and refs
   useEffect(() => {
     return () => {
+      // Clear search timeout
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
+      // Stop voice recognition
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+        recognitionRef.current = null;
       }
     };
   }, []);
