@@ -588,11 +588,10 @@ export function SearchScreen({
               </div>
             ) : displaySongs.length > 0 ? (
               <div ref={resultsContainerRef} className="flex-1 overflow-y-auto hide-scrollbar">
-                <div className={`grid gap-4 p-2 ${
-                  showKeyboard ? 'grid-cols-2 lg:grid-cols-3' : 'grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
-                }`}>
+                <div className="grid grid-cols-3 gap-4 p-2">
                   {displaySongs.map((song, index) => {
-                    const cols = showKeyboard ? 3 : 5;
+                    // TV layout: 3 columns fixed
+                    const cols = 3;
                     return (
                       <SongCard
                         key={song.youtubeId}
@@ -618,8 +617,8 @@ export function SearchScreen({
                 {continuation && !isLoadingMore && hasSearched && (
                   <div className="flex justify-center py-4">
                     <FocusableButton
-                      row={RESULTS_START_ROW + Math.ceil(displaySongs.length / (showKeyboard ? 3 : 5))}
-                      col={0}
+                      row={RESULTS_START_ROW + Math.ceil(displaySongs.length / 3)}
+                      col={1}
                       onSelect={loadMore}
                       variant="secondary"
                       size="md"
@@ -634,8 +633,8 @@ export function SearchScreen({
                 {!hasSearched && !isLoadingMore && displaySongs.length >= 4 && onGetSuggestions && (
                   <div className="flex justify-center py-4">
                     <FocusableButton
-                      row={RESULTS_START_ROW + Math.ceil(displaySongs.length / (showKeyboard ? 3 : 5))}
-                      col={0}
+                      row={RESULTS_START_ROW + Math.ceil(displaySongs.length / 3)}
+                      col={1}
                       onSelect={() => {
                         if (!onGetSuggestions || displaySongs.length === 0) return;
                         setIsLoadingMore(true);
