@@ -523,11 +523,11 @@ export function useMobileSocket(): UseMobileSocketReturn {
   const sendScore = useCallback((score: { pitchAccuracy: number; timing: number; totalScore: number }) => {
     if (socketRef.current?.connected && isJoinedRef.current) {
       const now = Date.now();
-      // Throttle: only send if 500ms passed OR score changed significantly (>5 points)
+      // Throttle: only send if 500ms passed OR score changed significantly (>2 points)
       const timeSinceLastSend = now - lastScoreSentRef.current;
       const scoreDiff = Math.abs(score.totalScore - lastScoreValueRef.current);
       
-      if (timeSinceLastSend >= 500 || scoreDiff >= 5) {
+      if (timeSinceLastSend >= 500 || scoreDiff >= 2) {
         socketRef.current.emit('score:update' as keyof ClientToServerEvents, score);
         lastScoreSentRef.current = now;
         lastScoreValueRef.current = score.totalScore;

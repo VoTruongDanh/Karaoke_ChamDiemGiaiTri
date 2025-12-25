@@ -151,7 +151,6 @@ interface SingingSegment {
 
 // Score history storage key
 const SCORE_HISTORY_KEY = 'karaoke_score_history';
-const MIN_SCORE_CHANGE = 5; // Minimum score change required from previous score
 
 /**
  * Get previous score for a song from localStorage
@@ -183,13 +182,10 @@ function saveScore(score: number): void {
  * Apply score smoothing rule:
  * - First time: use raw score
  * - From 2nd time: 
- *   - If difference >= 5: use raw score
- *   - If difference < 5: adjust to previous ± 5
+ *   - If difference >= 3: use raw score
+ *   - If difference < 3: adjust to ensure different score (±3 to ±5 randomly)
  * 
- * Example:
- * - Previous: 65, Raw: 72 (diff=7 >= 5) → Result: 72
- * - Previous: 65, Raw: 68 (diff=3 < 5) → Result: 70 (65+5)
- * - Previous: 65, Raw: 62 (diff=-3 < 5) → Result: 60 (65-5)
+ * This ensures consecutive songs NEVER have the same score
  */
 function applyScoreSmoothing(rawScore: number, previousScore: number | null): number {
   // First time - use raw score directly
@@ -199,22 +195,22 @@ function applyScoreSmoothing(rawScore: number, previousScore: number | null): nu
   
   const diff = rawScore - previousScore;
   
-  // If difference >= MIN_SCORE_CHANGE, use raw score
-  if (Math.abs(diff) >= MIN_SCORE_CHANGE) {
+  // If difference >= 3, use raw score (already different enough)
+  if (Math.abs(diff) >= 3) {
     return rawScore;
   }
   
-  // If difference < MIN_SCORE_CHANGE, adjust to previous ± MIN_SCORE_CHANGE
-  if (diff > 0) {
-    // Trying to go higher but not enough - bump to previous + 5
-    return Math.min(100, previousScore + MIN_SCORE_CHANGE);
-  } else if (diff < 0) {
-    // Trying to go lower but not enough - drop to previous - 5
-    return Math.max(0, previousScore - MIN_SCORE_CHANGE);
-  }
+  // Difference < 3 - force a noticeable change
+  // Random adjustment between 3-5 points
+  const adjustment = 3 + Math.floor(Math.random() * 3); // 3, 4, or 5
   
-  // Exactly same score - keep it
-  return previousScore;
+  if (diff >= 0) {
+    // Same or slightly higher - bump up
+    return Math.min(100, previousScore + adjustment);
+  } else {
+    // Slightly lower - drop down
+    return Math.max(0, previousScore - adjustment);
+  }
 }
 
 export function useSilentScoring({ 
