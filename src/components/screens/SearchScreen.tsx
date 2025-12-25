@@ -402,22 +402,22 @@ export function SearchScreen({
 
   return (
     <NavigationGrid className="h-screen bg-tv-bg overflow-hidden">
-      <div className="w-full h-full flex flex-col p-4">
+      <div className="w-full h-full flex flex-col p-3">
         {/* Header */}
-        <header className="flex items-center gap-4 mb-4 flex-shrink-0">
+        <header className="flex items-center gap-3 mb-3 flex-shrink-0">
           <FocusableButton
             row={0}
             col={0}
             onSelect={onBack}
             variant="secondary"
-            size="md"
+            size="sm"
             icon={<BackIcon />}
-            className="!px-4"
+            className="!px-3"
           >
             Quay lại
           </FocusableButton>
           
-          <h1 className="text-2xl font-bold flex-1">Tìm kiếm bài hát</h1>
+          <h1 className="text-xl font-bold flex-1">Tìm kiếm bài hát</h1>
           
           {/* Voice search button */}
           <FocusableButton
@@ -425,14 +425,14 @@ export function SearchScreen({
             col={1}
             onSelect={isListening ? stopVoiceSearch : startVoiceSearch}
             variant="secondary"
-            size="lg"
-            icon={<MicIcon className="w-6 h-6" />}
+            size="md"
+            icon={<MicIcon className="w-5 h-5" />}
             autoFocus
-            className={`!px-6 !bg-rose-500 !text-white !border-rose-500 ${
+            className={`!px-4 !bg-rose-500 !text-white !border-rose-500 ${
               isListening ? '!bg-rose-600 animate-pulse' : ''
             }`}
           >
-            {isListening ? 'Đang nghe...' : 'Tìm bằng giọng nói'}
+            {isListening ? 'Đang nghe...' : 'Tìm giọng nói'}
           </FocusableButton>
           
           {/* Keyboard toggle */}
@@ -441,9 +441,9 @@ export function SearchScreen({
             col={2}
             onSelect={() => setShowKeyboard(!showKeyboard)}
             variant={showKeyboard ? "primary" : "secondary"}
-            size="md"
+            size="sm"
             icon={<KeyboardIcon />}
-            className="!px-4"
+            className="!px-3"
           >
             {showKeyboard ? 'Ẩn' : 'Bàn phím'}
           </FocusableButton>
@@ -451,22 +451,22 @@ export function SearchScreen({
 
         {/* Voice listening indicator */}
         {isListening && (
-          <div className="mb-4 flex-shrink-0">
-            <div className="flex items-center justify-center gap-3 bg-red-500/20 border border-red-500/30 rounded-2xl p-4">
+          <div className="mb-3 flex-shrink-0">
+            <div className="flex items-center justify-center gap-2 bg-red-500/20 border border-red-500/30 rounded-xl p-3">
               <div className="flex gap-1">
                 {[...Array(5)].map((_, i) => (
                   <div 
                     key={i} 
                     className="w-1 bg-red-500 rounded-full animate-pulse"
                     style={{ 
-                      height: `${20 + Math.random() * 20}px`,
+                      height: `${16 + Math.random() * 16}px`,
                       animationDelay: `${i * 0.1}s` 
                     }}
                   />
                 ))}
               </div>
-              <span className="text-lg font-medium text-red-400">
-                {voiceText || 'Hãy nói tên bài hát bạn muốn tìm...'}
+              <span className="text-base font-medium text-red-400">
+                {voiceText || 'Hãy nói tên bài hát...'}
               </span>
             </div>
           </div>
@@ -474,8 +474,8 @@ export function SearchScreen({
 
         {/* Voice error */}
         {voiceError && (
-          <div className="mb-4 flex-shrink-0">
-            <div className="bg-red-500/20 border border-red-500/30 text-red-400 px-4 py-3 rounded-xl text-center">
+          <div className="mb-3 flex-shrink-0">
+            <div className="bg-red-500/20 border border-red-500/30 text-red-400 px-3 py-2 rounded-xl text-center text-sm">
               {voiceError}
             </div>
           </div>
