@@ -14,6 +14,8 @@ export interface ControllerScreenProps {
   queue: QueueItem[];
   /** Currently playing song */
   currentSong: QueueItem | null;
+  /** Whether playback is currently playing */
+  isPlaying?: boolean;
   /** Callback to search for songs */
   onSearch: (query: string, pageToken?: string) => Promise<{ songs: Song[]; nextPageToken?: string }>;
   /** Callback to get YouTube suggestions based on video IDs */
@@ -154,13 +156,17 @@ function SongResultCard({
 }
 
 /**
- * Compact now playing bar
+ * Compact now playing bar with play/pause control
  */
 function NowPlayingBar({ 
   currentSong,
+  isPlaying,
+  onPlayPause,
   onSkip,
 }: { 
   currentSong: QueueItem;
+  isPlaying?: boolean;
+  onPlayPause?: () => void;
   onSkip?: () => void;
 }) {
   return (
@@ -170,6 +176,19 @@ function NowPlayingBar({
         <p className="text-xs text-white/70">Đang phát</p>
         <p className="text-sm font-medium text-white truncate">{currentSong.song.title}</p>
       </div>
+      {onPlayPause && (
+        <button onClick={onPlayPause} className="p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
+          {isPlaying ? (
+            <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          )}
+        </button>
+      )}
       {onSkip && (
         <button onClick={onSkip} className="p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
           <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -185,7 +204,7 @@ function NowPlayingBar({
  * ControllerScreen - Mobile controller with smart suggestions
  */
 export function ControllerScreen({
-  sessionCode, queue, currentSong, onSearch, onGetSuggestions, onAddToQueue, onViewQueue, onDisconnect, onPlay, onSkip,
+  sessionCode, queue, currentSong, isPlaying = true, onSearch, onGetSuggestions, onAddToQueue, onViewQueue, onDisconnect, onPlay, onPause, onSkip,
 }: ControllerScreenProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Song[]>([]);
@@ -617,7 +636,12 @@ export function ControllerScreen({
 
       {currentSong && (
         <div className="px-3 py-2 bg-white dark:bg-tv-surface border-b border-slate-100 dark:border-tv-border">
-          <NowPlayingBar currentSong={currentSong} onSkip={onSkip} />
+          <NowPlayingBar 
+            currentSong={currentSong} 
+            isPlaying={isPlaying}
+            onPlayPause={isPlaying ? onPause : onPlay}
+            onSkip={onSkip} 
+          />
         </div>
       )}
 

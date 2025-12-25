@@ -252,6 +252,35 @@ function setupSocketHandlers(io, sessionStore) {
       }
     });
 
+    // Mobile reorders song in queue
+    socket.on('queue:reorder', (itemId, newIndex) => {
+      console.log(`[Reorder] Request: itemId=${itemId}, newIndex=${newIndex}`);
+      const session = sessionStore.getSessionBySocket(socket.id);
+      if (!session) return socket.emit('error', 'Session not found');
+      
+      // Find waiting items only
+      const waitingItems = session.queue.filter(item => item.status === 'waiting');
+      const itemIndex = waitingItems.findIndex(item => item.id === itemId);
+      
+      console.log(`[Reorder] Found at index ${itemIndex}, total waiting: ${waitingItems.length}`);
+      
+      if (itemIndex === -1 || newIndex < 0 || newIndex >= waitingItems.length) {
+        return socket.emit('error', 'Invalid reorder request');
+      }
+      
+      // Remove and insert at new position
+      const [item] = waitingItems.splice(itemIndex, 1);
+      waitingItems.splice(newIndex, 0, item);
+      
+      // Rebuild queue: non-waiting items + reordered waiting items
+      const nonWaitingItems = session.queue.filter(item => item.status !== 'waiting');
+      const newQueue = [...nonWaitingItems, ...waitingItems];
+      
+      sessionStore.updateQueue(session.id, newQueue);
+      io.to(session.id).emit('queue:updated', newQueue);
+      console.log(`[Reorder] Done: ${itemId} to position ${newIndex}`);
+    });
+
     // Playback controls
     socket.on('playback:play', () => {
       const session = sessionStore.getSessionBySocket(socket.id);

@@ -46,6 +46,10 @@ export interface PlayingScreenProps {
   scoreData?: ScoreData | null;
   scoringEnabled?: boolean;
   onError?: (error: string) => void;
+  /** External play/pause control from mobile */
+  externalPause?: boolean;
+  /** Callback when play state changes */
+  onPlayStateChange?: (isPlaying: boolean) => void;
 }
 
 function BackIcon() {
@@ -298,6 +302,8 @@ export function PlayingScreen({
   scoreData,
   scoringEnabled = false,
   onError,
+  externalPause,
+  onPlayStateChange,
 }: PlayingScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [showControls, setShowControls] = useState(true);
@@ -410,13 +416,33 @@ export function PlayingScreen({
       if (isPlaying) {
         player.pauseVideo();
         setIsPlaying(false);
+        onPlayStateChange?.(false);
       } else {
         player.playVideo();
         setIsPlaying(true);
+        onPlayStateChange?.(true);
       }
     } catch {}
     resetHideTimer();
-  }, [isPlaying, resetHideTimer]);
+  }, [isPlaying, resetHideTimer, onPlayStateChange]);
+
+  // Handle external pause control from mobile
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player || externalPause === undefined) return;
+    
+    try {
+      if (externalPause && isPlaying) {
+        player.pauseVideo();
+        setIsPlaying(false);
+        onPlayStateChange?.(false);
+      } else if (!externalPause && !isPlaying) {
+        player.playVideo();
+        setIsPlaying(true);
+        onPlayStateChange?.(true);
+      }
+    } catch {}
+  }, [externalPause, isPlaying, onPlayStateChange]);
 
   // Handle keyboard navigation
   useEffect(() => {

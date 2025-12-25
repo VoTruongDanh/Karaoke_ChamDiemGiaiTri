@@ -268,16 +268,16 @@ function TVStatCard({ label, value, icon, delay }: { label: string; value: numbe
 }
 
 /**
- * Confetti particle component for high scores
+ * Confetti particle component for high scores - OPTIMIZED for TV
  */
-function Confetti({ show, intensity = 30 }: { show: boolean; intensity?: number }) {
-  // Memoize random values to prevent re-render issues
+function Confetti({ show, intensity = 15 }: { show: boolean; intensity?: number }) {
+  // Reduced particle count for TV performance
   const particles = useMemo(() => 
     [...Array(intensity)].map((_, i) => ({
       id: i,
       left: Math.random() * 100,
-      delay: Math.random() * 3,
-      duration: 2.5 + Math.random() * 2,
+      delay: Math.random() * 2,
+      duration: 3 + Math.random() * 1.5,
       color: ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff6bd6', '#a855f7'][i % 6],
     })), [intensity]
   );
@@ -289,7 +289,7 @@ function Confetti({ show, intensity = 30 }: { show: boolean; intensity?: number 
       {particles.map((p) => (
         <div
           key={p.id}
-          className="absolute w-3 h-3 rounded-full animate-confetti"
+          className="absolute w-2 h-2 rounded-full animate-confetti"
           style={{
             left: `${p.left}%`,
             top: '-20px',
@@ -304,15 +304,13 @@ function Confetti({ show, intensity = 30 }: { show: boolean; intensity?: number 
 }
 
 /**
- * Firework burst effect - simplified version
+ * Firework burst effect - simplified for TV performance
  */
 function Fireworks({ show }: { show: boolean }) {
-  // Fixed positions for fireworks
+  // Reduced positions for TV
   const positions = useMemo(() => [
-    { x: 25, y: 30 },
-    { x: 50, y: 25 },
-    { x: 75, y: 35 },
-    { x: 35, y: 45 },
+    { x: 30, y: 30 },
+    { x: 70, y: 35 },
   ], []);
   
   if (!show) return null;
@@ -326,17 +324,17 @@ function Fireworks({ show }: { show: boolean }) {
           style={{ 
             left: `${pos.x}%`, 
             top: `${pos.y}%`,
-            animationDelay: `${idx * 0.5}s`,
+            animationDelay: `${idx * 0.6}s`,
           }}
         >
-          {[...Array(8)].map((_, i) => (
+          {[...Array(6)].map((_, i) => (
             <div
               key={i}
               className="absolute w-2 h-2 rounded-full animate-firework"
               style={{
-                backgroundColor: ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff6bd6'][i % 5],
-                transform: `rotate(${i * 45}deg) translateY(-10px)`,
-                animationDelay: `${idx * 0.5 + i * 0.03}s`,
+                backgroundColor: ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff'][i % 4],
+                transform: `rotate(${i * 60}deg) translateY(-8px)`,
+                animationDelay: `${idx * 0.6 + i * 0.04}s`,
               }}
             />
           ))}
@@ -347,16 +345,16 @@ function Fireworks({ show }: { show: boolean }) {
 }
 
 /**
- * Rising stars effect
+ * Rising stars effect - reduced for TV
  */
 function RisingStars({ show }: { show: boolean }) {
   const stars = useMemo(() => 
-    [...Array(12)].map((_, i) => ({
+    [...Array(6)].map((_, i) => ({
       id: i,
-      left: 5 + i * 8,
-      delay: i * 0.25,
-      duration: 3 + (i % 3),
-      emoji: ['⭐', '✨', '🌟', '💫'][i % 4],
+      left: 10 + i * 15,
+      delay: i * 0.4,
+      duration: 3.5 + (i % 2),
+      emoji: ['⭐', '✨', '🌟'][i % 3],
     })), []
   );
   
@@ -367,7 +365,7 @@ function RisingStars({ show }: { show: boolean }) {
       {stars.map((s) => (
         <div
           key={s.id}
-          className="absolute text-2xl animate-rise-star"
+          className="absolute text-xl animate-rise-star"
           style={{
             left: `${s.left}%`,
             bottom: '-30px',
@@ -383,17 +381,17 @@ function RisingStars({ show }: { show: boolean }) {
 }
 
 /**
- * Floating music notes
+ * Floating music notes - reduced for TV
  */
 function FloatingNotes({ show }: { show: boolean }) {
   const notes = useMemo(() => 
-    [...Array(8)].map((_, i) => ({
+    [...Array(4)].map((_, i) => ({
       id: i,
-      left: 10 + i * 12,
-      top: 20 + (i % 4) * 20,
-      delay: i * 0.4,
-      duration: 4 + (i % 3),
-      emoji: ['🎵', '🎶', '♪', '♫'][i % 4],
+      left: 15 + i * 20,
+      top: 25 + (i % 2) * 30,
+      delay: i * 0.6,
+      duration: 4.5,
+      emoji: ['🎵', '🎶'][i % 2],
     })), []
   );
   
@@ -404,7 +402,7 @@ function FloatingNotes({ show }: { show: boolean }) {
       {notes.map((n) => (
         <div
           key={n.id}
-          className="absolute text-3xl animate-float-note opacity-60"
+          className="absolute text-2xl animate-float-note opacity-50"
           style={{
             left: `${n.left}%`,
             top: `${n.top}%`,
@@ -420,16 +418,16 @@ function FloatingNotes({ show }: { show: boolean }) {
 }
 
 /**
- * Sparkle effect for medium scores
+ * Sparkle effect for medium scores - reduced for TV
  */
 function Sparkles({ show }: { show: boolean }) {
   const sparkles = useMemo(() => 
-    [...Array(12)].map((_, i) => ({
+    [...Array(6)].map((_, i) => ({
       id: i,
-      left: 10 + (i % 4) * 25,
-      top: 10 + Math.floor(i / 4) * 30,
-      delay: i * 0.15,
-      duration: 1.5 + (i % 3) * 0.3,
+      left: 15 + (i % 3) * 30,
+      top: 20 + Math.floor(i / 3) * 40,
+      delay: i * 0.2,
+      duration: 1.8,
     })), []
   );
   
@@ -454,14 +452,14 @@ function Sparkles({ show }: { show: boolean }) {
 }
 
 /**
- * Floating hearts for encouragement (low scores)
+ * Floating hearts for encouragement (low scores) - reduced for TV
  */
 function FloatingHearts({ show }: { show: boolean }) {
   const hearts = useMemo(() => 
-    [...Array(6)].map((_, i) => ({
+    [...Array(3)].map((_, i) => ({
       id: i,
-      left: 15 + i * 14,
-      delay: i * 0.4,
+      left: 25 + i * 25,
+      delay: i * 0.5,
     })), []
   );
   
@@ -472,12 +470,12 @@ function FloatingHearts({ show }: { show: boolean }) {
       {hearts.map((h) => (
         <div
           key={h.id}
-          className="absolute text-2xl animate-float-up"
+          className="absolute text-xl animate-float-up"
           style={{
             left: `${h.left}%`,
             bottom: '-30px',
             animationDelay: `${h.delay}s`,
-            animationDuration: '4s',
+            animationDuration: '4.5s',
           }}
         >
           💪
@@ -488,14 +486,14 @@ function FloatingHearts({ show }: { show: boolean }) {
 }
 
 /**
- * Shooting stars effect for high scores
+ * Shooting stars effect for high scores - reduced for TV
  */
 function ShootingStars({ show }: { show: boolean }) {
   const stars = useMemo(() => 
-    [...Array(5)].map((_, i) => ({
+    [...Array(3)].map((_, i) => ({
       id: i,
-      top: 10 + i * 18,
-      delay: i * 0.8,
+      top: 15 + i * 25,
+      delay: i * 1,
     })), []
   );
   
@@ -512,7 +510,7 @@ function ShootingStars({ show }: { show: boolean }) {
             animationDelay: `${s.delay}s`,
           }}
         >
-          <div className="w-20 h-0.5 bg-gradient-to-r from-transparent via-white to-yellow-300 rounded-full" />
+          <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-white to-yellow-300 rounded-full" />
         </div>
       ))}
     </div>
@@ -548,16 +546,16 @@ function PulseRings({ show, color = 'yellow' }: { show: boolean; color?: string 
 }
 
 /**
- * Floating bubbles effect
+ * Floating bubbles effect - reduced for TV
  */
 function FloatingBubbles({ show }: { show: boolean }) {
   const bubbles = useMemo(() => 
-    [...Array(15)].map((_, i) => ({
+    [...Array(8)].map((_, i) => ({
       id: i,
-      left: 5 + i * 6.5,
-      size: 8 + (i % 4) * 6,
-      delay: i * 0.3,
-      duration: 3 + (i % 3),
+      left: 8 + i * 12,
+      size: 10 + (i % 3) * 5,
+      delay: i * 0.4,
+      duration: 3.5 + (i % 2),
     })), []
   );
   
@@ -568,7 +566,7 @@ function FloatingBubbles({ show }: { show: boolean }) {
       {bubbles.map((b) => (
         <div
           key={b.id}
-          className="absolute rounded-full bg-gradient-to-br from-white/30 to-white/10 animate-float-bubble"
+          className="absolute rounded-full bg-gradient-to-br from-white/20 to-white/5 animate-float-bubble"
           style={{
             left: `${b.left}%`,
             bottom: '-50px',
@@ -584,14 +582,14 @@ function FloatingBubbles({ show }: { show: boolean }) {
 }
 
 /**
- * Spiral particles effect
+ * Spiral particles effect - reduced for TV
  */
 function SpiralParticles({ show }: { show: boolean }) {
   const particles = useMemo(() => 
-    [...Array(12)].map((_, i) => ({
+    [...Array(6)].map((_, i) => ({
       id: i,
-      delay: i * 0.2,
-      color: ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff6bd6', '#a855f7'][i % 6],
+      delay: i * 0.3,
+      color: ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff'][i % 4],
     })), []
   );
   
@@ -602,11 +600,11 @@ function SpiralParticles({ show }: { show: boolean }) {
       {particles.map((p) => (
         <div
           key={p.id}
-          className="absolute w-3 h-3 rounded-full animate-spiral"
+          className="absolute w-2 h-2 rounded-full animate-spiral"
           style={{
             backgroundColor: p.color,
             animationDelay: `${p.delay}s`,
-            transform: `rotate(${p.id * 30}deg)`,
+            transform: `rotate(${p.id * 60}deg)`,
           }}
         />
       ))}
@@ -615,16 +613,16 @@ function SpiralParticles({ show }: { show: boolean }) {
 }
 
 /**
- * Twinkling stars background
+ * Twinkling stars background - reduced for TV
  */
 function TwinklingStars({ show }: { show: boolean }) {
   const stars = useMemo(() => 
-    [...Array(20)].map((_, i) => ({
+    [...Array(10)].map((_, i) => ({
       id: i,
-      left: 5 + (i * 4.7),
-      top: 5 + ((i * 17) % 90),
-      size: 2 + (i % 3),
-      delay: i * 0.15,
+      left: 10 + (i * 9),
+      top: 10 + ((i * 23) % 80),
+      size: 2 + (i % 2),
+      delay: i * 0.2,
     })), []
   );
   
@@ -650,7 +648,7 @@ function TwinklingStars({ show }: { show: boolean }) {
 }
 
 /**
- * Rotating glow ring effect
+ * Rotating glow ring effect - simplified for TV
  */
 function RotatingGlow({ show, color = 'yellow' }: { show: boolean; color?: string }) {
   if (!show) return null;
@@ -664,23 +662,23 @@ function RotatingGlow({ show, color = 'yellow' }: { show: boolean; color?: strin
   
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-      <div className={`w-[500px] h-[500px] rounded-full bg-gradient-to-r ${gradientColors} opacity-20 blur-3xl animate-rotate-glow`} />
+      <div className={`w-[400px] h-[400px] rounded-full bg-gradient-to-r ${gradientColors} opacity-15 blur-3xl`} />
     </div>
   );
 }
 
 /**
- * Emoji rain effect
+ * Emoji rain effect - reduced for TV
  */
-function EmojiRain({ show, emojis = ['🎉', '🎊', '✨', '🌟'] }: { show: boolean; emojis?: string[] }) {
+function EmojiRain({ show, emojis = ['🎉', '🎊', '✨'] }: { show: boolean; emojis?: string[] }) {
   const items = useMemo(() => 
-    [...Array(20)].map((_, i) => ({
+    [...Array(10)].map((_, i) => ({
       id: i,
-      left: i * 5,
-      delay: i * 0.2,
-      duration: 3 + (i % 3),
+      left: i * 10,
+      delay: i * 0.3,
+      duration: 3.5 + (i % 2),
       emoji: emojis[i % emojis.length],
-      size: 16 + (i % 3) * 8,
+      size: 18 + (i % 2) * 6,
     })), [emojis]
   );
   
@@ -742,6 +740,8 @@ function TVAppContent() {
   const [previewScore, setPreviewScore] = useState<number | null>(null);
   // Hidden button click counter - need 6 clicks without moving mouse
   const hiddenClickRef = useRef<{ count: number; lastTime: number; lastX: number; lastY: number }>({ count: 0, lastTime: 0, lastX: 0, lastY: 0 });
+  // External pause control from mobile
+  const [externalPause, setExternalPause] = useState(false);
   
   const { addToast } = useToast();
   
@@ -924,8 +924,14 @@ function TVAppContent() {
   // Handle playback commands from mobile
   useEffect(() => {
     onPlaybackCommand((command) => {
-      if (command === 'play') handleStartPlaying();
-      else if (command === 'skip') handleSkip();
+      if (command === 'play') {
+        setExternalPause(false);
+        handleStartPlaying();
+      } else if (command === 'pause') {
+        setExternalPause(true);
+      } else if (command === 'skip') {
+        handleSkip();
+      }
     });
   }, [onPlaybackCommand]);
 
@@ -1027,6 +1033,7 @@ function TVAppContent() {
     }
     queueStore.setItemStatus(next.id, 'playing');
     notifySongStarted(next);
+    setExternalPause(false); // Reset pause state when starting new song
     
     setTimeout(() => setCurrentScreen('playing'), 100);
   }, [queueStore, notifySongStarted, addToast]);
@@ -1221,9 +1228,12 @@ function TVAppContent() {
             currentSong={currentSong}
             onSongEnd={handleSongEnd}
             onBack={goBack} 
+            onSkip={handleSkip}
             scoringEnabled={!!mobileScore}
             scoreData={mobileScore}
             onError={handleYouTubeError}
+            externalPause={externalPause}
+            onPlayStateChange={(playing) => setExternalPause(!playing)}
           />
         );
 

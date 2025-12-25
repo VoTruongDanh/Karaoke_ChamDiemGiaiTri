@@ -60,11 +60,32 @@ function MobileAppContent() {
     removeFromQueue,
     reorderQueue,
     requestPlay,
+    requestPause,
     requestSkip,
     sendScore,
     clearFinishedSong,
     disconnect,
   } = useMobileSocket();
+
+  // Track playback state locally (assume playing when song starts)
+  const [isPlaying, setIsPlaying] = useState(true);
+  
+  // Reset isPlaying when song changes
+  useEffect(() => {
+    if (currentSong) {
+      setIsPlaying(true);
+    }
+  }, [currentSong?.id]);
+
+  const handlePlay = useCallback(() => {
+    requestPlay();
+    setIsPlaying(true);
+  }, [requestPlay]);
+
+  const handlePause = useCallback(() => {
+    requestPause();
+    setIsPlaying(false);
+  }, [requestPause]);
 
   // Silent scoring - background recording with auto-reconnect
   // Pass song duration for duration-based score multiplier
@@ -236,12 +257,14 @@ function MobileAppContent() {
             sessionCode={sessionCode}
             queue={queue}
             currentSong={currentSong}
+            isPlaying={isPlaying}
             onSearch={handleSearch}
             onGetSuggestions={handleGetSuggestions}
             onAddToQueue={addToQueue}
             onViewQueue={() => setCurrentScreen('queue')}
             onDisconnect={handleDisconnect}
-            onPlay={requestPlay}
+            onPlay={handlePlay}
+            onPause={handlePause}
             onSkip={requestSkip}
           />
         );

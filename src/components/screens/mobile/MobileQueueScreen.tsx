@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import type { QueueItem } from '@/types/queue';
 import type { Song } from '@/types/song';
 
@@ -102,15 +102,18 @@ export function MobileQueueScreen({
   onReorder,
 }: MobileQueueScreenProps) {
   const [replayAddedIds, setReplayAddedIds] = useState<Set<string>>(new Set());
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [targetIndex, setTargetIndex] = useState<number | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const startY = useRef(0);
-  const currentY = useRef(0);
+  const [dragState, setDragState] = useState<{
+    dragging: boolean;
+    startIndex: number;
+    currentIndex: number;
+    startY: number;
+    currentY: number;
+    offsetY: number; // Offset from item top to touch point
+  } | null>(null);
   
   const waitingItems = queue.filter(item => item.status === 'waiting');
   const completedItems = queue.filter(item => item.status === 'completed');
+  const itemHeight = 72; // Approximate height of each item
 
   const handleReplay = useCallback((item: QueueItem) => {
     if (!onAddToQueue) return;
@@ -125,44 +128,58 @@ export function MobileQueueScreen({
     }, 2000);
   }, [onAddToQueue]);
 
-  // Simple touch-based reorder
-  const handleTouchStart = (e: React.TouchEvent, index: number) => {
+  // Simple drag handlers using pointer events
+  const handleDragStart = useCallback((index: number, clientY: number, itemTop: number) => {
     if (!onReorder || waitingItems.length <= 1) return;
-    startY.current = e.touches[0].clientY;
-    currentY.current = e.touches[0].clientY;
-    setDraggedIndex(index);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (draggedIndex === null || !onReorder) return;
-    e.preventDefault();
-    currentY.current = e.touches[0].clientY;
-    
-    // Find which item we're over
-    let newTarget = draggedIndex;
-    itemRefs.current.forEach((ref, i) => {
-      if (ref && i !== draggedIndex) {
-        const rect = ref.getBoundingClientRect();
-        const midY = rect.top + rect.height / 2;
-        if (currentY.current > midY && i > draggedIndex) {
-          newTarget = i;
-        } else if (currentY.current < midY && i < draggedIndex) {
-          newTarget = i;
-        }
-      }
+    setDragState({
+      dragging: true,
+      startIndex: index,
+      currentIndex: index,
+      startY: clientY,
+      currentY: clientY,
+      offsetY: clientY - itemTop,
     });
-    setTargetIndex(newTarget !== draggedIndex ? newTarget : null);
-  };
+  }, [onReorder, waitingItems.length]);
 
-  const handleTouchEnd = () => {
-    if (draggedIndex !== null && targetIndex !== null && onReorder) {
-      const item = waitingItems[draggedIndex];
-      console.log('[Queue] Reorder:', item.id, 'from', draggedIndex, 'to', targetIndex);
-      onReorder(item.id, targetIndex);
+  const handleDragMove = useCallback((clientY: number) => {
+    if (!dragState) return;
+    
+    // Calculate new index based on Y movement
+    const deltaY = clientY - dragState.startY;
+    const indexDelta = Math.round(deltaY / itemHeight);
+    let newIndex = dragState.startIndex + indexDelta;
+    
+    // Clamp to valid range
+    newIndex = Math.max(0, Math.min(waitingItems.length - 1, newIndex));
+    
+    setDragState(prev => prev ? { ...prev, currentIndex: newIndex, currentY: clientY } : null);
+  }, [dragState, waitingItems.length, itemHeight]);
+
+  const handleDragEnd = useCallback(() => {
+    if (!dragState || !onReorder) {
+      setDragState(null);
+      return;
     }
-    setDraggedIndex(null);
-    setTargetIndex(null);
-  };
+    
+    const { startIndex, currentIndex } = dragState;
+    if (startIndex !== currentIndex) {
+      const item = waitingItems[startIndex];
+      if (item) {
+        console.log('[Queue] Reorder:', item.id, 'from', startIndex, 'to', currentIndex);
+        onReorder(item.id, currentIndex);
+      }
+    }
+    setDragState(null);
+  }, [dragState, onReorder, waitingItems]);
+
+  // Get items excluding the dragged one (for background list)
+  const getBackgroundItems = useCallback(() => {
+    if (!dragState) return waitingItems;
+    return waitingItems.filter((_, i) => i !== dragState.startIndex);
+  }, [waitingItems, dragState]);
+
+  const backgroundItems = getBackgroundItems();
+  const draggedItem = dragState ? waitingItems[dragState.startIndex] : null;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-tv-bg flex flex-col">
@@ -182,7 +199,7 @@ export function MobileQueueScreen({
       </header>
 
       {/* Main */}
-      <main className="flex-1 overflow-y-auto p-4" ref={containerRef}>
+      <main className="flex-1 overflow-y-auto p-4 relative">
         <NowPlayingCard currentSong={currentSong} />
 
         {waitingItems.length > 0 ? (
@@ -193,58 +210,105 @@ export function MobileQueueScreen({
                 <span className="text-xs text-primary-500">Giữ & kéo để đổi</span>
               )}
             </div>
-            <div className="space-y-2">
-              {waitingItems.map((item, index) => (
-                <div
-                  key={item.id}
-                  ref={el => { itemRefs.current[index] = el; }}
-                  onTouchStart={(e) => handleTouchStart(e, index)}
-                  onTouchMove={handleTouchMove}
-                  onTouchEnd={handleTouchEnd}
-                  className={`flex items-center gap-3 p-3 rounded-xl transition-all select-none ${
-                    draggedIndex === index 
-                      ? 'bg-primary-100 dark:bg-primary-900/50 scale-[1.02] shadow-lg z-10' 
-                      : targetIndex === index
-                        ? 'bg-primary-50 dark:bg-primary-900/30 border-2 border-dashed border-primary-400'
-                        : 'bg-white dark:bg-tv-card'
-                  }`}
-                  style={{ touchAction: onReorder && waitingItems.length > 1 ? 'none' : 'auto' }}
-                >
-                  {/* Drag indicator */}
-                  {onReorder && waitingItems.length > 1 && (
-                    <div className="text-slate-300 dark:text-gray-600 flex-shrink-0">
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                        <circle cx="9" cy="6" r="1.5" />
-                        <circle cx="15" cy="6" r="1.5" />
-                        <circle cx="9" cy="12" r="1.5" />
-                        <circle cx="15" cy="12" r="1.5" />
-                        <circle cx="9" cy="18" r="1.5" />
-                        <circle cx="15" cy="18" r="1.5" />
-                      </svg>
+            <div className="space-y-2 relative">
+              {/* Background items (with placeholder for dragged item) */}
+              {waitingItems.map((item, index) => {
+                const isDraggedItem = dragState?.startIndex === index;
+                const isDropTarget = dragState && !isDraggedItem && index === dragState.currentIndex;
+                
+                return (
+                  <div
+                    key={item.id}
+                    onTouchStart={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      handleDragStart(index, e.touches[0].clientY, rect.top);
+                    }}
+                    onTouchMove={(e) => {
+                      if (dragState) {
+                        e.preventDefault();
+                        handleDragMove(e.touches[0].clientY);
+                      }
+                    }}
+                    onTouchEnd={handleDragEnd}
+                    className={`flex items-center gap-3 p-3 rounded-xl transition-all select-none ${
+                      isDraggedItem
+                        ? 'opacity-30 bg-slate-100 dark:bg-tv-surface border-2 border-dashed border-slate-300 dark:border-tv-border'
+                        : isDropTarget
+                          ? 'bg-primary-50 dark:bg-primary-900/30 border-2 border-dashed border-primary-400'
+                          : 'bg-white dark:bg-tv-card'
+                    }`}
+                    style={{ touchAction: onReorder && waitingItems.length > 1 ? 'none' : 'auto' }}
+                  >
+                    {/* Drag handle */}
+                    {onReorder && waitingItems.length > 1 && (
+                      <div className="text-slate-300 dark:text-gray-600 flex-shrink-0">
+                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                          <circle cx="9" cy="6" r="1.5" />
+                          <circle cx="15" cy="6" r="1.5" />
+                          <circle cx="9" cy="12" r="1.5" />
+                          <circle cx="15" cy="12" r="1.5" />
+                          <circle cx="9" cy="18" r="1.5" />
+                          <circle cx="15" cy="18" r="1.5" />
+                        </svg>
+                      </div>
+                    )}
+                    
+                    <div className="w-6 h-6 bg-slate-100 dark:bg-tv-surface rounded flex items-center justify-center text-xs font-medium text-slate-500 flex-shrink-0">
+                      {index + 1}
                     </div>
-                  )}
-                  
-                  <div className="w-6 h-6 bg-slate-100 dark:bg-tv-surface rounded flex items-center justify-center text-xs font-medium text-slate-500 flex-shrink-0">
-                    {index + 1}
+                    
+                    <img src={item.song.thumbnail} alt="" className="w-12 h-9 object-cover rounded flex-shrink-0" />
+                    
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate text-slate-800 dark:text-white">{item.song.title}</p>
+                      <p className="text-xs text-slate-500 truncate">{formatDuration(item.song.duration)}</p>
+                    </div>
+                    
+                    {onRemove && !isDraggedItem && (
+                      <button
+                        onClick={() => onRemove(item.id)}
+                        className="p-2 text-slate-400 hover:text-red-500 rounded flex-shrink-0"
+                      >
+                        <TrashIcon />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+              
+              {/* Floating dragged item */}
+              {dragState && draggedItem && (
+                <div
+                  className="fixed left-4 right-4 flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-tv-card shadow-2xl border-2 border-primary-500 z-50 pointer-events-none"
+                  style={{
+                    top: dragState.currentY - dragState.offsetY,
+                    transform: 'scale(1.02)',
+                  }}
+                >
+                  {/* Drag handle */}
+                  <div className="text-primary-500 flex-shrink-0">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                      <circle cx="9" cy="6" r="1.5" />
+                      <circle cx="15" cy="6" r="1.5" />
+                      <circle cx="9" cy="12" r="1.5" />
+                      <circle cx="15" cy="12" r="1.5" />
+                      <circle cx="9" cy="18" r="1.5" />
+                      <circle cx="15" cy="18" r="1.5" />
+                    </svg>
                   </div>
                   
-                  <img src={item.song.thumbnail} alt="" className="w-12 h-9 object-cover rounded flex-shrink-0" />
+                  <div className="w-6 h-6 bg-primary-100 dark:bg-primary-900 rounded flex items-center justify-center text-xs font-medium text-primary-600 dark:text-primary-400 flex-shrink-0">
+                    {dragState.currentIndex + 1}
+                  </div>
+                  
+                  <img src={draggedItem.song.thumbnail} alt="" className="w-12 h-9 object-cover rounded flex-shrink-0" />
                   
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate text-slate-800 dark:text-white">{item.song.title}</p>
-                    <p className="text-xs text-slate-500 truncate">{formatDuration(item.song.duration)}</p>
+                    <p className="text-sm font-medium truncate text-slate-800 dark:text-white">{draggedItem.song.title}</p>
+                    <p className="text-xs text-slate-500 truncate">{formatDuration(draggedItem.song.duration)}</p>
                   </div>
-                  
-                  {onRemove && (
-                    <button
-                      onClick={() => onRemove(item.id)}
-                      className="p-2 text-slate-400 hover:text-red-500 rounded flex-shrink-0"
-                    >
-                      <TrashIcon />
-                    </button>
-                  )}
                 </div>
-              ))}
+              )}
             </div>
           </div>
         ) : (
