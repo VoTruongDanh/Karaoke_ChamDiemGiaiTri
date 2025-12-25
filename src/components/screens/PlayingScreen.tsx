@@ -62,9 +62,8 @@ function BackIcon() {
 
 function SkipIcon() {
   return (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v14" />
+    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
     </svg>
   );
 }
@@ -191,19 +190,21 @@ function YouTubePlayer({
           height: '100%',
           playerVars: { 
             autoplay: 1, 
-            controls: 0, 
-            modestbranding: 1, 
-            rel: 0,
-            fs: 0, 
+            controls: 0,           // Ẩn controls
+            modestbranding: 1,     // Ẩn logo YouTube
+            rel: 0,                // Không hiện video liên quan khi kết thúc
+            fs: 0,                 // Ẩn nút fullscreen
             origin: window.location.origin, 
             playsinline: 1, 
             mute: 1,
-            iv_load_policy: 3,
-            disablekb: 1,
-            showinfo: 0,
+            iv_load_policy: 3,     // Ẩn annotations
+            disablekb: 1,          // Tắt keyboard controls
+            showinfo: 0,           // Ẩn tiêu đề video (deprecated nhưng vẫn thử)
+            cc_load_policy: 0,     // Không tự động bật phụ đề
+            hl: 'vi',              // Ngôn ngữ
             // Performance optimizations
             enablejsapi: 1,
-            vq: 'hd720', // Limit quality to 720p for smoother playback on TV
+            vq: 'hd720',           // Giới hạn 720p cho TV mượt hơn
           },
           events: {
             onReady: () => { 
@@ -381,17 +382,28 @@ export function PlayingScreen({
     };
   }, [isSeeking, showControls, duration]);
 
-  // Auto-hide controls after 5s
+  // Auto-hide controls after 5s - only when playing
   const resetHideTimer = useCallback(() => {
     setShowControls(true);
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-    hideTimerRef.current = setTimeout(() => setShowControls(false), 5000);
-  }, []);
+    // Only auto-hide when video is playing
+    if (isPlaying) {
+      hideTimerRef.current = setTimeout(() => setShowControls(false), 5000);
+    }
+  }, [isPlaying]);
 
   useEffect(() => {
     resetHideTimer();
     return () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); };
   }, [resetHideTimer]);
+
+  // Show controls when paused
+  useEffect(() => {
+    if (!isPlaying) {
+      setShowControls(true);
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    }
+  }, [isPlaying]);
 
   // Sync DOM focus with focusedButton state
   useEffect(() => {
@@ -666,11 +678,11 @@ export function PlayingScreen({
   }, [onSongEnd, currentSong.song.duration]);
 
   const getButtonClass = (button: typeof focusedButton) => {
-    const base = "p-3 rounded-full transition-all focus:outline-none";
+    const base = "p-3 rounded-full transition-all focus:outline-none text-gray-800";
     if (focusedButton === button && showControls) {
-      return `${base} bg-[#f5f5f5]/60 ring-2 ring-[#f5f5f5] scale-110`;
+      return `${base} bg-white/90 ring-2 ring-white scale-110 shadow-lg`;
     }
-    return `${base} bg-[#f5f5f5]/40 hover:bg-[#f5f5f5]/50`;
+    return `${base} bg-white/70 hover:bg-white/80 shadow-md`;
   };
 
   // Format time as mm:ss
@@ -759,14 +771,22 @@ export function PlayingScreen({
 
       {/* Controls overlay - auto hide */}
       <div className={`absolute inset-0 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+        {/* Top gradient overlay - che UI YouTube */}
+        <div className="absolute top-0 left-0 right-0 h-24 bg-black/95 pointer-events-none" />
+        <div className="absolute top-24 left-0 right-0 h-16 bg-gradient-to-b from-black/95 to-transparent pointer-events-none" />
+        
+        {/* Bottom gradient overlay - che video gợi ý YouTube */}
+        <div className="absolute bottom-0 left-0 right-0 h-40 bg-black/95 pointer-events-none" />
+        <div className="absolute bottom-40 left-0 right-0 h-16 bg-gradient-to-t from-black/95 to-transparent pointer-events-none" />
+        
         {/* Top bar */}
-        <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/70 to-transparent flex items-center justify-between pointer-events-none">
+        <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between pointer-events-none">
           <button
             ref={backButtonRef}
             tabIndex={0}
             onClick={onBack}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all pointer-events-auto ${
-              focusedButton === 'back' ? 'bg-[#f5f5f5]/60 ring-2 ring-[#f5f5f5] scale-105' : 'bg-[#f5f5f5]/40 hover:bg-[#f5f5f5]/50'
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all pointer-events-auto text-gray-800 ${
+              focusedButton === 'back' ? 'bg-white/90 ring-2 ring-white scale-105 shadow-lg' : 'bg-white/70 hover:bg-white/80 shadow-md'
             }`}
           >
             <BackIcon />
@@ -778,8 +798,8 @@ export function PlayingScreen({
               ref={skipButtonRef}
               tabIndex={0}
               onClick={onSkip}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all pointer-events-auto ${
-                focusedButton === 'skip' ? 'bg-[#f5f5f5]/60 ring-2 ring-[#f5f5f5] scale-105' : 'bg-[#f5f5f5]/40 hover:bg-[#f5f5f5]/50'
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all pointer-events-auto text-gray-800 ${
+                focusedButton === 'skip' ? 'bg-white/90 ring-2 ring-white scale-105 shadow-lg' : 'bg-white/70 hover:bg-white/80 shadow-md'
               }`}
             >
               <span>Bỏ qua</span>
@@ -812,8 +832,8 @@ export function PlayingScreen({
             ref={playButtonRef}
             tabIndex={0}
             onClick={togglePlayPause}
-            className={`p-4 rounded-full transition-all pointer-events-auto ${
-              focusedButton === 'play' ? 'bg-[#f5f5f5]/60 ring-2 ring-[#f5f5f5] scale-110' : 'bg-[#f5f5f5]/40 hover:bg-[#f5f5f5]/50'
+            className={`p-4 rounded-full transition-all pointer-events-auto text-gray-800 ${
+              focusedButton === 'play' ? 'bg-white/90 ring-2 ring-white scale-110 shadow-lg' : 'bg-white/70 hover:bg-white/80 shadow-md'
             }`}
           >
             {isPlaying ? <PauseIcon /> : <PlayIcon />}
@@ -839,7 +859,7 @@ export function PlayingScreen({
         </div>
 
         {/* Bottom song info + progress bar */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent pointer-events-none">
+        <div className="absolute bottom-0 left-0 right-0 pointer-events-none">
           {/* Progress bar */}
           <div className="px-4 pt-4">
             <div 
@@ -873,8 +893,8 @@ export function PlayingScreen({
           
           {/* Song info */}
           <div className="px-4 pb-4">
-            <p className="text-lg font-semibold truncate">{currentSong.song.title}</p>
-            <p className="text-sm text-gray-300">{currentSong.song.channelName}</p>
+            <p className="text-lg font-semibold truncate text-white drop-shadow-lg">{currentSong.song.title}</p>
+            <p className="text-sm text-gray-200 drop-shadow">{currentSong.song.channelName}</p>
           </div>
         </div>
 
