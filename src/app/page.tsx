@@ -270,7 +270,7 @@ function TVStatCard({ label, value, icon, delay }: { label: string; value: numbe
 /**
  * Confetti particle component for high scores - OPTIMIZED for TV
  */
-function Confetti({ show, intensity = 15 }: { show: boolean; intensity?: number }) {
+function Confetti({ show, intensity = 10 }: { show: boolean; intensity?: number }) {
   // Reduced particle count for TV performance
   const particles = useMemo(() => 
     [...Array(intensity)].map((_, i) => ({
@@ -349,10 +349,10 @@ function Fireworks({ show }: { show: boolean }) {
  */
 function RisingStars({ show }: { show: boolean }) {
   const stars = useMemo(() => 
-    [...Array(6)].map((_, i) => ({
+    [...Array(4)].map((_, i) => ({
       id: i,
-      left: 10 + i * 15,
-      delay: i * 0.4,
+      left: 15 + i * 20,
+      delay: i * 0.5,
       duration: 3.5 + (i % 2),
       emoji: ['⭐', '✨', '🌟'][i % 3],
     })), []
@@ -550,11 +550,11 @@ function PulseRings({ show, color = 'yellow' }: { show: boolean; color?: string 
  */
 function FloatingBubbles({ show }: { show: boolean }) {
   const bubbles = useMemo(() => 
-    [...Array(8)].map((_, i) => ({
+    [...Array(5)].map((_, i) => ({
       id: i,
-      left: 8 + i * 12,
+      left: 10 + i * 18,
       size: 10 + (i % 3) * 5,
-      delay: i * 0.4,
+      delay: i * 0.5,
       duration: 3.5 + (i % 2),
     })), []
   );
@@ -617,12 +617,12 @@ function SpiralParticles({ show }: { show: boolean }) {
  */
 function TwinklingStars({ show }: { show: boolean }) {
   const stars = useMemo(() => 
-    [...Array(10)].map((_, i) => ({
+    [...Array(6)].map((_, i) => ({
       id: i,
-      left: 10 + (i * 9),
-      top: 10 + ((i * 23) % 80),
+      left: 15 + (i * 14),
+      top: 15 + ((i * 25) % 70),
       size: 2 + (i % 2),
-      delay: i * 0.2,
+      delay: i * 0.3,
     })), []
   );
   
@@ -672,10 +672,10 @@ function RotatingGlow({ show, color = 'yellow' }: { show: boolean; color?: strin
  */
 function EmojiRain({ show, emojis = ['🎉', '🎊', '✨'] }: { show: boolean; emojis?: string[] }) {
   const items = useMemo(() => 
-    [...Array(10)].map((_, i) => ({
+    [...Array(6)].map((_, i) => ({
       id: i,
-      left: i * 10,
-      delay: i * 0.3,
+      left: i * 16,
+      delay: i * 0.4,
       duration: 3.5 + (i % 2),
       emoji: emojis[i % emojis.length],
       size: 18 + (i % 2) * 6,
@@ -933,7 +933,7 @@ function TVAppContent() {
         handleSkip();
       }
     });
-  }, [onPlaybackCommand]);
+  }, [onPlaybackCommand, handleStartPlaying, handleSkip]);
 
   const navigateTo = useCallback((screen: Screen) => setCurrentScreen(screen), []);
   const goBack = useCallback(() => setCurrentScreen('home'), []);
