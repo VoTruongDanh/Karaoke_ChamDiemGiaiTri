@@ -423,21 +423,6 @@ function YouTubePlayer({
     };
   }, [videoId, playerRef, targetQuality, forceReloadWithLowerQuality]);
 
-  // Calculate scale to fill screen while keeping 1280x720 internal resolution
-  useEffect(() => {
-    const updateScale = () => {
-      if (!containerRef.current) return;
-      const scaleX = window.innerWidth / 1280;
-      const scaleY = window.innerHeight / 720;
-      const scale = Math.max(scaleX, scaleY); // Use max to cover entire screen
-      containerRef.current.style.setProperty('--player-scale', String(scale));
-    };
-    
-    updateScale();
-    window.addEventListener('resize', updateScale);
-    return () => window.removeEventListener('resize', updateScale);
-  }, []);
-
   if (error) {
     return (
       <div className="w-full h-full bg-black flex items-center justify-center">
@@ -449,28 +434,15 @@ function YouTubePlayer({
   }
 
   return (
-    <div className="w-full h-full bg-black overflow-hidden relative flex items-center justify-center">
+    <div className="w-full h-full bg-black overflow-hidden relative">
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
           <div className="w-8 h-8 border-3 border-primary-400 border-t-transparent rounded-full animate-spin" />
         </div>
       )}
-      {/* 
-        Limit player size to 1280x720 max to force YouTube to choose 720p or lower.
-        YouTube auto-selects quality based on player dimensions.
-        Using CSS transform scale to fill screen while keeping internal resolution low.
-      */}
       <div 
         ref={containerRef} 
-        className="bg-black [&>div]:w-full [&>div]:h-full [&>iframe]:w-full [&>iframe]:h-full"
-        style={{
-          width: '1280px',
-          height: '720px',
-          maxWidth: '100vw',
-          maxHeight: '100vh',
-          transform: 'scale(var(--player-scale, 1))',
-          transformOrigin: 'center center',
-        }}
+        className="w-full h-full [&>div]:w-full [&>div]:h-full [&>iframe]:w-full [&>iframe]:h-full"
       />
     </div>
   );

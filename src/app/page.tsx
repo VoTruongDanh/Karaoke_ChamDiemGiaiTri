@@ -33,19 +33,27 @@ function ExitConfirmModal({ onStay, onExit }: { onStay: () => void; onExit: () =
   const exitRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
+    // Capture all keyboard events when modal is open
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Block ALL keyboard events from reaching components below
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        e.preventDefault();
         setFocused(prev => prev === 'stay' ? 'exit' : 'stay');
       } else if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
         if (focused === 'stay') onStay();
         else onExit();
+      } else if (e.key === 'Escape' || e.key === 'Backspace' || e.keyCode === 461 || e.keyCode === 10009) {
+        // Back button = exit
+        onExit();
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    // Use capture phase to intercept before other handlers
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [focused, onStay, onExit]);
 
   useEffect(() => {
@@ -54,7 +62,10 @@ function ExitConfirmModal({ onStay, onExit }: { onStay: () => void; onExit: () =
   }, [focused]);
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+    <div 
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      onClick={(e) => e.stopPropagation()}
+    >
       <div className="bg-slate-800 rounded-2xl p-6 max-w-sm mx-4 text-center shadow-2xl border border-slate-700">
         <div className="w-16 h-16 mx-auto mb-4 bg-yellow-500/20 rounded-full flex items-center justify-center">
           <svg className="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -62,7 +73,7 @@ function ExitConfirmModal({ onStay, onExit }: { onStay: () => void; onExit: () =
           </svg>
         </div>
         <h3 className="text-xl font-bold text-white mb-2">Thoát ứng dụng?</h3>
-        <p className="text-gray-400 mb-6">Dùng ◀ ▶ để chọn, Enter để xác nhận</p>
+        <p className="text-gray-400 mb-6">◀ ▶ để chọn • Enter xác nhận</p>
         <div className="flex gap-3 justify-center">
           <button
             ref={stayRef}
