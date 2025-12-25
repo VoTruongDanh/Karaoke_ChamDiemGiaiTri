@@ -559,7 +559,7 @@ export function SearchScreen({
               </div>
             ) : displaySongs.length > 0 ? (
               <div ref={resultsContainerRef} className="flex-1 overflow-y-auto hide-scrollbar">
-                <div className={`grid gap-4 p-2 ${
+                <div className={`grid gap-5 p-4 ${
                   showKeyboard ? 'grid-cols-2 lg:grid-cols-3' : 'grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
                 }`}>
                   {displaySongs.map((song, index) => {
@@ -585,7 +585,7 @@ export function SearchScreen({
                   </div>
                 )}
                 
-                {/* Load more button (fallback) */}
+                {/* Load more button for search results */}
                 {continuation && !isLoadingMore && hasSearched && (
                   <div className="flex justify-center py-4">
                     <FocusableButton
@@ -597,6 +597,36 @@ export function SearchScreen({
                       className="!px-8"
                     >
                       Tải thêm kết quả
+                    </FocusableButton>
+                  </div>
+                )}
+                
+                {/* Load more button for suggestions (when not searched yet) */}
+                {!hasSearched && !isLoadingMore && displaySongs.length >= 4 && onGetSuggestions && (
+                  <div className="flex justify-center py-4">
+                    <FocusableButton
+                      row={resultsStartRow + Math.ceil(displaySongs.length / (showKeyboard ? 3 : 5))}
+                      col={0}
+                      onSelect={() => {
+                        if (!onGetSuggestions || displaySongs.length === 0) return;
+                        setIsLoadingMore(true);
+                        const lastSong = displaySongs[displaySongs.length - 1];
+                        onGetSuggestions([lastSong.youtubeId], 8)
+                          .then(newSongs => {
+                            const existingIds = new Set(displaySongs.map(s => s.youtubeId));
+                            const filtered = newSongs.filter(s => !existingIds.has(s.youtubeId));
+                            if (filtered.length > 0) {
+                              setSuggestions(prev => [...prev, ...filtered]);
+                            }
+                          })
+                          .catch(() => {})
+                          .finally(() => setIsLoadingMore(false));
+                      }}
+                      variant="secondary"
+                      size="md"
+                      className="!px-8"
+                    >
+                      Tải thêm gợi ý
                     </FocusableButton>
                   </div>
                 )}

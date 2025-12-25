@@ -142,6 +142,7 @@ export function useTVNavigation(config: TVNavigationConfig = {}): TVNavigationRe
 
   /**
    * Find the next valid position in a direction
+   * Supports skipping empty rows when moving vertically
    */
   const findNextPosition = useCallback(
     (
@@ -170,38 +171,49 @@ export function useTVNavigation(config: TVNavigationConfig = {}): TVNavigationRe
           break;
       }
 
-      // Check bounds
-      if (newRow < 0 || newRow >= grid.length) return null;
-      if (!grid[newRow]) return null;
-      if (newCol < 0) return null;
-
-      // Find the element at the new position, or search for nearest in that row
-      if (grid[newRow][newCol]) {
-        return { row: newRow, col: newCol };
-      }
-
-      // If moving vertically, try to find nearest element in the target row
+      // For vertical movement, skip empty rows
       if (direction === 'up' || direction === 'down') {
-        const row = grid[newRow];
-        if (!row) return null;
+        const step = direction === 'up' ? -1 : 1;
+        let targetRow = newRow;
+        
+        // Search for next row with elements (max 10 rows to prevent infinite loop)
+        for (let i = 0; i < 10; i++) {
+          if (targetRow < 0 || targetRow >= grid.length) return null;
+          
+          const row = grid[targetRow];
+          if (row && row.some(el => el !== undefined)) {
+            // Found a row with elements, find nearest column
+            let nearestCol = -1;
+            let minDistance = Infinity;
 
-        // Find nearest element in the row
-        let nearestCol = -1;
-        let minDistance = Infinity;
+            for (let c = 0; c < row.length; c++) {
+              if (row[c]) {
+                const distance = Math.abs(c - fromCol);
+                if (distance < minDistance) {
+                  minDistance = distance;
+                  nearestCol = c;
+                }
+              }
+            }
 
-        for (let c = 0; c < row.length; c++) {
-          if (row[c]) {
-            const distance = Math.abs(c - fromCol);
-            if (distance < minDistance) {
-              minDistance = distance;
-              nearestCol = c;
+            if (nearestCol >= 0) {
+              return { row: targetRow, col: nearestCol };
             }
           }
+          
+          targetRow += step;
         }
+        
+        return null;
+      }
 
-        if (nearestCol >= 0) {
-          return { row: newRow, col: nearestCol };
-        }
+      // Horizontal movement - check bounds
+      if (newCol < 0) return null;
+      if (!grid[newRow]) return null;
+
+      // Find the element at the new position
+      if (grid[newRow][newCol]) {
+        return { row: newRow, col: newCol };
       }
 
       return null;

@@ -419,9 +419,9 @@ export function HomeScreen({
                 </div>
                 <div 
                   ref={suggestionsContainerRef}
-                  className="max-h-[400px] overflow-y-auto hide-scrollbar p-2"
+                  className="max-h-[400px] overflow-y-auto hide-scrollbar p-4"
                 >
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-5">
                     {suggestions.map((song, index) => {
                       const isAdded = addedIds.has(song.youtubeId);
                       // Calculate base row based on what's visible above
@@ -504,6 +504,36 @@ export function HomeScreen({
                     <div className="flex items-center justify-center gap-2 py-4">
                       <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
                       <span className="text-sm text-gray-400">Đang tải thêm...</span>
+                    </div>
+                  )}
+                  
+                  {/* Load more button */}
+                  {!isLoadingMore && suggestions.length >= 4 && (
+                    <div className="flex justify-center pt-4">
+                      <FocusableButton
+                        row={(() => {
+                          const showPlayNow = !currentSong && onPlayNow && waitingCount > 0;
+                          const hasQueuePreview = waitingCount > 0;
+                          let baseRow: number;
+                          if (currentSong) {
+                            baseRow = hasQueuePreview ? 3 : 2;
+                          } else {
+                            if (showPlayNow) {
+                              baseRow = hasQueuePreview ? 3 : 2;
+                            } else {
+                              baseRow = hasQueuePreview ? 2 : 1;
+                            }
+                          }
+                          return baseRow + Math.ceil(suggestions.length / 2);
+                        })()}
+                        col={0}
+                        onSelect={loadMoreSuggestions}
+                        variant="secondary"
+                        size="md"
+                        className="!px-8"
+                      >
+                        Tải thêm gợi ý
+                      </FocusableButton>
                     </div>
                   )}
                 </div>
