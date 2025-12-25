@@ -5,7 +5,6 @@ import { NavigationGrid } from '@/components/NavigationGrid';
 import { FocusableButton } from '@/components/FocusableButton';
 import { LazyImage } from '@/components/LazyImage';
 import { useQueueStore } from '@/stores/queueStore';
-import { useBackButton } from '@/hooks/useBackButton';
 import type { QueueItem } from '@/types/queue';
 
 export interface QueueScreenProps {
@@ -206,13 +205,6 @@ export function QueueScreen({ onBack }: QueueScreenProps) {
   const remove = useQueueStore((state) => state.remove);
   const replay = useQueueStore((state) => state.replay);
   const getCurrent = useQueueStore((state) => state.getCurrent);
-
-  // Handle back button
-  useBackButton({
-    onBack: () => {
-      onBack();
-    }
-  });
 
   const currentSong = getCurrent();
   const waitingItems = items.filter(item => item.status === 'waiting');

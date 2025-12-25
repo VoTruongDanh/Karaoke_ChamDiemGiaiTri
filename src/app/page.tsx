@@ -24,6 +24,74 @@ type Screen = 'home' | 'search' | 'queue' | 'playing' | 'summary' | 'result';
 
 const YOUTUBE_API_KEY = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY || '';
 
+/**
+ * Exit confirmation modal with d-pad support
+ */
+function ExitConfirmModal({ onStay, onExit }: { onStay: () => void; onExit: () => void }) {
+  const [focused, setFocused] = useState<'stay' | 'exit'>('stay');
+  const stayRef = useRef<HTMLButtonElement>(null);
+  const exitRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        setFocused(prev => prev === 'stay' ? 'exit' : 'stay');
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (focused === 'stay') onStay();
+        else onExit();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [focused, onStay, onExit]);
+
+  useEffect(() => {
+    if (focused === 'stay') stayRef.current?.focus();
+    else exitRef.current?.focus();
+  }, [focused]);
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+      <div className="bg-slate-800 rounded-2xl p-6 max-w-sm mx-4 text-center shadow-2xl border border-slate-700">
+        <div className="w-16 h-16 mx-auto mb-4 bg-yellow-500/20 rounded-full flex items-center justify-center">
+          <svg className="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <h3 className="text-xl font-bold text-white mb-2">Thoát ứng dụng?</h3>
+        <p className="text-gray-400 mb-6">Dùng ◀ ▶ để chọn, Enter để xác nhận</p>
+        <div className="flex gap-3 justify-center">
+          <button
+            ref={stayRef}
+            onClick={onStay}
+            className={`px-6 py-3 rounded-lg font-medium transition-all ${
+              focused === 'stay' 
+                ? 'bg-primary-500 text-white ring-2 ring-primary-300 scale-105' 
+                : 'bg-slate-700 text-white hover:bg-slate-600'
+            }`}
+          >
+            Ở lại
+          </button>
+          <button
+            ref={exitRef}
+            onClick={onExit}
+            className={`px-6 py-3 rounded-lg font-medium transition-all ${
+              focused === 'exit' 
+                ? 'bg-red-600 text-white ring-2 ring-red-400 scale-105' 
+                : 'bg-slate-700 text-white hover:bg-slate-600'
+            }`}
+          >
+            Thoát
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface GradeInfo {
   grade: string;
   title: string;
@@ -810,55 +878,50 @@ function TVAppContent() {
     window.history.pushState({ karaoke: true }, '', window.location.href);
     
     const handlePopState = (e: PopStateEvent) => {
-      const now = Date.now();
-      const timeSinceLastPress = now - backPressTimeRef.current;
-      
       // Always push state back to prevent navigation
       window.history.pushState({ karaoke: true }, '', window.location.href);
       
       if (currentScreen === 'home') {
-        if (timeSinceLastPress < 2000 && backPressTimeRef.current > 0) {
-          // Second press within 2s - actually allow exit
-          setShowBackConfirm(false);
-          window.history.go(-2); // Go back past our dummy state
-          return;
-        } else {
-          // First press - show warning
-          backPressTimeRef.current = now;
-          setShowBackConfirm(true);
-          addToast({ type: 'warning', message: 'Nhấn Back lần nữa để thoát', duration: 2000 });
-          setTimeout(() => setShowBackConfirm(false), 2000);
-        }
-      } else if (currentScreen !== 'playing' && currentScreen !== 'result') {
-        // Navigate to home instead of browser back
+        // Show exit confirmation modal
+        setShowBackConfirm(true);
+      } else if (currentScreen === 'search' || currentScreen === 'queue' || currentScreen === 'summary') {
+        // Navigate to home
         setCurrentScreen('home');
+      } else if (currentScreen === 'result') {
+        // Result screen - go to home
+        setCurrentScreen('home');
+        clearFinishedSong();
+        setResultData(null);
       }
+      // playing screen - do nothing (handled by PlayingScreen itself)
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Backspace, Escape, GoBack, BrowserBack (common back keys on TV remotes)
       if (e.key === 'Backspace' || e.key === 'Escape' || e.key === 'GoBack' || e.key === 'BrowserBack' || e.keyCode === 461 || e.keyCode === 10009) {
+        // Don't handle if playing - PlayingScreen handles its own back
+        if (currentScreen === 'playing') return;
+        
         e.preventDefault();
         e.stopPropagation();
         
-        const now = Date.now();
-        const timeSinceLastPress = now - backPressTimeRef.current;
+        // If exit modal is showing, handle it
+        if (showBackConfirm) {
+          // Second back press - exit app
+          setShowBackConfirm(false);
+          window.history.go(-2);
+          return;
+        }
         
         if (currentScreen === 'home') {
-          if (timeSinceLastPress < 2000 && backPressTimeRef.current > 0) {
-            // Second press - allow exit
-            setShowBackConfirm(false);
-            window.history.go(-2);
-            return;
-          } else {
-            // First press - show warning
-            backPressTimeRef.current = now;
-            setShowBackConfirm(true);
-            addToast({ type: 'warning', message: 'Nhấn Back lần nữa để thoát', duration: 2000 });
-            setTimeout(() => setShowBackConfirm(false), 2000);
-          }
-        } else if (currentScreen !== 'playing' && currentScreen !== 'result') {
+          // Show exit confirmation modal
+          setShowBackConfirm(true);
+        } else if (currentScreen === 'search' || currentScreen === 'queue' || currentScreen === 'summary') {
           setCurrentScreen('home');
+        } else if (currentScreen === 'result') {
+          setCurrentScreen('home');
+          clearFinishedSong();
+          setResultData(null);
         }
       }
     };
@@ -1304,6 +1367,14 @@ function TVAppContent() {
       <ScreenTransition transitionKey={previewScore !== null ? `preview-${previewScore}` : currentScreen} type="fade" duration={200}>
         {renderScreen()}
       </ScreenTransition>
+      
+      {/* Exit confirmation modal */}
+      {showBackConfirm && (
+        <ExitConfirmModal 
+          onStay={() => setShowBackConfirm(false)}
+          onExit={() => window.history.go(-2)}
+        />
+      )}
       
       {/* Hidden link to preview result screen - click 6 times rapidly without moving mouse */}
       {currentScreen === 'home' && previewScore === null && (

@@ -4,7 +4,6 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { NavigationGrid } from '@/components/NavigationGrid';
 import { FocusableButton } from '@/components/FocusableButton';
 import { LazyImage } from '@/components/LazyImage';
-import { useBackButton } from '@/hooks/useBackButton';
 import type { Song } from '@/types/song';
 
 export interface SearchScreenProps {
@@ -425,13 +424,6 @@ export function SearchScreen({
   // Row 5-6: Quick search tags (if keyboard shown)
   // Row 10+: Song results (always start at row 10 for simplicity)
   const RESULTS_START_ROW = 10;
-
-  // Handle back button
-  useBackButton({
-    onBack: () => {
-      onBack();
-    }
-  });
 
   return (
     <NavigationGrid className="h-screen bg-tv-bg overflow-hidden">

@@ -5,7 +5,6 @@ import confetti from 'canvas-confetti';
 import { NavigationGrid } from '@/components/NavigationGrid';
 import { FocusableButton } from '@/components/FocusableButton';
 import { LazyImage } from '@/components/LazyImage';
-import { useBackButton } from '@/hooks/useBackButton';
 import type { QueueItem } from '@/types/queue';
 import type { ScoreData } from '@/types/score';
 import type { Song } from '@/types/song';
@@ -1997,17 +1996,6 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
   const quote = useMemo(() => grade ? getRandomQuote(grade) : '', [grade]);
   const isHigh = finalScore ? finalScore.totalScore >= 80 : false;
   const isSRank = finalScore ? finalScore.totalScore >= 90 : false;
-
-  // Handle back button - go to next song or home
-  useBackButton({
-    onBack: () => {
-      if (onHome) {
-        onHome();
-      } else {
-        onNext();
-      }
-    }
-  });
 
   
   // Load suggestions
