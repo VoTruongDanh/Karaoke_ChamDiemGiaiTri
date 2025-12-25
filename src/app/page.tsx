@@ -758,6 +758,7 @@ function TVAppContent() {
     mobileScore,
     mobileFeedback,
     finishedSong,
+    playingSong,
     createSession,
     updateQueue,
     notifySongStarted,
@@ -766,9 +767,13 @@ function TVAppContent() {
     clearFinishedSong,
   } = useTVSocket();
 
+  // Use selectors to get reactive state from Zustand
+  const queueItems = useQueueStore((state) => state.items);
+  const queueCurrentSong = useQueueStore((state) => state.items.find((item) => item.status === 'playing') || null);
   const queueStore = useQueueStore();
-  const currentSong = queueStore.getCurrent();
-  const queueItems = queueStore.items;
+  
+  // Use playingSong from socket if available, otherwise fall back to queue
+  const currentSong = playingSong || queueCurrentSong;
   const sessionCreatedRef = useRef(false);
   const prevQueueLengthRef = useRef(0);
   // Keep mobileScore in ref to avoid stale closure
@@ -1231,7 +1236,6 @@ function TVAppContent() {
 
       case 'playing':
         if (!currentSong) {
-          // Just show loading, don't auto-redirect
           return (
             <div className="min-h-screen bg-tv-bg flex items-center justify-center">
               <div className="text-center">

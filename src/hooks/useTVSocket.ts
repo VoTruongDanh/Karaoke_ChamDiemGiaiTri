@@ -31,6 +31,8 @@ export interface TVSocketState {
   mobileFeedback: RealTimeFeedback | null;
   /** Song that just finished with final score */
   finishedSong: { song: QueueItem; finalScore: ScoreData | null } | null;
+  /** Currently playing song (from socket event) */
+  playingSong: QueueItem | null;
 }
 
 /**
@@ -86,6 +88,7 @@ export function useTVSocket(): UseTVSocketReturn {
     mobileScore: null,
     mobileFeedback: null,
     finishedSong: null,
+    playingSong: null,
   });
 
   // Get queue store actions - use ref to avoid stale closure
@@ -183,9 +186,10 @@ export function useTVSocket(): UseTVSocketReturn {
     // Song events
     socket.on('song:playing', (song: QueueItem) => {
       console.log('[TV Socket] Song playing:', song.song.title);
-      // Clear finished song when new song starts
+      // Save playing song to state
       setState((prev) => ({
         ...prev,
+        playingSong: song,
         finishedSong: null,
       }));
     });
