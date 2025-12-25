@@ -33,6 +33,15 @@ function ExitConfirmModal({ onStay, onExit }: { onStay: () => void; onExit: () =
   const exitRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
+    // Block navigation by setting a global flag
+    (window as any).__exitModalOpen = true;
+    
+    return () => {
+      (window as any).__exitModalOpen = false;
+    };
+  }, []);
+
+  useEffect(() => {
     // Capture all keyboard events when modal is open
     const handleKeyDown = (e: KeyboardEvent) => {
       // Block ALL keyboard events from reaching components below

@@ -267,6 +267,9 @@ export function useTVNavigation(config: TVNavigationConfig = {}): TVNavigationRe
     if (!enabled) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Check if exit modal is open - skip navigation
+      if ((window as any).__exitModalOpen) return;
+      
       // Try key first, then keyCode for older TV browsers
       const action = KEY_MAP[event.key] || KEY_MAP[String(event.keyCode)];
       
