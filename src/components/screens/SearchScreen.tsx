@@ -100,7 +100,7 @@ function OnScreenKeyboard({
   query: string;
 }) {
   return (
-    <div className="bg-white/5 backdrop-blur-lg rounded-2xl p-4">
+    <div className="bg-white/5 rounded-2xl p-4">
       {/* Search input display */}
       <div className="bg-black/30 rounded-xl p-3 mb-4">
         <div className="flex items-center gap-2">
@@ -279,6 +279,8 @@ export function SearchScreen({
   // Voice error auto-clear
   const voiceErrorTimerRef = useRef<NodeJS.Timeout | null>(null);
   const voiceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastVoiceStartRef = useRef<number>(0); // Anti-spam: track last voice start time
+  const voiceCooldownRef = useRef<boolean>(false); // Anti-spam: cooldown flag
   
   const clearVoiceErrorAfterDelay = useCallback((delay: number) => {
     if (voiceErrorTimerRef.current) {
@@ -287,8 +289,26 @@ export function SearchScreen({
     voiceErrorTimerRef.current = setTimeout(() => setVoiceError(null), delay);
   }, []);
 
-  // Voice search
+  // Voice search with anti-spam protection
   const startVoiceSearch = useCallback(() => {
+    // Anti-spam: check cooldown (minimum 2 seconds between starts)
+    const now = Date.now();
+    if (voiceCooldownRef.current || now - lastVoiceStartRef.current < 2000) {
+      console.log('[Voice] Spam protection: too fast, ignoring');
+      return;
+    }
+    lastVoiceStartRef.current = now;
+    
+    // If already listening, stop instead
+    if (isListening || recognitionRef.current) {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch {}
+        recognitionRef.current = null;
+      }
+      setIsListening(false);
+      return;
+    }
+    
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setVoiceError('Trình duyệt không hỗ trợ nhận dạng giọng nói');
@@ -296,10 +316,9 @@ export function SearchScreen({
       return;
     }
 
-    if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch {}
-      recognitionRef.current = null;
-    }
+    // Set cooldown
+    voiceCooldownRef.current = true;
+    setTimeout(() => { voiceCooldownRef.current = false; }, 1500);
 
     try {
       const recognition = new SpeechRecognition();
@@ -398,11 +417,11 @@ export function SearchScreen({
       setVoiceError(`Không thể khởi động mic`);
       clearVoiceErrorAfterDelay(3000);
     }
-  }, [doSearch, clearVoiceErrorAfterDelay]);
+  }, [isListening, doSearch, clearVoiceErrorAfterDelay]);
 
   const stopVoiceSearch = useCallback(() => {
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      try { recognitionRef.current.stop(); } catch {}
       recognitionRef.current = null;
     }
     setIsListening(false);

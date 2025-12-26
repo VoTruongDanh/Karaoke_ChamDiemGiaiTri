@@ -2270,7 +2270,7 @@ export function TVSongResultScreen({ song, finalScore, onNext, hasNextSong, onGe
         
         {/* Suggestions section */}
         {showSuggestions && suggestions.length > 0 && onAddToQueue && (
-          <div className="mt-4 bg-black/50 backdrop-blur-xl rounded-xl p-4 animate-fade-in border border-white/20">
+          <div className="mt-4 bg-black/70 rounded-xl p-4 animate-fade-in border border-white/20">
             <p className="text-sm text-white mb-3 font-bold">🎵 Hát tiếp bài này</p>
             <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-1">
               {suggestions.slice(0, 6).map((s, index) => {

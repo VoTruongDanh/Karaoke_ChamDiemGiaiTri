@@ -296,7 +296,7 @@ export function HomeScreen({
         {/* Main content */}
         <div className="flex gap-6 lg:gap-8 items-start">
           {/* Left - QR Code */}
-          <div className="bg-white/5 dark:bg-white/5 backdrop-blur rounded-2xl p-4 flex-shrink-0">
+          <div className="bg-white/5 dark:bg-white/5 rounded-2xl p-4 flex-shrink-0">
             <QRCodeDisplay code={sessionCode} />
           </div>
 
@@ -326,7 +326,7 @@ export function HomeScreen({
                     {/* Overlay gradient */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                     {/* "Đang phát" badge */}
-                    <div className="absolute top-2 left-2 flex items-center gap-2 bg-black/50 backdrop-blur-sm px-2 py-1 rounded-full">
+                    <div className="absolute top-2 left-2 flex items-center gap-2 bg-black/70 px-2 py-1 rounded-full">
                       <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                       <p className="text-xs text-green-400 font-medium">Đang phát</p>
                     </div>
@@ -385,7 +385,7 @@ export function HomeScreen({
 
             {/* Queue preview - row 4 */}
             {waitingCount > 0 && (
-              <div className="bg-white/5 dark:bg-white/5 backdrop-blur rounded-2xl p-4">
+              <div className="bg-white/5 dark:bg-white/5 rounded-2xl p-4">
                 <p className="text-base text-gray-400 mb-3">Tiếp theo</p>
                 <div className="flex gap-3 overflow-x-auto hide-scrollbar p-1">
                   {queueItems
@@ -418,7 +418,7 @@ export function HomeScreen({
 
             {/* Suggestions - always show if available */}
             {suggestions.length > 0 && onAddToQueue && (
-              <div className="bg-white/5 dark:bg-white/5 backdrop-blur rounded-2xl p-4 overflow-visible">
+              <div className="bg-white/5 dark:bg-white/5 rounded-2xl p-4 overflow-visible">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-base text-gray-400">Gợi ý cho bạn</p>
                   <p className="text-xs text-gray-500">{suggestions.length} bài</p>

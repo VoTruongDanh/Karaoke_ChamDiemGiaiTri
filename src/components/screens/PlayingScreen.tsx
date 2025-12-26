@@ -1079,7 +1079,7 @@ export function PlayingScreen({
 
         {/* Score display */}
         {scoringEnabled && scoreData && (
-          <div className="absolute top-16 right-4 bg-black/60 backdrop-blur rounded-lg p-3">
+          <div className="absolute top-16 right-4 bg-black/70 rounded-lg p-3">
             <p className="text-xs text-gray-400 text-center">Điểm</p>
             <p className="text-2xl font-bold text-primary-400 text-center">{scoreData.totalScore}</p>
           </div>

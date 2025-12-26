@@ -77,7 +77,7 @@ function formatDuration(seconds: number): string {
 function CurrentSongDisplay({ currentSong }: { currentSong: QueueItem | null }) {
   if (!currentSong) {
     return (
-      <div className="bg-white/5 backdrop-blur rounded-2xl p-4 mb-4">
+      <div className="bg-white/5 rounded-2xl p-4 mb-4">
         <p className="text-sm text-gray-400 mb-2">Đang phát</p>
         <div className="flex items-center gap-4 opacity-50">
           <div className="w-24 h-16 bg-gray-700 rounded-lg flex items-center justify-center">
@@ -90,7 +90,7 @@ function CurrentSongDisplay({ currentSong }: { currentSong: QueueItem | null }) 
   }
 
   return (
-    <div className="bg-white/5 backdrop-blur rounded-2xl p-4 mb-4 ring-2 ring-primary-500">
+    <div className="bg-white/5 rounded-2xl p-4 mb-4 ring-2 ring-primary-500">
       <div className="flex items-center gap-2 mb-2">
         <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
         <p className="text-sm text-green-500">Đang phát</p>
@@ -256,7 +256,7 @@ export function QueueScreen({ onBack }: QueueScreenProps) {
         <CurrentSongDisplay currentSong={currentSong} />
 
         {/* Queue list */}
-        <div className="bg-white/5 backdrop-blur rounded-2xl p-4">
+        <div className="bg-white/5 rounded-2xl p-4">
           <p className="text-sm text-gray-400 mb-3">Danh sách chờ</p>
           
           {waitingItems.length === 0 ? (
@@ -285,7 +285,7 @@ export function QueueScreen({ onBack }: QueueScreenProps) {
 
         {/* Completed songs - can replay */}
         {completedItems.length > 0 && (
-          <div className="bg-white/5 backdrop-blur rounded-2xl p-4 mt-4">
+          <div className="bg-white/5 rounded-2xl p-4 mt-4">
             <p className="text-sm text-gray-400 mb-3">Đã hát ({completedItems.length})</p>
             <div className="max-h-[200px] overflow-y-auto hide-scrollbar">
               {completedItems.map((item, index) => (
