@@ -52,14 +52,15 @@ function SongCard({ song, row, col, onSelect }: {
       col={col}
       onSelect={onSelect}
       variant="ghost"
-      className="!p-0 !min-w-0 text-left !border-0 !rounded-lg !min-h-[160px]"
+      className="!p-0 !min-w-0 text-left !border-0 !rounded-lg"
     >
-      <div className="flex flex-col w-full h-full bg-white/5 rounded-lg overflow-hidden">
-        <div className="relative w-full h-[100px]">
+      <div className="flex flex-col w-full bg-white/5 rounded-lg overflow-hidden">
+        {/* Fixed height thumbnail with 16:9 aspect ratio */}
+        <div className="relative w-full aspect-video">
           <LazyImage 
             src={song.thumbnail} 
             alt={song.title}
-            className="w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full object-cover"
             width={320}
             height={180}
           />
@@ -70,7 +71,7 @@ function SongCard({ song, row, col, onSelect }: {
             </div>
           ) : null}
         </div>
-        <div className="p-2 flex-1">
+        <div className="p-2">
           <p className="text-sm font-medium line-clamp-2 leading-tight">{song.title}</p>
           <p className="text-xs text-gray-400 truncate mt-1">{song.channelName}</p>
         </div>
