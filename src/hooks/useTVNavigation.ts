@@ -270,6 +270,20 @@ export function useTVNavigation(config: TVNavigationConfig = {}): TVNavigationRe
       // Check if exit modal is open - skip navigation
       if ((window as any).__exitModalOpen) return;
       
+      // Skip if focus is on input/textarea - let them handle their own events
+      const activeElement = document.activeElement;
+      const isInputFocused = activeElement instanceof HTMLInputElement || 
+                             activeElement instanceof HTMLTextAreaElement;
+      
+      if (isInputFocused) {
+        // Only handle Escape to blur input
+        if (event.key === 'Escape') {
+          (activeElement as HTMLElement).blur();
+          event.preventDefault();
+        }
+        return; // Let input handle all other keys
+      }
+      
       // Try key first, then keyCode for older TV browsers
       const action = KEY_MAP[event.key] || KEY_MAP[String(event.keyCode)];
       

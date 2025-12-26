@@ -97,6 +97,7 @@ export function SearchScreen({
   const [isListening, setIsListening] = useState(false);
   const [voiceText, setVoiceText] = useState('');
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [inputFocused, setInputFocused] = useState(false);
   const recognitionRef = useRef<any>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   
@@ -355,46 +356,60 @@ export function SearchScreen({
             Quay lại
           </FocusableButton>
           
-          {/* Search Input - standalone, not inside FocusableButton */}
-          <div className="flex-1 relative">
-            <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2 w-full focus-within:ring-2 focus-within:ring-primary-500">
-              <SearchIcon />
-              <input
-                ref={inputRef}
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && query.trim()) {
-                    e.preventDefault();
-                    doSearch(query);
-                  }
+          {/* Search Input - d-pad focusable */}
+          <div 
+            className={`flex-1 flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2 cursor-pointer mx-2
+              nav-item ${inputFocused ? 'ring-2 ring-primary-500' : ''}`}
+            data-row={0}
+            data-col={1}
+            tabIndex={0}
+            onClick={() => inputRef.current?.focus()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                inputRef.current?.focus();
+              }
+            }}
+            onFocus={() => setInputFocused(true)}
+            onBlur={() => setInputFocused(false)}
+          >
+            <SearchIcon />
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && query.trim()) {
+                  e.preventDefault();
+                  doSearch(query);
+                }
+              }}
+              placeholder="Tìm bài hát..."
+              className="flex-1 bg-transparent outline-none text-white placeholder-gray-400 min-w-0"
+              enterKeyHint="search"
+            />
+            {query && (
+              <button 
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setQuery('');
+                  inputRef.current?.focus();
                 }}
-                placeholder="Tìm bài hát..."
-                className="flex-1 bg-transparent outline-none text-white placeholder-gray-400"
-                enterKeyHint="search"
-              />
-              {query && (
-                <button 
-                  type="button"
-                  onClick={() => {
-                    setQuery('');
-                    inputRef.current?.focus();
-                  }}
-                  className="text-gray-400 hover:text-white p-1"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
-            </div>
+                className="text-gray-400 hover:text-white p-1 flex-shrink-0"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
           </div>
           
           {/* Mic button - auto focus */}
           <FocusableButton
             row={0}
-            col={1}
+            col={2}
             onSelect={isListening ? stopVoiceSearch : startVoiceSearch}
             variant="secondary"
             size="sm"
