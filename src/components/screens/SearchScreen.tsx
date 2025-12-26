@@ -355,18 +355,9 @@ export function SearchScreen({
             Quay lại
           </FocusableButton>
           
-          {/* Search Input - focusable for d-pad */}
-          <FocusableButton
-            row={0}
-            col={1}
-            onSelect={() => inputRef.current?.focus()}
-            variant="ghost"
-            className="!flex-1 !p-0 !min-h-0 !border-0"
-          >
-            <div 
-              className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2 w-full"
-              onClick={() => inputRef.current?.focus()}
-            >
+          {/* Search Input - standalone, not inside FocusableButton */}
+          <div className="flex-1 relative">
+            <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2 w-full focus-within:ring-2 focus-within:ring-primary-500">
               <SearchIcon />
               <input
                 ref={inputRef}
@@ -374,22 +365,19 @@ export function SearchScreen({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
-                  // Prevent d-pad navigation when typing
-                  e.stopPropagation();
                   if (e.key === 'Enter' && query.trim()) {
                     e.preventDefault();
                     doSearch(query);
                   }
                 }}
-                onFocus={(e) => e.target.select()}
                 placeholder="Tìm bài hát..."
                 className="flex-1 bg-transparent outline-none text-white placeholder-gray-400"
+                enterKeyHint="search"
               />
               {query && (
                 <button 
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
+                  onClick={() => {
                     setQuery('');
                     inputRef.current?.focus();
                   }}
@@ -401,12 +389,12 @@ export function SearchScreen({
                 </button>
               )}
             </div>
-          </FocusableButton>
+          </div>
           
           {/* Mic button - auto focus */}
           <FocusableButton
             row={0}
-            col={2}
+            col={1}
             onSelect={isListening ? stopVoiceSearch : startVoiceSearch}
             variant="secondary"
             size="sm"
