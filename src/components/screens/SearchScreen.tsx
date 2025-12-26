@@ -361,14 +361,14 @@ export function SearchScreen({
             Quay lại
           </FocusableButton>
           
-          {/* Search Input */}
-          <form onSubmit={handleSubmit} className="flex-1 flex gap-2">
+          {/* Search Input - Enter to search */}
+          <form onSubmit={handleSubmit} className="flex-1">
             <FocusableButton
               row={0}
               col={1}
               onSelect={focusInput}
               variant="ghost"
-              className="!flex-1 !p-0 !min-h-0 !border-0"
+              className="!flex-1 !p-0 !min-h-0 !border-0 !w-full"
             >
               <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2 w-full">
                 <SearchIcon />
@@ -377,7 +377,7 @@ export function SearchScreen({
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Tìm bài hát..."
+                  placeholder="Tìm bài hát... (Enter để tìm)"
                   className="flex-1 bg-transparent outline-none text-white placeholder-gray-400"
                 />
                 {query && (
@@ -393,24 +393,12 @@ export function SearchScreen({
                 )}
               </div>
             </FocusableButton>
-            
-            <FocusableButton
-              row={0}
-              col={2}
-              onSelect={() => query.trim() && doSearch(query)}
-              variant="primary"
-              size="sm"
-              icon={<SearchIcon />}
-              className="!px-4 flex-shrink-0"
-            >
-              Tìm
-            </FocusableButton>
           </form>
           
           {/* Mic button - auto focus */}
           <FocusableButton
             row={0}
-            col={3}
+            col={2}
             onSelect={isListening ? stopVoiceSearch : startVoiceSearch}
             variant="secondary"
             size="sm"
