@@ -330,16 +330,10 @@ export function SearchScreen({
     };
   }, []);
 
-  // Handle input submit
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    if (query.trim()) doSearch(query);
-  }, [query, doSearch]);
-
   const displaySongs = hasSearched ? results : suggestions;
   
   // D-pad layout:
-  // Row 0: Back, Mic
+  // Row 0: Back, Input, Mic
   // Row 1: Quick tags (when not searched)
   // Row 2+: Song results
   const RESULTS_START_ROW = 2;
@@ -361,9 +355,18 @@ export function SearchScreen({
             Quay lại
           </FocusableButton>
           
-          {/* Search Input - direct input, no wrapper button */}
-          <form onSubmit={handleSubmit} className="flex-1">
-            <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2 w-full border border-transparent focus-within:border-primary-500">
+          {/* Search Input - focusable for d-pad */}
+          <FocusableButton
+            row={0}
+            col={1}
+            onSelect={() => inputRef.current?.focus()}
+            variant="ghost"
+            className="!flex-1 !p-0 !min-h-0 !border-0"
+          >
+            <div 
+              className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2 w-full"
+              onClick={() => inputRef.current?.focus()}
+            >
               <SearchIcon />
               <input
                 ref={inputRef}
@@ -371,19 +374,26 @@ export function SearchScreen({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
+                  // Prevent d-pad navigation when typing
+                  e.stopPropagation();
                   if (e.key === 'Enter' && query.trim()) {
                     e.preventDefault();
                     doSearch(query);
                   }
                 }}
+                onFocus={(e) => e.target.select()}
                 placeholder="Tìm bài hát..."
                 className="flex-1 bg-transparent outline-none text-white placeholder-gray-400"
               />
               {query && (
                 <button 
                   type="button"
-                  onClick={() => setQuery('')}
-                  className="text-gray-400 hover:text-white"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setQuery('');
+                    inputRef.current?.focus();
+                  }}
+                  className="text-gray-400 hover:text-white p-1"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -391,12 +401,12 @@ export function SearchScreen({
                 </button>
               )}
             </div>
-          </form>
+          </FocusableButton>
           
           {/* Mic button - auto focus */}
           <FocusableButton
             row={0}
-            col={1}
+            col={2}
             onSelect={isListening ? stopVoiceSearch : startVoiceSearch}
             variant="secondary"
             size="sm"
